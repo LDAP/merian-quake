@@ -1,0 +1,8 @@
+/build
+**/.cache
+*.sublime-workspace
+
+/subprojects/*
+!/subprojects/*.wrap
+
+vgcore.*

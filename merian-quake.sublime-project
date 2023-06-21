@@ -1,0 +1,26 @@
+{
+	"debugger_tasks": [
+		{
+			"name": "Meson Compile",
+			"cmd": ["meson", "compile", "-C", "build"]
+		}
+	],
+	"debugger_configurations":
+	[
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug Merian",
+			"program": "${folder}/build/merian-quake",
+			"args": [],
+			"cwd": "${folder}",
+			"pre_debug_task": "Meson Compile"
+		},
+	],
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	]
+}
