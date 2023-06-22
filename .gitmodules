@@ -1,0 +1,6 @@
+[submodule "subprojects/merian"]
+	path = subprojects/merian
+	url = https://github.com/LDAP/merian
+[submodule "subprojects/quakespasm"]
+	path = subprojects/quakespasm
+	url = https://github.com/hanatos/quakespasm
