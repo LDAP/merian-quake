@@ -1,6 +1,6 @@
 project(
     'merian-quake',
-    'cpp',
+    ['cpp', 'c'],
     version : '0.0.1',
     default_options : [
         'warning_level=3',
@@ -28,26 +28,13 @@ quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'])
 
 # Shaders
 glslc = find_program('glslangValidator')
-shaders = files(
 
-)
-shader_targets = []
-foreach s : shaders
-    shader_targets += custom_target(
-        'shader @0@'.format(s),
-        command : [glslc, '--target-env', 'vulkan1.3', '-Ires/shaders', '-V', '@INPUT@', '-o',  '@OUTPUT@'],
-        input : s, 
-        output : '@PLAINNAME@.spv',
-        install_dir: 'assets/shaders',
-        install: true
-    )
-endforeach
-
-src_files = files(
-    'src/main.cpp',
-)
+src_files = []
 inc_dirs = [
+    include_directories('./src')
 ]
+
+subdir('src')
 
 exe = executable(
     'merian-quake',
@@ -61,5 +48,5 @@ exe = executable(
         vulkan,
     ],
     include_directories: inc_dirs,
-    install : true
+    install : true,
 )

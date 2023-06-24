@@ -6,3 +6,5 @@
 !/subprojects/*.wrap
 
 vgcore.*
+
+/res/quake
