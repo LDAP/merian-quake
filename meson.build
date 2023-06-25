@@ -34,6 +34,9 @@ inc_dirs = [
     include_directories('./src')
 ]
 
+project_source_root = meson.project_source_root()
+merian_shaders = project_source_root + '/subprojects/merian/src/merian-nodes'
+
 subdir('src')
 
 exe = executable(

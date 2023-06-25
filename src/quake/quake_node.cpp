@@ -1,5 +1,10 @@
 #include "quake/quake_node.hpp"
+#include "merian/utils/glm.hpp"
 #include "merian/utils/string.hpp"
+
+static const uint32_t spv[] = {
+#include "quake.comp.spv.h"
+};
 
 struct QuakeData {
     // The first quake node sets this
@@ -200,27 +205,43 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
 
 // -------------------------------------------------------------------------------------------
 
+std::tuple<std::vector<merian::NodeInputDescriptorImage>,
+           std::vector<merian::NodeInputDescriptorBuffer>>
+QuakeNode::describe_inputs() {
+    return {
+        {
+            merian::NodeInputDescriptorImage::compute_read("gbuffer", 1),
+            merian::NodeInputDescriptorImage::compute_read("mv", 0),
+            merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
+        },
+        {},
+    };
+}
+
+std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
+           std::vector<merian::NodeOutputDescriptorBuffer>>
+QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
+                            const std::vector<merian::NodeOutputDescriptorBuffer>&) {
+
+    return {
+        {
+            merian::NodeOutputDescriptorImage::compute_write(
+                "irradiance", vk::Format::eR16G16B16A16Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "gbuffer", vk::Format::eR32G32B32A32Sfloat, width, height),
+        },
+        {},
+    };
+}
+
 void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                           const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
                           const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                          const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {}
-
-void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
-                            merian::GraphRun& run,
-                            const uint32_t set_index,
-                            const std::vector<merian::ImageHandle>& image_inputs,
-                            const std::vector<merian::BufferHandle>& buffer_inputs,
-                            const std::vector<merian::ImageHandle>& image_outputs,
-                            const std::vector<merian::BufferHandle>& buffer_outputs) {
-    if (!pause) {
-        double newtime = Sys_DoubleTime();
-        double time = old_time == 0 ? 0.0 : newtime - old_time;
-        Host_Frame(time);
-        // init some left/right vectors also used for sound
-        R_SetupView();
-        old_time = newtime;
-    }
+                          const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
+    // SELECT MAP
 
     // if (frame == 0) {
     //     // careful to only do this at == 0 so sv_player (among others) will not crash
@@ -230,8 +251,57 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     //         sv_player_set = 0; // just in case we loaded a map (demo, savegame)
     //     }
     // }
-    
-    // commit_params does here stuff with sv_player
+}
+
+void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
+                            merian::GraphRun& run,
+                            const uint32_t set_index,
+                            const std::vector<merian::ImageHandle>& image_inputs,
+                            const std::vector<merian::BufferHandle>& buffer_inputs,
+                            const std::vector<merian::ImageHandle>& image_outputs,
+                            const std::vector<merian::BufferHandle>& buffer_outputs) {
+
+    // UPDATE GAMESTATE (if not paused)
+    if (!pause) {
+        if (!pending_commands.empty()) {
+            // only one command between each HostFrame
+            Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
+            pending_commands.pop();
+        }
+
+        double newtime = Sys_DoubleTime();
+        // Use (1. / 60.) else the Host_Frame() does nothing and sv_player is not valid below
+        double time = old_time == 0 ? 1. / 60. : newtime - old_time;
+        Host_Frame(time);
+        // init some left/right vectors also used for sound
+        R_SetupView();
+        old_time = newtime;
+    }
+
+    // UPDATE PUSH CONSTANT (with player data)
+
+    // TODO: maybe check if sv_player is valid
+    // for (int i=0;i<svs.maxclients && !sv_player_set; i++, host_client++)
+    // {
+    //   if (!host_client->active) continue;
+    //   sv_player = host_client->edict;
+    //   sv_player_set = 1;
+    // }
+
+    pc.frame = frame;
+    pc.torch = sv_player->v.weapon == 1; // shotgun has torch
+    pc.water = sv_player->v.waterlevel >= 3;
+    pc.health = sv_player->v.health;
+    pc.armor = sv_player->v.armorvalue;
+    pc.sky = texnum_skybox;
+    pc.cl_time = cl.time;
+    float rgt[3];
+    AngleVectors(r_refdef.viewangles, &pc.cam_w.x, rgt, &pc.cam_u.x);
+    copy_to_vec4(r_refdef.vieworg, pc.cam_x);
+    glm::vec3 fog_color = vec3_from_float(Fog_GetColor());
+    float fog_density = Fog_GetDensity();
+    fog_density *= fog_density;
+    pc.fog = glm::vec4(fog_color, fog_density);
 
     frame++;
 }

@@ -5,6 +5,7 @@ This is a raytraced version of quakespasm.
 ## Usage
 
 Copy you maps into `res/quake` (the id1 folder), or specify a custom path.
+Copy a blue noise texture into `res/blue` or specify a custom path.
 Then compile and run:
 
 ```bash
