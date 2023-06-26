@@ -3,6 +3,7 @@ shaders = [
 ]
 included_files = files(
     'quake_water.glsl',
+    'config.h',
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',

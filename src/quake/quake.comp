@@ -21,13 +21,8 @@
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 
-layout(std140, set = 0, binding = 0) uniform global_t
-{ 
+layout(push_constant) uniform PushConstant { 
   int frame;
-} global;
-
-layout(std140, set = 0, binding = 1) uniform params_t
-{ 
   vec4 cam_x;
   vec4 cam_w;
   vec4 cam_u;
@@ -41,47 +36,41 @@ layout(std140, set = 0, binding = 1) uniform params_t
   int   armor;
 } params;
 
-// layout(push_constant, std140) uniform push_t
-// { } push;
+// GRAPH IN/OUTs
 
-layout(set = 1, binding = 0) uniform writeonly image2D img_irradiance;
+layout(set = 0, binding = 0) uniform sampler2D img_gbuf_in;
+layout(set = 0, binding = 1) uniform sampler2D img_mv;
+layout(set = 0, binding = 2) uniform sampler2D img_blue;
+layout(set = 1, binding = 3) uniform usampler2D img_nee_in; // mc states
 
-// TODO: make this an array (and support more instances for decals etc)
-layout(std430, set = 1, binding = 1) buffer sssbo_t
-{
-  uint v[]; // extra geo info for static geo
-} stcssbo;
+layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
+layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
+layout(set = 0, binding = 6) uniform writeonly image2D img_gbuf_out;
+layout(set = 1, binding = 7) uniform writeonly uimage2D img_nee_out; // mc states
 
-layout(std430, set = 1, binding = 2) buffer dssbo_t
-{
-  uint v[]; // extra geo info for dynamic geo
-} dynssbo;
+// QUAKE 
 
-layout(set = 1, binding = 3) uniform sampler2D img_tex[];
-layout(set = 1, binding = 4) uniform sampler2D img_blue;
-
-layout(set = 1, binding = 5) uniform writeonly image2D img_albedo;
-
-layout(set = 1, binding = 6) uniform usampler2D img_nee_in;
-layout(set = 1, binding = 7) uniform writeonly uimage2D img_nee_out;
-layout(set = 1, binding = 8) uniform sampler2D img_mv;
-
-layout(set = 1, binding =  9) uniform sampler2D img_gbuf_in;
-layout(set = 1, binding = 10) uniform writeonly image2D img_gbuf_out;
-layout(set = 1, binding = 11) uniform writeonly image2D img_debug;
-// layout(set = 1, binding = 12) uniform sampler2D img_oldout;
-
-layout(set = 2, binding = 0) uniform accelerationStructureEXT rt_accel;
-
-layout(set = 2, binding = 1) buffer buf_vtx_t
-{ // 3x float vertex data for every instance
+layout(set = 1, binding = 0) buffer buf_vtx_t {
+  // 3x float vertex data for every instance
   float v[];
 } buf_vtx[];
 
-layout(set = 2, binding = 2) buffer buf_idx_t
-{ // index data for every instance
+layout(set = 1, binding = 1) buffer buf_idx_t {
+  // index data for every instance
   uint i[];
 } buf_idx[];
+
+layout(std430, set = 1, binding = 2) buffer sssbo_t {
+  // extra geo info for static geo
+  uint v[];
+} stcssbo;
+layout(std430, set = 1, binding = 3) buffer dssbo_t {
+  // extra geo info for dynamic geo
+  uint v[];
+} dynssbo;
+
+layout(set = 1, binding = 4) uniform sampler2D img_tex[];
+layout(set = 1, binding = 5) uniform accelerationStructureEXT rt_accel;
 
 // importance sample the blackman harris pixel filter.
 // has 1.5px radius support
@@ -97,7 +86,7 @@ vec3 envmap(in vec3 w)
   if(params.sky_lf == -1u)
   { // classic quake sky
     vec2 st = 0.5 + 0.5*vec2(-w.y,w.x) / abs(w.z);
-    vec2 t = global.frame * vec2(0.002, 0.001);
+    vec2 t = params.frame * vec2(0.002, 0.001);
     vec4 bck = texelFetch(img_tex[nonuniformEXT(params.sky_rt)], ivec2(mod(st+0.1*t, vec2(1))*textureSize(img_tex[nonuniformEXT(params.sky_rt)], 0)), 0);
     vec4 fnt= texelFetch(img_tex[nonuniformEXT(params.sky_bk)], ivec2(mod(st+t, vec2(1))*textureSize(img_tex[nonuniformEXT(params.sky_bk)], 0)), 0);
     vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
@@ -549,8 +538,8 @@ raycast_res_t cast_ray(rayQueryEXT rq, vec3 x, vec3 w, const float t_max)
         st = mat3x2(st0, st1, st2) * b;
       }
       if(flags > 0) st = vec2(
-          st.x + 0.2*sin(st.y*2.0 + global.frame * 0.01),
-          st.y + 0.2*sin(st.x*2.0 + global.frame * 0.01));
+          st.x + 0.2*sin(st.y*2.0 + params.frame * 0.01),
+          st.y + 0.2*sin(st.x*2.0 + params.frame * 0.01));
       ivec2 tc = ivec2(textureSize(img_tex[nonuniformEXT(mat)], 0)*mod(st, vec2(1.0)));
       tc = clamp(tc, ivec2(0), textureSize(img_tex[nonuniformEXT(mat)], 0)-1);
       vec4 diffcol = texelFetch(img_tex[nonuniformEXT(mat)], tc, 0);
@@ -795,7 +784,7 @@ main()
 
   if(params.cl_time < 2.0) return; // stupid last resort fix for level loading in progress :|
 
-  uint seed = 19937 * global.frame;
+  uint seed = 19937 * params.frame;
   const ivec2 rp = ipos % textureSize(img_blue, 0);
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
 
@@ -918,7 +907,7 @@ main()
         vec4 rand = xrand(seed, rp);
 #define BSDF_P 0.125 // can we do it in lockstep per warp?
 // #define BSDF_P 0
-        bool use_vmf = (params.ref == 0) && (global.frame > 10) && (rand.z >= BSDF_P); // bsdf at random in between
+        bool use_vmf = (params.ref == 0) && (params.frame > 10) && (rand.z >= BSDF_P); // bsdf at random in between
         if(use_vmf) read_neighbour_state(tent, m0.x, m0.n, ipos, mv, seed, rp);
         if(!mc_state_valid(tent)) use_vmf = false; // XXX probably wrong in general
         if(use_vmf)

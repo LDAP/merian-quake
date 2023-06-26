@@ -1,6 +1,13 @@
 #include "quake/quake_node.hpp"
+#include "config.h"
+#include "merian/utils/bitpacking.hpp"
 #include "merian/utils/glm.hpp"
+#include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/string.hpp"
+#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
+#include "merian/vk/descriptors/descriptor_set_update.hpp"
+#include "merian/vk/graph/node_utils.hpp"
+#include "merian/vk/shader/shader_module.hpp"
 
 static const uint32_t spv[] = {
 #include "quake.comp.spv.h"
@@ -46,17 +53,9 @@ extern "C" void IN_Move(usercmd_t* cmd) {
     quake_data.node->IN_Move(cmd);
 }
 
-// QuakeNode --------------------------------------------------------------------------------------
+// Helper -----------------------------------------------------------------------------------------
 
-QuakeNode::QuakeNode(const merian::ResourceAllocatorHandle& allocator, const char* base_dir)
-    : allocator(allocator) {
-
-    if (quake_data.node) {
-        throw std::runtime_error{"Only one quake node can be created."};
-    }
-    quake_data.node = this;
-    host_parms = &quake_data.params;
-
+void init_quake(const char* base_dir) {
     const char* argv[] = {
         "quakespasm",
         "-basedir",
@@ -108,8 +107,422 @@ QuakeNode::QuakeNode(const merian::ResourceAllocatorHandle& allocator, const cha
     IN_Activate();
 }
 
-QuakeNode::~QuakeNode() {
+void deinit_quake() {
     free(quake_data.params.membase);
+}
+
+void add_geo_alias(entity_t* ent,
+                   qmodel_t* m,
+                   std::vector<float>& vtx,
+                   std::vector<uint32_t>& idx,
+                   std::vector<QuakeNode::VertexExtraData>& ext) {
+    assert(m->type == mod_alias);
+
+    // TODO: e->model->flags & MF_HOLEY <= enable alpha test
+    // fprintf(stderr, "alias origin and angles %g %g %g -- %g %g %g\n",
+    //     ent->origin[0], ent->origin[1], ent->origin[2],
+    //     ent->angles[0], ent->angles[1], ent->angles[2]);
+    aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
+    aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
+    // the plural here really hurts but it's from quakespasm code:
+    int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
+    trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
+
+    // lerpdata_t  lerpdata;
+    // R_SetupAliasFrame(hdr, ent->frame, &lerpdata);
+    // R_SetupEntityTransform(ent, &lerpdata);
+    // angles: pitch yaw roll. axes: right fwd up
+    float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
+    float fwd[3], rgt[3], top[3], pos[3];
+    AngleVectors(angles, fwd, rgt, top);
+    for (int k = 0; k < 3; k++)
+        rgt[k] = -rgt[k]; // seems these come in flipped
+
+    // for(int f = 0; f < hdr->numposes; f++)
+    // TODO: upload all vertices so we can just alter the indices on gpu
+    int f = ent->frame;
+    if (f < 0 || f >= hdr->numposes)
+        return;
+
+    uint32_t vtx_cnt = vtx.size();
+    for (int v = 0; v < hdr->numverts_vbo; v++) {
+        int i = hdr->numverts * f + desc[v].vertindex;
+        // get model pos
+        for (int k = 0; k < 3; k++)
+            pos[k] = trivertexes[i].v[k] * hdr->scale[k] + hdr->scale_origin[k];
+        // convert to world space
+        for (int k = 0; k < 3; k++)
+            vtx.emplace_back(ent->origin[k] + rgt[k] * pos[1] + top[k] * pos[2] + fwd[k] * pos[0]);
+    }
+
+    for (int i = 0; i < hdr->numindexes; i++)
+        idx[i] = vtx_cnt + indexes[i];
+
+    // both options fail to extract correct creases/vertex normals for health/shells
+    // in fact, the shambler has crazy artifacts all over. maybe this is all wrong and
+    // just by chance happened to produce something similar enough sometimes?
+    // TODO: fuck this vbo bs and get the mdl itself
+
+    // normals for each vertex from above
+    uint32_t* tmpn = (uint32_t*)alloca(sizeof(uint32_t) * hdr->numverts_vbo);
+    for (int v = 0; v < hdr->numverts_vbo; v++) {
+        int i = hdr->numverts * f + desc[v].vertindex;
+        float nm[3], nw[3];
+        memcpy(nm, r_avertexnormals[trivertexes[i].lightnormalindex], sizeof(float) * 3);
+        for (int k = 0; k < 3; k++)
+            nw[k] = nm[0] * fwd[k] + nm[1] * rgt[k] + nm[2] * top[k];
+        *(tmpn + v) = merian::encode_normal(nw);
+    }
+
+    // add extra data for each primitive
+    for (int i = 0; i < hdr->numindexes / 3; i++) {
+        const int sk = CLAMP(0, ent->skinnum, hdr->numskins - 1), fm = ((int)(cl.time * 10)) & 3;
+        const uint16_t texnum = hdr->gltextures[sk][fm]->texnum;
+        const uint16_t fb_texnum = hdr->fbtextures[sk][fm] ? hdr->fbtextures[sk][fm]->texnum : 0;
+
+        uint32_t n0, n1, n2;
+        if (hdr->nmtextures[sk][fm]) {
+            // this discards the vertex normals
+            n0 = merian::pack_uint32(0, hdr->nmtextures[sk][fm]->texnum);
+            n1 = 0xffffffff; // mark as brush model -> to use normal map
+        } else {
+            // the vertex normals -> currently not used in shader
+            n0 = *(tmpn + indexes[3 * i + 0]);
+            n1 = *(tmpn + indexes[3 * i + 1]);
+            n2 = *(tmpn + indexes[3 * i + 2]);
+        }
+
+        ext.emplace_back(
+            n0, n1, n2,
+            merian::float_to_half((desc[indexes[3 * i + 0]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 0]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half((desc[indexes[3 * i + 1]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) / (float)hdr->skinheight),
+            texnum, fb_texnum);
+    }
+}
+
+void add_geo_brush(entity_t* ent,
+                   qmodel_t* m,
+                   std::vector<float>& vtx,
+                   std::vector<uint32_t>& idx,
+                   std::vector<QuakeNode::VertexExtraData>& ext) {
+    assert(m->type == mod_brush);
+
+    // fprintf(stderr, "brush origin and angles %g %g %g -- %g %g %g with %d surfs\n",
+    //     ent->origin[0], ent->origin[1], ent->origin[2],
+    //     ent->angles[0], ent->angles[1], ent->angles[2],
+    //     m->nummodelsurfaces);
+    float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
+    float fwd[3], rgt[3], top[3];
+    AngleVectors(angles, fwd, rgt, top);
+
+    for (int i = 0; i < m->nummodelsurfaces; i++) {
+#if WATER_MODE == WATER_MODE_FULL
+        int wateroffset = 0;
+    again:;
+#endif
+
+        msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
+        if (!strcmp(surf->texinfo->texture->name, "skip"))
+            continue;
+
+        glpoly_t* p = surf->polys;
+        while (p) {
+            uint32_t vtx_cnt = vtx.size();
+            for (int k = 0; k < p->numverts; k++) {
+                for (int l = 0; l < 3; l++) {
+                    float coord = p->verts[k][0] * fwd[l] - p->verts[k][1] * rgt[l] +
+                                  p->verts[k][2] * top[l] + ent->origin[l];
+#if WATER_MODE == WATER_MODE_FULL
+                    if (wateroffset) {
+                        // clang-format off
+                        coord += fwd[l] * (p->verts[k][0] > (surf->mins[0] + surf->maxs[0]) / 2.0 ? WATER_DEPTH : -WATER_DEPTH);
+                        coord -= rgt[l] * (p->verts[k][1] > (surf->mins[1] + surf->maxs[1]) / 2.0 ? WATER_DEPTH : -WATER_DEPTH);
+                        if (l == 2)
+                            coord -= WATER_DEPTH;
+                        // clang-format on
+                    }
+#endif
+                    vtx.emplace_back(coord);
+                }
+            }
+
+            for (int k = 2; k < p->numverts; k++) {
+                idx.emplace_back(vtx_cnt);
+                idx.emplace_back(vtx_cnt + k - 1);
+                idx.emplace_back(vtx_cnt + k);
+            }
+
+            // TODO: make somehow dynamic. don't want to re-upload the whole model just because
+            // the texture animates. for now that means static brush models will not actually
+            // animate their textures
+            texture_t* t = R_TextureAnimation(surf->texinfo->texture, ent->frame);
+
+            for (int k = 2; k < p->numverts; k++) {
+                QuakeNode::VertexExtraData extra{
+                    merian::pack_uint32(t->gloss ? t->gloss->texnum : 0,
+                                        t->norm ? t->norm->texnum : 0),
+                    0xffffffff,
+                    0,
+                };
+                if (surf->texinfo->texture->gltexture) {
+                    extra.s_0 = merian::float_to_half(p->verts[0][3]);
+                    extra.t_0 = merian::float_to_half(p->verts[0][4]);
+                    extra.s_1 = merian::float_to_half(p->verts[k - 1][3]);
+                    extra.t_1 = merian::float_to_half(p->verts[k - 1][4]);
+                    extra.s_2 = merian::float_to_half(p->verts[k - 0][3]);
+                    extra.t_2 = merian::float_to_half(p->verts[k - 0][4]);
+                    extra.texnum_alpha = t->gltexture->texnum;
+                    extra.texnum_fb_flags = t->fullbright ? t->fullbright->texnum : 0;
+
+                    // alpha
+                    uint32_t ai = CLAMP(0, (ent->alpha - 1.0) / 254.0 * 15, 15); // alpha in 4 bits
+                    if (!ent->alpha)
+                        ai = 15;
+                    // TODO: 0 means default, 1 means invisible, 255 is opaque, 2--254 is
+                    // really applicable
+                    // TODO: default means  map_lavaalpha > 0 ? map_lavaalpha :
+                    // map_wateralpha
+                    // TODO: or "slime" or "tele" instead of "lava"
+                    extra.texnum_alpha |= ai << 12;
+
+                    // max textures is 4096 (12 bit) and we have 16. so we can put 4 bits
+                    // worth of flags here:
+                    uint32_t flags = 0;
+                    if (surf->flags & SURF_DRAWLAVA)
+                        flags = 1;
+                    if (surf->flags & SURF_DRAWSLIME)
+                        flags = 2;
+                    if (surf->flags & SURF_DRAWTELE)
+                        flags = 3;
+                    if (surf->flags & SURF_DRAWWATER)
+                        flags = 4;
+                    if (surf->flags & SURF_DRAWSKY)
+                        flags = 6;
+#if WATER_MODE == WATER_MODE_FULL
+                    if (wateroffset)
+                        flags = 5; // this is our procedural water lower mark
+#endif
+                    if (strstr(t->gltexture->name, "wfall"))
+                        flags = 7; // hack for ad_tears and emissive waterfalls
+
+                    extra.texnum_fb_flags |= flags << 12;
+                }
+                // ?! What does that?
+                if (surf->flags & SURF_DRAWSKY)
+                    extra.texnum_alpha = 0xfff;
+
+                ext.push_back(extra);
+            }
+
+#if WATER_MODE == WATER_MODE_FULL
+            if (!wateroffset && (surf->flags & SURF_DRAWWATER)) {
+                // TODO: and normal points the right way?
+                wateroffset = 1;
+                goto again;
+            }
+#endif
+            // p = p->next;
+            p = 0; // XXX
+        }
+    }
+}
+
+void add_geo_sprite(entity_t* ent,
+                    qmodel_t* m,
+                    std::vector<float>& vtx,
+                    std::vector<uint32_t>& idx,
+                    std::vector<QuakeNode::VertexExtraData>& ext) {
+    assert(m->type == mod_sprite);
+
+    vec3_t point, v_forward, v_right, v_up;
+    msprite_t* psprite;
+    mspriteframe_t* frame;
+    float *s_up, *s_right;
+    float angle, sr, cr;
+    // XXX newer quakespasm has this: ENTSCALE_DECODE(ent->scale);
+    float scale = 1.0f;
+
+    vec3_t vpn, vright, vup, r_origin;
+    VectorCopy(r_refdef.vieworg, r_origin);
+    AngleVectors(r_refdef.viewangles, vpn, vright, vup);
+
+    frame = R_GetSpriteFrame(ent);
+    psprite = (msprite_t*)ent->model->cache.data;
+
+    switch (psprite->type) {
+    case SPR_VP_PARALLEL_UPRIGHT: // faces view plane, up is towards the heavens
+        v_up[0] = 0;
+        v_up[1] = 0;
+        v_up[2] = 1;
+        s_up = v_up;
+        s_right = vright;
+        break;
+    case SPR_FACING_UPRIGHT: // faces camera origin, up is towards the heavens
+        VectorSubtract(ent->origin, r_origin, v_forward);
+        v_forward[2] = 0;
+        VectorNormalizeFast(v_forward);
+        v_right[0] = v_forward[1];
+        v_right[1] = -v_forward[0];
+        v_right[2] = 0;
+        v_up[0] = 0;
+        v_up[1] = 0;
+        v_up[2] = 1;
+        s_up = v_up;
+        s_right = v_right;
+        break;
+    case SPR_VP_PARALLEL: // faces view plane, up is towards the top of the screen
+        s_up = vup;
+        s_right = vright;
+        break;
+    case SPR_ORIENTED: // pitch yaw roll are independent of camera
+        AngleVectors(ent->angles, v_forward, v_right, v_up);
+        s_up = v_up;
+        s_right = v_right;
+        break;
+    case SPR_VP_PARALLEL_ORIENTED: // faces view plane, but obeys roll value
+        angle = ent->angles[ROLL] * M_PI_DIV_180;
+        sr = sin(angle);
+        cr = cos(angle);
+        v_right[0] = vright[0] * cr + vup[0] * sr;
+        v_right[1] = vright[1] * cr + vup[1] * sr;
+        v_right[2] = vright[2] * cr + vup[2] * sr;
+        v_up[0] = vright[0] * -sr + vup[0] * cr;
+        v_up[1] = vright[1] * -sr + vup[1] * cr;
+        v_up[2] = vright[2] * -sr + vup[2] * cr;
+        s_up = v_up;
+        s_right = v_right;
+        break;
+    default:
+        return;
+    }
+
+    // add three quads
+    for (int k = 0; k < 3; k++) {
+        float vert[4][3];
+
+        vec3_t front;
+        CrossProduct(s_up, s_right, front);
+        VectorMA(ent->origin, frame->down * scale, k == 1 ? front : s_up, point);
+        VectorMA(point, frame->left * scale, k == 2 ? front : s_right, point);
+        for (int l = 0; l < 3; l++)
+            vert[0][l] = point[l];
+
+        VectorMA(ent->origin, frame->up * scale, k == 1 ? front : s_up, point);
+        VectorMA(point, frame->left * scale, k == 2 ? front : s_right, point);
+        for (int l = 0; l < 3; l++)
+            vert[1][l] = point[l];
+
+        VectorMA(ent->origin, frame->up * scale, k == 1 ? front : s_up, point);
+        VectorMA(point, frame->right * scale, k == 2 ? front : s_right, point);
+        for (int l = 0; l < 3; l++)
+            vert[2][l] = point[l];
+
+        VectorMA(ent->origin, frame->down * scale, k == 1 ? front : s_up, point);
+        VectorMA(point, frame->right * scale, k == 2 ? front : s_right, point);
+        for (int l = 0; l < 3; l++)
+            vert[3][l] = point[l];
+
+        // add vertices
+        uint32_t vtx_cnt = vtx.size();
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[0][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[1][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[2][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[3][l]);
+
+        // add index
+        idx.emplace_back(vtx_cnt);
+        idx.emplace_back(vtx_cnt + 2 - 1);
+        idx.emplace_back(vtx_cnt + 2);
+
+        idx.emplace_back(vtx_cnt);
+        idx.emplace_back(vtx_cnt + 3 - 1);
+        idx.emplace_back(vtx_cnt + 3);
+
+        // add extra data
+        float n[3],
+            e0[] = {vert[2][0] - vert[0][0], vert[2][1] - vert[0][1], vert[2][2] - vert[0][2]},
+            e1[] = {vert[1][0] - vert[0][0], vert[1][1] - vert[0][1], vert[1][2] - vert[0][2]};
+        CrossProduct(e0, e1, n);
+        uint32_t n_enc = merian::encode_normal(n);
+
+        uint16_t texnum = 0;
+        if (frame->gltexture) {
+            texnum = frame->gltexture->texnum;
+        }
+
+        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half(0), merian::float_to_half(1),
+                         merian::float_to_half(0), merian::float_to_half(0),
+                         merian::float_to_half(1), merian::float_to_half(0), texnum,
+                         texnum // sprite allways emits
+        );
+        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half(0), merian::float_to_half(1),
+                         merian::float_to_half(1), merian::float_to_half(0),
+                         merian::float_to_half(1), merian::float_to_half(1), texnum,
+                         texnum // sprite allways emits
+        );
+
+    } // end three axes
+}
+
+// Adds the geo from entity into the vectors.
+void add_geo(entity_t* ent,
+             std::vector<float>& vtx,
+             std::vector<uint32_t>& idx,
+             std::vector<QuakeNode::VertexExtraData>& ext) {
+    if (!ent)
+        return;
+    qmodel_t* m = ent->model;
+    if (!m)
+        return;
+    // if (qs_data.worldspawn)
+    //     return;
+
+    // TODO: lerp between lerpdata.pose1 and pose2 using blend
+    // TODO: apply transformation matrix cpu side, whatever.
+    // TODO: later: put into rt animation kernel
+    if (m->type == mod_alias) { // alias model:
+        add_geo_alias(ent, m, vtx, idx, ext);
+        assert(ext.size() == idx.size() / 3);
+    } else if (m->type == mod_brush) { // brush model:
+        add_geo_brush(ent, m, vtx, idx, ext);
+        assert(ext.size() == idx.size() / 3);
+    } else if (m->type == mod_sprite) {
+        // explosions, decals, etc, this is R_DrawSpriteModel
+        add_geo_sprite(ent, m, vtx, idx, ext);
+        assert(ext.size() == idx.size() / 3);
+    }
+}
+
+// QuakeNode
+// --------------------------------------------------------------------------------------
+
+QuakeNode::QuakeNode(const merian::SharedContext& context,
+                     const merian::ResourceAllocatorHandle& allocator,
+                     const char* base_dir)
+    : context(context), allocator(allocator) {
+
+    // QUAKE INIT
+    if (quake_data.node) {
+        throw std::runtime_error{"Only one quake node can be created."};
+    }
+    quake_data.node = this;
+    host_parms = &quake_data.params;
+    init_quake(base_dir);
+
+    // PIPELINE CREATION
+    shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);
+}
+
+QuakeNode::~QuakeNode() {
+    deinit_quake();
 }
 
 // -------------------------------------------------------------------------------------------
@@ -162,16 +575,18 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
 
     // We store the texture on system memory for now
     // and upload in cmd_process later
-    QuakeTexture texture(glt, data);
+    std::shared_ptr<QuakeTexture> texture = std::make_shared<QuakeTexture>(glt, data);
     // If we replace an existing texture the old texture is automatically freed.
-    // TODO: Multiple frames in flight? (maybe use glt->visframe, semaphore,...?)
-    textures.insert(std::make_pair(glt->texnum, std::move(texture)));
+    // TODO: Multiple frames in flight? (For each in flight an array, then copy from last, and
+    // replace pending?)
+    textures.insert(std::make_pair(glt->texnum, texture));
     pending_uploads.push(glt->texnum);
 }
 
-// pretty much a copy from in_sdl.c:
 void QuakeNode::IN_Move(usercmd_t* cmd) {
     SPDLOG_DEBUG("move");
+
+    // pretty much a copy from in_sdl.c:
 
     int dmx = (this->mouse_x - this->mouse_oldx) * sensitivity.value;
     int dmy = (this->mouse_y - this->mouse_oldy) * sensitivity.value;
@@ -213,6 +628,7 @@ QuakeNode::describe_inputs() {
             merian::NodeInputDescriptorImage::compute_read("gbuffer", 1),
             merian::NodeInputDescriptorImage::compute_read("mv", 0),
             merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
+            merian::NodeInputDescriptorImage::compute_read("nee_in", 1),
         },
         {},
     };
@@ -231,6 +647,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "gbuffer", vk::Format::eR32G32B32A32Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "nee_out", vk::Format::eR32G32B32A32Uint, width, height),
         },
         {},
     };
@@ -251,11 +669,16 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     //         sv_player_set = 0; // just in case we loaded a map (demo, savegame)
     //     }
     // }
+
+    // GRAPH DESC SETS
+    std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
+        merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
+                                           image_outputs, buffer_outputs, graph_desc_set_layout);
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             merian::GraphRun& run,
-                            const uint32_t set_index,
+                            const uint32_t graph_set_index,
                             const std::vector<merian::ImageHandle>& image_inputs,
                             const std::vector<merian::BufferHandle>& buffer_inputs,
                             const std::vector<merian::ImageHandle>& image_outputs,
@@ -303,5 +726,15 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     fog_density *= fog_density;
     pc.fog = glm::vec4(fog_color, fog_density);
 
+    // Quake loads static geo only after a few frames...
+    if (frame == 10)
+        prepare_static_geo(cmd);
+    prepare_dynamic_geo(cmd);
+    prepare_tlas(cmd);
+
     frame++;
 }
+
+void QuakeNode::prepare_static_geo(const vk::CommandBuffer& cmd) {}
+void QuakeNode::prepare_dynamic_geo(const vk::CommandBuffer& cmd) {}
+void QuakeNode::prepare_tlas(const vk::CommandBuffer& cmd) {}

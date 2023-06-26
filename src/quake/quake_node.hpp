@@ -3,6 +3,7 @@
 #include "glm/ext/vector_float4.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/shader/shader_module.hpp"
 
 #include <queue>
 
@@ -11,7 +12,7 @@ extern "C" {
 }
 
 class QuakeNode : public merian::Node {
-  private:
+  public:
     // in gl_texmgr.c
     static constexpr uint32_t MAX_GLTEXTURES = 4096;
 
@@ -21,12 +22,6 @@ class QuakeNode : public merian::Node {
             cpu_tex.resize(width * height);
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
         }
-
-        QuakeTexture(const QuakeTexture& other) = delete;
-
-        QuakeTexture(const QuakeTexture&& other)
-            : width(other.width), height(other.height), cpu_tex(std::move(other.cpu_tex)),
-              gpu_tex(other.gpu_tex) {}
 
         uint32_t width;
         uint32_t height;
@@ -60,27 +55,24 @@ class QuakeNode : public merian::Node {
     };
 
     struct VertexExtraData {
-        // glossmap texnum if available else 0
-        uint16_t gloss;
-        // normal/displacemnt texnum if available else 0
-        uint16_t norm;
+        // Normals encoded using encode_normal
+        // or glossmap texnum and normalmap texnum
+        // if n1_brush = ~0.
+        uint32_t n0_gloss_norm{};
+        // Marks as brush model if ~0, else second normal
+        uint32_t n1_brush{};
+        uint32_t n2{};
 
-        uint16_t _2;
-        uint16_t _3;
+        // Texture coords, encoded using float_to_half
+        uint16_t s_0{};
+        uint16_t t_0{};
+        uint16_t s_1{};
+        uint16_t t_1{};
+        uint16_t s_2{};
+        uint16_t t_2{};
 
-        uint16_t _4;
-        uint16_t _5;
-
-        uint16_t _6;
-        uint16_t _7;
-
-        uint16_t _8;
-        uint16_t _9;
-
-        uint16_t _10;
-        uint16_t _11;
-
-        uint16_t texnum;
+        // texnum and (unused) alpha in upper 4 bits
+        uint16_t texnum_alpha{};
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
         // Flags:
         // 0 -> None
@@ -91,12 +83,13 @@ class QuakeNode : public merian::Node {
         // 5 -> Water, lower mark
         // 6 -> Sky (unused currently)
         // 7 -> Waterfall
-        uint16_t texnum_fb_flags;
+        uint16_t texnum_fb_flags{};
     };
 
   public:
     /* Path to the Quake basedir. This directory must contain the id1 directory. */
-    QuakeNode(const merian::ResourceAllocatorHandle& allocator,
+    QuakeNode(const merian::SharedContext& context,
+              const merian::ResourceAllocatorHandle& allocator,
               const char* base_dir = "./res/quake");
 
     ~QuakeNode();
@@ -143,26 +136,55 @@ class QuakeNode : public merian::Node {
                      const std::vector<merian::BufferHandle>& buffer_outputs) override;
 
   private:
+    void prepare_static_geo(const vk::CommandBuffer& cmd);
+    void prepare_dynamic_geo(const vk::CommandBuffer& cmd);
+    void prepare_tlas(const vk::CommandBuffer& cmd);
+
+  private:
+    const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
+
+    merian::ShaderModuleHandle shader;
+    merian::DescriptorSetLayoutHandle graph_desc_set_layout;
+    merian::DescriptorPoolHandle graph_pool;
+    std::vector<merian::DescriptorSetHandle> graph_sets;
+    std::vector<merian::TextureHandle> graph_textures;
+
+    // ----------------------------------------------------
+    // Params
 
     uint32_t width = 1920;
     uint32_t height = 1080;
 
     PushConstant pc;
 
+    // ----------------------------------------------------
+    // Per-frame info, TODO: what if multiple in flight?
+
     // Store some textures for custom patches
-    // TODO: Frame-awareness (like for textures...)
     uint32_t texnum_none;
     uint32_t texnum_blood;
     uint32_t texnum_explosion;
     std::array<uint32_t, 6> texnum_skybox;
 
+    // Textures
     // texnum -> texture
-    std::unordered_map<uint32_t, QuakeTexture> textures;
+    std::unordered_map<uint32_t, std::shared_ptr<QuakeTexture>> textures;
     std::queue<uint32_t> pending_uploads;
 
-    std::queue<std::string> pending_commands;
+    // Static geo
+    std::vector<uint32_t> static_idx;
+    std::vector<float> static_vtx;
+    std::vector<VertexExtraData> static_ext; // per primitive
 
+    // Dynamic geo
+    std::vector<uint32_t> dynamic_idx;
+    std::vector<float> dynamic_vtx;
+    std::vector<VertexExtraData> dynamic_ext;
+
+    // ----------------------------------------------------
+
+    std::queue<std::string> pending_commands;
     bool worldspawn = false;
 
     double old_time = 0;
