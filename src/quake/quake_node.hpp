@@ -3,9 +3,13 @@
 #include "glm/ext/vector_float4.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/raytrace/blas_builder.hpp"
+#include "merian/vk/raytrace/tlas_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
 #include <queue>
+#include <unordered_set>
 
 extern "C" {
 #include "quakedef.h"
@@ -16,10 +20,18 @@ class QuakeNode : public merian::Node {
     // in gl_texmgr.c
     static constexpr uint32_t MAX_GLTEXTURES = 4096;
 
+    static constexpr uint32_t local_size_x = 16;
+    static constexpr uint32_t local_size_y = 16;
+
+    static constexpr uint32_t static_geo_idx = 0;
+    static constexpr uint32_t dynamic_geo_idx = 1;
+    static constexpr uint32_t quake_textures_binding = 4;
+
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
             : width(glt->width), height(glt->height) {
             cpu_tex.resize(width * height);
+
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
         }
 
@@ -33,8 +45,6 @@ class QuakeNode : public merian::Node {
     };
 
     struct PushConstant {
-        int frame;
-
         glm::vec4 cam_x; // pos
         glm::vec4 cam_w; // forward
         glm::vec4 cam_u; // up
@@ -48,10 +58,12 @@ class QuakeNode : public merian::Node {
         std::array<uint32_t, 6> sky;
 
         float cl_time; // quake time
-        int ref;       // use reference sampling
+        int ref{false};       // use reference sampling
 
         int health;
         int armor;
+
+        int frame;
     };
 
     struct VertexExtraData {
@@ -135,20 +147,41 @@ class QuakeNode : public merian::Node {
                      const std::vector<merian::ImageHandle>& image_outputs,
                      const std::vector<merian::BufferHandle>& buffer_outputs) override;
 
+    void queue_command(std::string command) {
+        pending_commands.push(command);
+    }
+
   private:
-    void prepare_static_geo(const vk::CommandBuffer& cmd);
-    void prepare_dynamic_geo(const vk::CommandBuffer& cmd);
-    void prepare_tlas(const vk::CommandBuffer& cmd);
+    void update_static_geo(const vk::CommandBuffer& cmd);
+    void update_dynamic_geo(const vk::CommandBuffer& cmd);
+    void update_as(const vk::CommandBuffer& cmd);
+    // processes the pending uploads and updates the current descriptor set
+    void update_textures(const vk::CommandBuffer& cmd);
 
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
+
+    merian::BLASBuilder blas_builder;
+    merian::TLASBuilder tlas_builder;
 
     merian::ShaderModuleHandle shader;
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
     merian::DescriptorPoolHandle graph_pool;
     std::vector<merian::DescriptorSetHandle> graph_sets;
     std::vector<merian::TextureHandle> graph_textures;
+
+    // Use this buffer in bindings when the real resource is not available
+    merian::BufferHandle binding_dummy_buffer;
+    merian::TextureHandle binding_dummy_image;
+
+    //-----------------------------------------------------
+
+    merian::DescriptorSetLayoutHandle quake_desc_set_layout;
+    merian::DescriptorPoolHandle quake_pool;
+    merian::DescriptorSetHandle quake_sets;
+
+    merian::PipelineHandle pipe;
 
     // ----------------------------------------------------
     // Params
@@ -162,7 +195,6 @@ class QuakeNode : public merian::Node {
     // Per-frame info, TODO: what if multiple in flight?
 
     // Store some textures for custom patches
-    uint32_t texnum_none;
     uint32_t texnum_blood;
     uint32_t texnum_explosion;
     std::array<uint32_t, 6> texnum_skybox;
@@ -170,17 +202,34 @@ class QuakeNode : public merian::Node {
     // Textures
     // texnum -> texture
     std::unordered_map<uint32_t, std::shared_ptr<QuakeTexture>> textures;
-    std::queue<uint32_t> pending_uploads;
+    std::unordered_set<uint32_t> pending_uploads;
 
     // Static geo
-    std::vector<uint32_t> static_idx;
     std::vector<float> static_vtx;
+    std::vector<uint32_t> static_idx;
     std::vector<VertexExtraData> static_ext; // per primitive
+    // Can be nullptr if idx is empty
+    merian::BufferHandle static_vtx_buffer;
+    merian::BufferHandle static_idx_buffer;
+    merian::BufferHandle static_ext_buffer;
+    // Can be nullptr if idx is empty
+    merian::AccelerationStructureHandle static_blas;
 
     // Dynamic geo
-    std::vector<uint32_t> dynamic_idx;
     std::vector<float> dynamic_vtx;
+    std::vector<uint32_t> dynamic_idx;
     std::vector<VertexExtraData> dynamic_ext;
+    // Can be nullptr if idx is empty
+    merian::BufferHandle dynamic_vtx_buffer;
+    merian::BufferHandle dynamic_idx_buffer;
+    merian::BufferHandle dynamic_ext_buffer;
+    // Can be nullptr if idx is empty
+    merian::AccelerationStructureHandle dynamic_blas;
+
+    merian::BufferHandle instances_buffer;
+    std::vector<vk::AccelerationStructureInstanceKHR> instances;
+    // Can be nullptr if there is not geometry
+    merian::AccelerationStructureHandle tlas;
 
     // ----------------------------------------------------
 

@@ -4,13 +4,22 @@
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/string.hpp"
+#include "merian/utils/xorshift.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
+#include "merian/vk/graph/graph.hpp"
 #include "merian/vk/graph/node_utils.hpp"
+#include "merian/vk/pipeline/pipeline_compute.hpp"
+#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/utils/math.hpp"
 
 static const uint32_t spv[] = {
 #include "quake.comp.spv.h"
+};
+
+static const uint32_t clear_spv[] = {
+#include "clear.comp.spv.h"
 };
 
 struct QuakeData {
@@ -55,30 +64,49 @@ extern "C" void IN_Move(usercmd_t* cmd) {
 
 // Helper -----------------------------------------------------------------------------------------
 
-void init_quake(const char* base_dir) {
-    const char* argv[] = {
-        "quakespasm",
-        "-basedir",
-        base_dir,
-        "+skill",
-        "2",
-        "-game",
-        "ad",
-        "+map",
-        "e1m1",
-        "-game",
-        "SlayerTest", // needs different particle rules! also overbright
-                      // and lack of alpha?
-        "+map",
-        "e1m2b",
-        "+map",
-        "ep1m1",
-        "+map",
-        "e1m1b",
-        "+map",
-        "st1m1",
+static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
+                                               const merian::ResourceAllocatorHandle& allocator,
+                                               const std::vector<uint32_t>& data,
+                                               uint32_t width,
+                                               uint32_t height) {
+    static vk::ImageCreateInfo tex_image_info{
+        {},
+        vk::ImageType::e2D,
+        vk::Format::eR8G8B8A8Unorm,
+        {0, 0, 1},
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
     };
-    const int argc = 9;
+    static vk::ImageViewCreateInfo tex_view_info{
+        {},
+        VK_NULL_HANDLE,
+        vk::ImageViewType::e2D,
+        vk::Format::eR8G8B8A8Unorm,
+        {},
+        merian::first_level_and_layer(),
+    };
+
+    tex_image_info.extent.width = width;
+    tex_image_info.extent.height = height;
+
+    merian::ImageHandle image =
+        allocator->createImage(cmd, data.size() * sizeof(uint32_t), data.data(), tex_image_info);
+    tex_view_info.image = *image;
+    merian::TextureHandle tex = allocator->createTexture(image, tex_view_info);
+    tex->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
+    return tex;
+}
+
+void init_quake(const char* base_dir) {
+    const char* argv[] = {"quakespasm", "-basedir", base_dir, "+skill", "2"};
+    const int argc = 5;
 
     quake_data.params.basedir = base_dir; // does not work
     quake_data.params.argc = argc;
@@ -109,6 +137,66 @@ void init_quake(const char* base_dir) {
 
 void deinit_quake() {
     free(quake_data.params.membase);
+}
+
+void add_particles(std::vector<float>& vtx,
+                   std::vector<uint32_t>& idx,
+                   std::vector<QuakeNode::VertexExtraData>& ext,
+                   const uint32_t texnum_blood,
+                   const uint32_t texnum_explosion) {
+    merian::XORShift32 xrand{1337};
+
+    for (particle_t* p = active_particles; p; p = p->next) {
+        uint8_t* c = (uint8_t*)&d_8to24table[(int)p->color]; // that would be the colour. pick
+                                                             // texture based on this:
+        // smoke is r=g=b
+        // blood is g=b=0
+        // rocket trails are r=2*g=2*b a bit randomised
+        const uint16_t tex_col = c[1] == 0 && c[2] == 0 ? texnum_blood : texnum_explosion;
+        const uint16_t tex_lum = c[1] == 0 && c[2] == 0 ? 0 : texnum_explosion;
+
+        const float voff[4][3] = {
+            {0.0, 1.0, 0.0}, {-0.5, -0.5, -0.87}, {-0.5, -0.5, 0.87}, {1.0, -0.5, 0.0}};
+        float vert[4][3];
+        for (int l = 0; l < 3; l++) {
+            float off = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
+            for (int k = 0; k < 4; k++)
+                vert[k][l] =
+                    p->org[l] + off + 2 * voff[k][l] + (xrand.get() - 0.5) + (xrand.get() - 0.5);
+        }
+
+        const uint32_t vtx_cnt = vtx.size();
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[0][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[1][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[2][l]);
+        for (int l = 0; l < 3; l++)
+            vtx.emplace_back(vert[3][l]);
+
+        idx.emplace_back(vtx_cnt);
+        idx.emplace_back(vtx_cnt + 1);
+        idx.emplace_back(vtx_cnt + 2);
+
+        idx.emplace_back(vtx_cnt);
+        idx.emplace_back(vtx_cnt + 2);
+        idx.emplace_back(vtx_cnt + 3);
+
+        idx.emplace_back(vtx_cnt);
+        idx.emplace_back(vtx_cnt + 3);
+        idx.emplace_back(vtx_cnt + 1);
+
+        idx.emplace_back(vtx_cnt + 1);
+        idx.emplace_back(vtx_cnt + 2);
+        idx.emplace_back(vtx_cnt + 3);
+
+        for (int k = 0; k < 4; k++) {
+            ext.emplace_back(0, 0, 0, merian::float_to_half(0), merian::float_to_half(1),
+                             merian::float_to_half(0), merian::float_to_half(0),
+                             merian::float_to_half(1), merian::float_to_half(0), tex_col, tex_lum);
+        }
+    }
 }
 
 void add_geo_alias(entity_t* ent,
@@ -144,7 +232,7 @@ void add_geo_alias(entity_t* ent,
     if (f < 0 || f >= hdr->numposes)
         return;
 
-    uint32_t vtx_cnt = vtx.size();
+    uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i = hdr->numverts * f + desc[v].vertindex;
         // get model pos
@@ -156,7 +244,7 @@ void add_geo_alias(entity_t* ent,
     }
 
     for (int i = 0; i < hdr->numindexes; i++)
-        idx[i] = vtx_cnt + indexes[i];
+        idx.emplace_back(vtx_cnt + indexes[i]);
 
     // both options fail to extract correct creases/vertex normals for health/shells
     // in fact, the shambler has crazy artifacts all over. maybe this is all wrong and
@@ -231,7 +319,7 @@ void add_geo_brush(entity_t* ent,
 
         glpoly_t* p = surf->polys;
         while (p) {
-            uint32_t vtx_cnt = vtx.size();
+            uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
                 for (int l = 0; l < 3; l++) {
                     float coord = p->verts[k][0] * fwd[l] - p->verts[k][1] * rgt[l] +
@@ -427,7 +515,7 @@ void add_geo_sprite(entity_t* ent,
             vert[3][l] = point[l];
 
         // add vertices
-        uint32_t vtx_cnt = vtx.size();
+        uint32_t vtx_cnt = vtx.size() / 3;
         for (int l = 0; l < 3; l++)
             vtx.emplace_back(vert[0][l]);
         for (int l = 0; l < 3; l++)
@@ -491,14 +579,86 @@ void add_geo(entity_t* ent,
     if (m->type == mod_alias) { // alias model:
         add_geo_alias(ent, m, vtx, idx, ext);
         assert(ext.size() == idx.size() / 3);
+        assert(vtx.size() % 3 == 0);
     } else if (m->type == mod_brush) { // brush model:
         add_geo_brush(ent, m, vtx, idx, ext);
         assert(ext.size() == idx.size() / 3);
+        assert(vtx.size() % 3 == 0);
     } else if (m->type == mod_sprite) {
         // explosions, decals, etc, this is R_DrawSpriteModel
         add_geo_sprite(ent, m, vtx, idx, ext);
         assert(ext.size() == idx.size() / 3);
+        assert(vtx.size() % 3 == 0);
     }
+}
+
+// If the supplied buffer is not nullptr and is large enough, it is returned and an upload is
+// recorded. A new larger buffer is used otherwise.
+template <typename T>
+merian::BufferHandle
+ensure_buffer(const merian::ResourceAllocatorHandle& allocator,
+              const vk::BufferUsageFlags usage,
+              const vk::CommandBuffer& cmd,
+              const std::vector<T>& data,
+              const merian::BufferHandle optional_buffer,
+              const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
+    merian::BufferHandle buffer;
+    if (optional_buffer && optional_buffer->get_size() >= sizeof(T) * data.size()) {
+        buffer = optional_buffer;
+    } else {
+        // Make it a bit larger for logarithmic growth
+        buffer = allocator->createBuffer(sizeof(T) * data.size() * 1.25, usage, merian::NONE, {},
+                                         min_alignment);
+    }
+    allocator->getStaging()->cmdToBuffer(cmd, *buffer, 0, sizeof(T) * data.size(), data.data());
+    return buffer;
+}
+
+// Creates a vertex and index buffer for rt on the device and records the upload.
+// If the supplied buffers are not nullptr and are large enough, they are returned and an upload is
+// recorded. Returns (vertex_buffer, index_buffer).
+// Appropriate barriers are inserted.
+std::tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
+ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
+                               const vk::CommandBuffer& cmd,
+                               const std::vector<float>& vtx,
+                               const std::vector<uint32_t>& idx,
+                               const std::vector<QuakeNode::VertexExtraData>& ext,
+                               const merian::BufferHandle optional_vtx_buffer,
+                               const merian::BufferHandle optional_idx_buffer,
+                               const merian::BufferHandle optional_ext_buffer) {
+    auto usage_rt = vk::BufferUsageFlagBits::eShaderDeviceAddress |
+                    vk::BufferUsageFlagBits::eStorageBuffer |
+                    vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+    auto usage_storage = vk::BufferUsageFlagBits::eStorageBuffer;
+
+    merian::BufferHandle vertex_buffer =
+        ensure_buffer(allocator, usage_rt, cmd, vtx, optional_vtx_buffer);
+    merian::BufferHandle index_buffer =
+        ensure_buffer(allocator, usage_rt, cmd, idx, optional_idx_buffer);
+    merian::BufferHandle ext_buffer =
+        ensure_buffer(allocator, usage_storage, cmd, ext, optional_ext_buffer);
+
+    const std::array<vk::BufferMemoryBarrier2, 3> barriers = {
+        vertex_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
+                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::AccessFlagBits2::eTransferWrite,
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                           vk::AccessFlagBits2::eShaderRead),
+        index_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
+                                      vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                      vk::AccessFlagBits2::eTransferWrite,
+                                      vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                          vk::AccessFlagBits2::eShaderRead),
+        ext_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eComputeShader,
+            vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead),
+    };
+
+    vk::DependencyInfo dep_info{{}, {}, barriers, {}};
+    cmd.pipelineBarrier2(dep_info);
+
+    return std::make_tuple(vertex_buffer, index_buffer, ext_buffer);
 }
 
 // QuakeNode
@@ -507,7 +667,8 @@ void add_geo(entity_t* ent,
 QuakeNode::QuakeNode(const merian::SharedContext& context,
                      const merian::ResourceAllocatorHandle& allocator,
                      const char* base_dir)
-    : context(context), allocator(allocator) {
+    : context(context), allocator(allocator), blas_builder(context, allocator),
+      tlas_builder(context, allocator) {
 
     // QUAKE INIT
     if (quake_data.node) {
@@ -519,6 +680,20 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
     // PIPELINE CREATION
     shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);
+
+    quake_desc_set_layout =
+        merian::DescriptorSetLayoutBuilder()
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
+            .add_binding_storage_buffer()
+            .add_binding_storage_buffer()
+            .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
+            .add_binding_acceleration_structure()
+            .build_layout(context);
+    quake_pool = std::make_shared<merian::DescriptorPool>(quake_desc_set_layout, 1);
+    quake_sets = std::make_shared<merian::DescriptorSet>(quake_pool);
+
+    binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
 }
 
 QuakeNode::~QuakeNode() {
@@ -528,7 +703,6 @@ QuakeNode::~QuakeNode() {
 // -------------------------------------------------------------------------------------------
 
 void QuakeNode::QS_worldspawn() {
-    // Called after ~5 frames when textures are loaded.
     SPDLOG_DEBUG("worldspawn");
     worldspawn = true;
 }
@@ -539,6 +713,11 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
     SPDLOG_DEBUG("texture_load {} {} {}x{} from {}, frame: {}", glt->texnum, glt->name, glt->width,
                  glt->height, source, glt->visframe);
+
+    if (glt->width == 0 || glt->height == 0) {
+        SPDLOG_WARN("image extent was 0. skipping");
+        return;
+    }
 
     // STORE SOME TEXTURE IDs ----------------------------
 
@@ -579,12 +758,12 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // If we replace an existing texture the old texture is automatically freed.
     // TODO: Multiple frames in flight? (For each in flight an array, then copy from last, and
     // replace pending?)
-    textures.insert(std::make_pair(glt->texnum, texture));
-    pending_uploads.push(glt->texnum);
+    textures[glt->texnum] = texture;
+    pending_uploads.insert(glt->texnum);
 }
 
 void QuakeNode::IN_Move(usercmd_t* cmd) {
-    SPDLOG_DEBUG("move");
+    SPDLOG_TRACE("move");
 
     // pretty much a copy from in_sdl.c:
 
@@ -659,21 +838,35 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
                           const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
-    // SELECT MAP
-
-    // if (frame == 0) {
-    //     // careful to only do this at == 0 so sv_player (among others) will not crash
-    //     const char* p_exec = nullptr; // map exec string from examples/ad.cfg
-    //     if (p_exec) {
-    //         Cmd_ExecuteString(p_exec, src_command);
-    //         sv_player_set = 0; // just in case we loaded a map (demo, savegame)
-    //     }
-    // }
-
     // GRAPH DESC SETS
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
         merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
                                            image_outputs, buffer_outputs, graph_desc_set_layout);
+    if (!pipe) {
+        auto pipe_layout = merian::PipelineLayoutBuilder(context)
+                               .add_descriptor_set_layout(graph_desc_set_layout)
+                               .add_descriptor_set_layout(quake_desc_set_layout)
+                               .add_push_constant<PushConstant>()
+                               .build_pipeline_layout();
+        auto spec_builder = merian::SpecializationInfoBuilder();
+        spec_builder.add_entry(local_size_x, local_size_y);
+        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader, spec_builder.build());
+    }
+
+    // DUMMY IMAGE as placeholder
+    binding_dummy_image = make_rgb8_texture(cmd, allocator, {0, 0, 0, 0}, 2, 2);
+
+    // MAKE SURE ALL DESCRIPTORS ARE SET
+    merian::DescriptorSetUpdate update(quake_sets);
+    for (uint32_t texnum = 0; texnum < MAX_GLTEXTURES; texnum++) {
+        if (textures.contains(texnum) && textures[texnum]->gpu_tex) {
+            auto& tex = textures[texnum];
+            update.write_descriptor_texture(quake_textures_binding, tex->gpu_tex, texnum);
+        } else {
+            update.write_descriptor_texture(quake_textures_binding, binding_dummy_image, texnum);
+        }
+    }
+    update.update(context);
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -683,6 +876,10 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             const std::vector<merian::BufferHandle>& buffer_inputs,
                             const std::vector<merian::ImageHandle>& image_outputs,
                             const std::vector<merian::BufferHandle>& buffer_outputs) {
+
+    if (run.get_iteration() == 0) {
+        // TODO: Clear output and feedback buffers
+    }
 
     // UPDATE GAMESTATE (if not paused)
     if (!pause) {
@@ -701,16 +898,12 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         old_time = newtime;
     }
 
+    if (!sv_player) {
+        // TODO: Clear output and feedback buffers
+        return;
+    }
+
     // UPDATE PUSH CONSTANT (with player data)
-
-    // TODO: maybe check if sv_player is valid
-    // for (int i=0;i<svs.maxclients && !sv_player_set; i++, host_client++)
-    // {
-    //   if (!host_client->active) continue;
-    //   sv_player = host_client->edict;
-    //   sv_player_set = 1;
-    // }
-
     pc.frame = frame;
     pc.torch = sv_player->v.weapon == 1; // shotgun has torch
     pc.water = sv_player->v.waterlevel >= 3;
@@ -726,15 +919,219 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     fog_density *= fog_density;
     pc.fog = glm::vec4(fog_color, fog_density);
 
-    // Quake loads static geo only after a few frames...
-    if (frame == 10)
-        prepare_static_geo(cmd);
-    prepare_dynamic_geo(cmd);
-    prepare_tlas(cmd);
+    // UPDATE GEO
+    if (worldspawn) {
+        update_static_geo(cmd);
+        worldspawn = false;
+    }
+    update_dynamic_geo(cmd);
+    update_as(cmd);
+    update_textures(cmd);
+
+    if (!tlas) {
+        // TODO: Clear output and feedback buffers
+        return;
+    }
+
+    // BIND PIPELINE
+    pipe->bind(cmd);
+    pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+    pipe->bind_descriptor_set(cmd, quake_sets, 1);
+    pipe->push_constant(cmd, pc);
+    cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                 (height + local_size_y - 1) / local_size_y, 1);
 
     frame++;
 }
 
-void QuakeNode::prepare_static_geo(const vk::CommandBuffer& cmd) {}
-void QuakeNode::prepare_dynamic_geo(const vk::CommandBuffer& cmd) {}
-void QuakeNode::prepare_tlas(const vk::CommandBuffer& cmd) {}
+void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
+    merian::DescriptorSetUpdate update(quake_sets);
+    for (auto texnum : pending_uploads) {
+        std::shared_ptr<QuakeTexture>& tex = textures[texnum];
+        assert(!tex->gpu_tex);
+        tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height);
+        update.write_descriptor_texture(quake_textures_binding, tex->gpu_tex, texnum);
+    }
+    pending_uploads.clear();
+    update.update(context);
+}
+
+void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
+    static_vtx.clear();
+    static_idx.clear();
+    static_ext.clear();
+
+    add_geo(cl_entities, static_vtx, static_idx, static_ext);
+
+    SPDLOG_DEBUG("static geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(),
+                 static_idx.size(), static_ext.size());
+
+    merian::DescriptorSetUpdate update(quake_sets);
+    if (!static_idx.empty()) {
+        std::tie(static_vtx_buffer, static_idx_buffer, static_ext_buffer) =
+            ensure_vertex_index_ext_buffer(allocator, cmd, static_vtx, static_idx, static_ext,
+                                           static_vtx_buffer, static_idx_buffer, static_ext_buffer);
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
+            vk::Format::eR32G32B32Sfloat,
+            static_vtx_buffer->get_device_address(),
+            3 * sizeof(float),
+            static_cast<uint32_t>(static_vtx.size() / 3 - 1),
+            vk::IndexType::eUint32,
+            {static_idx_buffer->get_device_address()},
+            {}};
+
+        vk::AccelerationStructureGeometryKHR geometry{vk::GeometryTypeKHR::eTriangles, {triangles}};
+        // Create offset info that allows us to say how many triangles and vertices to read
+        vk::AccelerationStructureBuildRangeInfoKHR range_info{
+            static_cast<uint32_t>(static_idx.size() / 3), 0, 0, 0};
+        static_blas = blas_builder.queue_build(
+            {geometry}, {range_info},
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction);
+
+        update.write_descriptor_buffer(0, static_vtx_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
+        update.write_descriptor_buffer(1, static_idx_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
+        update.write_descriptor_buffer(2, static_ext_buffer);
+    } else {
+        update.write_descriptor_buffer(0, binding_dummy_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
+        update.write_descriptor_buffer(1, binding_dummy_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
+        update.write_descriptor_buffer(2, binding_dummy_buffer);
+    }
+    update.update(context);
+}
+
+void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
+    uint32_t old_vtx_size = dynamic_vtx.size();
+    uint32_t old_idx_size = dynamic_idx.size();
+
+    dynamic_vtx.clear();
+    dynamic_idx.clear();
+    dynamic_ext.clear();
+
+    add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+    for (int i = 0; i < cl_numvisedicts; i++)
+        add_geo(cl_visedicts[i], dynamic_vtx, dynamic_idx, dynamic_ext);
+    for (int i = 0; i < cl.num_statics; i++)
+        add_geo(cl_static_entities + i, dynamic_vtx, dynamic_idx, dynamic_ext);
+    add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
+
+    // for (int i=1 ; i<MAX_MODELS ; i++)
+    //     add_geo(cl.model_precache+i, p->vtx + 3*vtx_cnt, p->idx + idx_cnt, 0, &vtx_cnt,
+    //     &idx_cnt);
+    // for (int i=0; i<cl_max_edicts; i++)
+    //     add_geo(cl_entities+i, p->vtx + 3*vtx_cnt, p->idx + idx_cnt, 0, &vtx_cnt, &idx_cnt);
+
+    SPDLOG_TRACE("dynamic geo: vtx size: {} idx size: {} ext size: {}", dynamic_vtx.size(),
+                 dynamic_idx.size(), dynamic_ext.size());
+
+    if (!dynamic_idx.empty()) {
+        std::tie(dynamic_vtx_buffer, dynamic_idx_buffer, dynamic_ext_buffer) =
+            ensure_vertex_index_ext_buffer(allocator, cmd, dynamic_vtx, dynamic_idx, dynamic_ext,
+                                           dynamic_vtx_buffer, dynamic_idx_buffer,
+                                           dynamic_ext_buffer);
+
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
+            vk::Format::eR32G32B32Sfloat,
+            dynamic_vtx_buffer->get_device_address(),
+            3 * sizeof(float),
+            static_cast<uint32_t>(dynamic_vtx.size() / 3 - 1),
+            vk::IndexType::eUint32,
+            {dynamic_idx_buffer->get_device_address()},
+            {}};
+
+        vk::AccelerationStructureGeometryKHR geometry{vk::GeometryTypeKHR::eTriangles, {triangles}};
+        // Create offset info that allows us to say how many triangles and vertices to read
+        vk::AccelerationStructureBuildRangeInfoKHR range_info{
+            static_cast<uint32_t>(dynamic_idx.size() / 3), 0, 0, 0};
+
+        if (old_vtx_size == dynamic_vtx.size() && old_idx_size == dynamic_idx.size()) {
+            if (frame % 50 == 0)
+                blas_builder.queue_rebuild(
+                    {geometry}, {range_info}, dynamic_blas,
+                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+            else
+                blas_builder.queue_update(
+                    {geometry}, {range_info}, dynamic_blas,
+                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+        } else {
+            // Build new
+            dynamic_blas = blas_builder.queue_build(
+                {geometry}, {range_info},
+                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+            merian::DescriptorSetUpdate update(quake_sets);
+            update.write_descriptor_buffer(0, dynamic_vtx_buffer, 0, VK_WHOLE_SIZE,
+                                           dynamic_geo_idx);
+            update.write_descriptor_buffer(1, dynamic_idx_buffer, 0, VK_WHOLE_SIZE,
+                                           dynamic_geo_idx);
+            update.write_descriptor_buffer(3, dynamic_ext_buffer);
+            update.update(context);
+        }
+    } else {
+        merian::DescriptorSetUpdate update(quake_sets);
+        update.write_descriptor_buffer(0, binding_dummy_buffer, 0, VK_WHOLE_SIZE, dynamic_geo_idx);
+        update.write_descriptor_buffer(1, binding_dummy_buffer, 0, VK_WHOLE_SIZE, dynamic_geo_idx);
+        update.write_descriptor_buffer(3, binding_dummy_buffer);
+        update.update(context);
+    }
+}
+
+void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
+    blas_builder.get_cmds(cmd);
+
+    uint32_t old_instances_size = instances.size();
+    instances.clear();
+
+    // We use the custom index in the shader to differentiate
+    if (static_blas) {
+        instances.push_back(vk::AccelerationStructureInstanceKHR{
+            merian::transform_identity(),
+            static_geo_idx,
+            0xFF,
+            0,
+            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            static_blas->get_acceleration_structure_device_address(),
+        });
+    }
+    if (dynamic_blas) {
+        instances.push_back(vk::AccelerationStructureInstanceKHR{
+            merian::transform_identity(),
+            dynamic_geo_idx,
+            0xFF,
+            0,
+            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            dynamic_blas->get_acceleration_structure_device_address(),
+        });
+    }
+
+    if (!instances.empty()) {
+        const vk::BufferUsageFlags instances_buffer_usage =
+            vk::BufferUsageFlagBits::eShaderDeviceAddress |
+            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+        instances_buffer =
+            ensure_buffer(allocator, instances_buffer_usage, cmd, instances, instances_buffer, 16);
+        const vk::BufferMemoryBarrier barrier = instances_buffer->buffer_barrier(
+            vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
+                            barrier, {});
+
+        if (old_instances_size == instances.size()) {
+            // rebuild
+            tlas_builder.queue_rebuild(instances.size(), instances_buffer, tlas);
+        } else {
+            tlas = tlas_builder.queue_build(instances.size(), instances_buffer);
+
+            merian::DescriptorSetUpdate update(quake_sets);
+            update.write_descriptor_acceleration_structure(5, *tlas);
+            update.update(context);
+        }
+        tlas_builder.get_cmds(cmd);
+        tlas_builder.cmd_barrier(cmd, vk::PipelineStageFlagBits::eComputeShader);
+
+    } else {
+        tlas = nullptr;
+    }
+}

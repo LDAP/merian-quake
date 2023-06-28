@@ -17,60 +17,7 @@
 #include "quake_water.glsl"
 #include "config.h"
 
-
-layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
-
-
-layout(push_constant) uniform PushConstant { 
-  int frame;
-  vec4 cam_x;
-  vec4 cam_w;
-  vec4 cam_u;
-  vec4 fog;
-  int torch;
-  int water;
-  uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
-  float cl_time; // quake time
-  int   ref;     // use reference sampling
-  int   health;
-  int   armor;
-} params;
-
-// GRAPH IN/OUTs
-
-layout(set = 0, binding = 0) uniform sampler2D img_gbuf_in;
-layout(set = 0, binding = 1) uniform sampler2D img_mv;
-layout(set = 0, binding = 2) uniform sampler2D img_blue;
-layout(set = 1, binding = 3) uniform usampler2D img_nee_in; // mc states
-
-layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly image2D img_gbuf_out;
-layout(set = 1, binding = 7) uniform writeonly uimage2D img_nee_out; // mc states
-
-// QUAKE 
-
-layout(set = 1, binding = 0) buffer buf_vtx_t {
-  // 3x float vertex data for every instance
-  float v[];
-} buf_vtx[];
-
-layout(set = 1, binding = 1) buffer buf_idx_t {
-  // index data for every instance
-  uint i[];
-} buf_idx[];
-
-layout(std430, set = 1, binding = 2) buffer sssbo_t {
-  // extra geo info for static geo
-  uint v[];
-} stcssbo;
-layout(std430, set = 1, binding = 3) buffer dssbo_t {
-  // extra geo info for dynamic geo
-  uint v[];
-} dynssbo;
-
-layout(set = 1, binding = 4) uniform sampler2D img_tex[];
-layout(set = 1, binding = 5) uniform accelerationStructureEXT rt_accel;
+#include "layout.glsl"
 
 // importance sample the blackman harris pixel filter.
 // has 1.5px radius support
@@ -178,7 +125,8 @@ prepare_intersection(
     rayQueryEXT rq)
 {
   intersection_t inter;
-  inter.instid = rayQueryGetIntersectionInstanceIdEXT(rq, false);     // which of our ssbo
+  // static has index 0, dynamic has index 1.
+  inter.instid = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, false);
   inter.primid = rayQueryGetIntersectionPrimitiveIndexEXT(rq, false); // primitive inside instance
   inter.uv     = packHalf2x16(rayQueryGetIntersectionBarycentricsEXT(rq, false));
   inter.t      = rayQueryGetIntersectionTEXT(rq, false);
@@ -204,7 +152,7 @@ prepare_material_info(
   vec3 n0, n1, n2;
   vec2 st0, st1, st2;
   bool brush_model = false;
-  if(inter.opaque.instid == 0)
+  if(inter.opaque.instid == 1)
   { // dyn geo
     m.mat   =  dynssbo.v[i+6]&0xfff;
       alpha = (dynssbo.v[i+6]>>12)/15.0;
@@ -517,7 +465,7 @@ raycast_res_t cast_ray(rayQueryEXT rq, vec3 x, vec3 w, const float t_max)
       uint flags = 0;
       // uint alpha = 0;
       vec2 st;
-      if(rayQueryGetIntersectionInstanceIdEXT(rq, false) == 0) // which of our ssbo
+      if(rayQueryGetIntersectionInstanceCustomIndexEXT(rq, false) == 0) // which of our ssbo
       {
         mat   = dynssbo.v[i+6]&0xfff;
         // alpha = dynssbo.v[i+6]>>12;
@@ -777,8 +725,7 @@ void read_neighbour_state(
 }
 
 void
-main()
-{
+main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if(any(greaterThanEqual(ipos, imageSize(img_irradiance)))) return;
 
@@ -827,6 +774,8 @@ main()
     mat = propagate_ray(m0.x, w_cam, cam_underwater, xm, mrand(seed), rgb_cam);
     m0 = mat.c;
   }
+  imageStore(img_albedo, ipos, vec4(mat.albedo,1));
+  return;
   { // ray intersected geometry, init material state and tangent frame
 #if 0 // "honest" inscattering MC estimator. will not converge:
     float mu_t = 6e-5;

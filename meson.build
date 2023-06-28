@@ -9,6 +9,8 @@ project(
     ]
 )
 
+add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
+
 # Debug configuration
 if get_option('buildtype').startswith('debug')
   add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
