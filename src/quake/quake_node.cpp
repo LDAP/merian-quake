@@ -666,6 +666,7 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
 
 QuakeNode::QuakeNode(const merian::SharedContext& context,
                      const merian::ResourceAllocatorHandle& allocator,
+                     const std::shared_ptr<merian::InputController> controller,
                      const char* base_dir)
     : context(context), allocator(allocator), blas_builder(context, allocator),
       tlas_builder(context, allocator) {
@@ -694,6 +695,43 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     quake_sets = std::make_shared<merian::DescriptorSet>(quake_pool);
 
     binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
+
+    // clang-format off
+    controller->set_key_event_callback([&](merian::InputController& controller, int key, int scancode, merian::InputController::KeyStatus action, int){
+        if(key >= 65 && key <= 90) key |= 32;
+        if (action == merian::InputController::PRESS) {
+            Key_Event(key, true);
+        } else if (action == merian::InputController::RELEASE) {
+            Key_Event(key, false);
+        }
+        if (scancode == 1) { // ESCAPE
+            controller.request_raw_mouse_input(false);
+        }
+    });
+    controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
+        if (controller.get_raw_mouse_input()) {
+            this->mouse_x = xpos;
+            this->mouse_y = ypos;
+        }
+    });
+    controller->set_mouse_button_callback([&](merian::InputController& controller, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
+        if (button == merian::InputController::MOUSE1) {
+            controller.request_raw_mouse_input(true);
+        }
+        const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
+        Key_Event(remap[button], status == merian::InputController::PRESS);
+    });
+    controller->set_scroll_event_callback([&](merian::InputController&, double xoffset, double yoffset){
+        if (yoffset > 0) {
+            Key_Event(K_MWHEELUP, true);
+            Key_Event(K_MWHEELUP, false);
+        } else if (xoffset < 0) {
+            Key_Event(K_MWHEELDOWN, true);
+            Key_Event(K_MWHEELDOWN, false);
+        }
+    });
+
+    // clang-format on
 }
 
 QuakeNode::~QuakeNode() {

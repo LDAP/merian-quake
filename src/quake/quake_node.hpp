@@ -1,6 +1,7 @@
 #pragma once
 
 #include "glm/ext/vector_float4.hpp"
+#include "merian/utils/input_controller.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -102,6 +103,7 @@ class QuakeNode : public merian::Node {
     /* Path to the Quake basedir. This directory must contain the id1 directory. */
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle& allocator,
+              const std::shared_ptr<merian::InputController> controller,
               const char* base_dir = "./res/quake");
 
     ~QuakeNode();
