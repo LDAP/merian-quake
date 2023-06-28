@@ -686,8 +686,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         merian::DescriptorSetLayoutBuilder()
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
-            .add_binding_storage_buffer()
-            .add_binding_storage_buffer()
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
             .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
             .add_binding_acceleration_structure()
             .build_layout(context);
@@ -899,9 +898,9 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     for (uint32_t texnum = 0; texnum < MAX_GLTEXTURES; texnum++) {
         if (textures.contains(texnum) && textures[texnum]->gpu_tex) {
             auto& tex = textures[texnum];
-            update.write_descriptor_texture(quake_textures_binding, tex->gpu_tex, texnum);
+            update.write_descriptor_texture(BINDING_IMG_TEX, tex->gpu_tex, texnum);
         } else {
-            update.write_descriptor_texture(quake_textures_binding, binding_dummy_image, texnum);
+            update.write_descriptor_texture(BINDING_IMG_TEX, binding_dummy_image, texnum);
         }
     }
     update.update(context);
@@ -988,7 +987,7 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
         std::shared_ptr<QuakeTexture>& tex = textures[texnum];
         assert(!tex->gpu_tex);
         tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height);
-        update.write_descriptor_texture(quake_textures_binding, tex->gpu_tex, texnum);
+        update.write_descriptor_texture(BINDING_IMG_TEX, tex->gpu_tex, texnum);
     }
     pending_uploads.clear();
     update.update(context);
@@ -1027,13 +1026,19 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                 vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction);
 
-        update.write_descriptor_buffer(0, static_vtx_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
-        update.write_descriptor_buffer(1, static_idx_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
-        update.write_descriptor_buffer(2, static_ext_buffer);
+        update.write_descriptor_buffer(BINDING_VTX_BUF, static_vtx_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
+        update.write_descriptor_buffer(BINDING_IDX_BUF, static_idx_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
+        update.write_descriptor_buffer(BINDING_EXT_BUF, static_ext_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
     } else {
-        update.write_descriptor_buffer(0, binding_dummy_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
-        update.write_descriptor_buffer(1, binding_dummy_buffer, 0, VK_WHOLE_SIZE, static_geo_idx);
-        update.write_descriptor_buffer(2, binding_dummy_buffer);
+        update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
+        update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
+        update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_STATIC);
     }
     update.update(context);
 }
@@ -1100,18 +1105,22 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
                 vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                     vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
             merian::DescriptorSetUpdate update(quake_sets);
-            update.write_descriptor_buffer(0, dynamic_vtx_buffer, 0, VK_WHOLE_SIZE,
-                                           dynamic_geo_idx);
-            update.write_descriptor_buffer(1, dynamic_idx_buffer, 0, VK_WHOLE_SIZE,
-                                           dynamic_geo_idx);
-            update.write_descriptor_buffer(3, dynamic_ext_buffer);
+            update.write_descriptor_buffer(BINDING_VTX_BUF, dynamic_vtx_buffer, 0, VK_WHOLE_SIZE,
+                                           ARRAY_IDX_DYNAMIC);
+            update.write_descriptor_buffer(BINDING_IDX_BUF, dynamic_idx_buffer, 0, VK_WHOLE_SIZE,
+                                           ARRAY_IDX_DYNAMIC);
+            update.write_descriptor_buffer(BINDING_EXT_BUF, dynamic_ext_buffer, 0, VK_WHOLE_SIZE,
+                                           ARRAY_IDX_DYNAMIC);
             update.update(context);
         }
     } else {
         merian::DescriptorSetUpdate update(quake_sets);
-        update.write_descriptor_buffer(0, binding_dummy_buffer, 0, VK_WHOLE_SIZE, dynamic_geo_idx);
-        update.write_descriptor_buffer(1, binding_dummy_buffer, 0, VK_WHOLE_SIZE, dynamic_geo_idx);
-        update.write_descriptor_buffer(3, binding_dummy_buffer);
+        update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_DYNAMIC);
+        update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_DYNAMIC);
+        update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       ARRAY_IDX_DYNAMIC);
         update.update(context);
     }
 }
@@ -1126,20 +1135,20 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
     if (static_blas) {
         instances.push_back(vk::AccelerationStructureInstanceKHR{
             merian::transform_identity(),
-            static_geo_idx,
+            ARRAY_IDX_STATIC,
             0xFF,
             0,
-            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             static_blas->get_acceleration_structure_device_address(),
         });
     }
     if (dynamic_blas) {
         instances.push_back(vk::AccelerationStructureInstanceKHR{
             merian::transform_identity(),
-            dynamic_geo_idx,
+            ARRAY_IDX_DYNAMIC,
             0xFF,
             0,
-            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             dynamic_blas->get_acceleration_structure_device_address(),
         });
     }
@@ -1163,7 +1172,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
             tlas = tlas_builder.queue_build(instances.size(), instances_buffer);
 
             merian::DescriptorSetUpdate update(quake_sets);
-            update.write_descriptor_acceleration_structure(5, *tlas);
+            update.write_descriptor_acceleration_structure(BINDING_TLAS, *tlas);
             update.update(context);
         }
         tlas_builder.get_cmds(cmd);

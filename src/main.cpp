@@ -6,6 +6,7 @@
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
 #include "merian-nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/io/file_loader.hpp"
+#include "merian/utils/input_controller_glfw.hpp"
 #include "merian/vk/command/ring_command_pool.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
@@ -40,6 +41,8 @@ int main() {
     auto queue = context->get_queue_GCT();
     auto [window, surface] = extGLFW.get();
 
+    std::shared_ptr<merian::InputController> controller = std::make_shared<merian::GLFWInputController>(window);
+
     merian::Graph graph{context, alloc, queue};
     auto output =
         std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
@@ -48,7 +51,7 @@ int main() {
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black_color = std::make_shared<merian::ColorOutputNode>(
         vk::Format::eR16G16B16A16Sfloat, vk::ClearColorValue{}, vk::Extent3D{1920, 1080, 1});
-    auto quake = std::make_shared<QuakeNode>(context, alloc);
+    auto quake = std::make_shared<QuakeNode>(context, alloc, controller);
     graph.add_node("output", output);
     graph.add_node("black_color", black_color);
     graph.add_node("blue_noise", blue_noise);

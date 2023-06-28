@@ -1,3 +1,5 @@
+#include "config.h"
+
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 
@@ -30,24 +32,20 @@ layout(set = 0, binding = 7) uniform writeonly uimage2D img_nee_out; // mc state
 
 // QUAKE 
 
-layout(set = 1, binding = 0) buffer buf_vtx_t {
-  // 3x float vertex data for every instance
+layout(set = 1, binding = BINDING_VTX_BUF) buffer buf_vtx_t {
+  // 3x float vertex data for every vertex
   float v[];
 } buf_vtx[];
 
-layout(set = 1, binding = 1) buffer buf_idx_t {
+layout(set = 1, binding = BINDING_IDX_BUF) buffer buf_idx_t {
   // index data for every instance
   uint i[];
 } buf_idx[];
 
-layout(std430, set = 1, binding = 2) buffer sssbo_t {
-  // extra geo info for static geo
+layout(std430, set = 1, binding = BINDING_EXT_BUF) buffer buf_ext_t {
+  // extra geo info
   uint v[];
-} stcssbo;
-layout(std430, set = 1, binding = 3) buffer dssbo_t {
-  // extra geo info for dynamic geo
-  uint v[];
-} dynssbo;
+} buf_ext[];
 
-layout(set = 1, binding = 4) uniform sampler2D img_tex[];
-layout(set = 1, binding = 5) uniform accelerationStructureEXT rt_accel;
+layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[];
+layout(set = 1, binding = BINDING_TLAS) uniform accelerationStructureEXT rt_accel;
