@@ -1,5 +1,8 @@
 #include "config.h"
 
+#extension GL_EXT_scalar_block_layout       : require
+#extension GL_EXT_shader_16bit_storage      : enable
+
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 
@@ -32,20 +35,37 @@ layout(set = 0, binding = 7) uniform writeonly uimage2D img_nee_out; // mc state
 
 // QUAKE 
 
-layout(set = 1, binding = BINDING_VTX_BUF) buffer buf_vtx_t {
-  // 3x float vertex data for every vertex
-  float v[];
-} buf_vtx[];
+// See quake_node.hpp
+struct VertexExtraData {
 
-layout(set = 1, binding = BINDING_IDX_BUF) buffer buf_idx_t {
+    uint n0_gloss_norm;
+
+    uint n1_brush;
+    uint n2;
+
+    uint st_0;
+    uint st_1;
+    uint st_2;
+
+    uint16_t texnum_alpha;
+    uint16_t texnum_fb_flags;
+};
+
+layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
+  // 3x float vertex data for every vertex
+  vec3 v[];
+} buf_vtx[2];
+
+layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer buf_idx_t {
   // index data for every instance
   uint i[];
-} buf_idx[];
+} buf_idx[2];
 
-layout(std430, set = 1, binding = BINDING_EXT_BUF) buffer buf_ext_t {
+layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer buf_ext_t {
   // extra geo info
-  uint v[];
-} buf_ext[];
+  VertexExtraData v[];
+} buf_ext[2];
 
-layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[];
-layout(set = 1, binding = BINDING_TLAS) uniform accelerationStructureEXT rt_accel;
+layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[MAX_GLTEXTURES];
+
+layout(set = 1, binding = BINDING_TLAS) uniform accelerationStructureEXT tlas;
