@@ -78,6 +78,7 @@ class QuakeNode : public merian::Node {
         uint16_t t_2{};
 
         // texnum and (unused) alpha in upper 4 bits
+        // if texnum is 0xfff then it is marked as sky
         uint16_t texnum_alpha{};
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
         // Flags:

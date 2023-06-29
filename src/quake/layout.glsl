@@ -5,20 +5,19 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-
 layout(push_constant) uniform PushConstant { 
-  vec4 cam_x;
-  vec4 cam_w;
-  vec4 cam_u;
-  vec4 fog;
-  int torch;
-  int water;
-  uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
-  float cl_time; // quake time
-  int   ref;     // use reference sampling
-  int   health;
-  int   armor;
-  int frame;
+    vec4 cam_x;
+    vec4 cam_w;
+    vec4 cam_u;
+    vec4 fog;
+    int torch;
+    int water;
+    uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
+    float cl_time; // quake time
+    int   ref;     // use reference sampling
+    int   health;
+    int   armor;
+    int frame;
 } params;
 
 // GRAPH IN/OUTs
@@ -52,18 +51,18 @@ struct VertexExtraData {
 };
 
 layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
-  // 3x float vertex data for every vertex
-  vec3 v[];
+    // vertex positons
+    vec3 v[];
 } buf_vtx[2];
 
 layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer buf_idx_t {
-  // index data for every instance
-  uint i[];
+    // index data for every instance
+    uvec3 i[];
 } buf_idx[2];
 
 layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer buf_ext_t {
-  // extra geo info
-  VertexExtraData v[];
+    // extra geo info
+    VertexExtraData v[];
 } buf_ext[2];
 
 layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[MAX_GLTEXTURES];

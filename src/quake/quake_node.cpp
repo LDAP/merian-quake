@@ -1,6 +1,7 @@
 #include "quake/quake_node.hpp"
 #include "config.h"
 #include "merian/utils/bitpacking.hpp"
+#include "merian/utils/colors.hpp"
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/string.hpp"
@@ -240,7 +241,7 @@ void add_geo_alias(entity_t* ent,
             pos[k] = trivertexes[i].v[k] * hdr->scale[k] + hdr->scale_origin[k];
         // convert to world space
         for (int k = 0; k < 3; k++)
-            vtx.emplace_back(ent->origin[k] + rgt[k] * pos[1] + top[k] * pos[2] + fwd[k] * pos[0]);
+            vtx.emplace_back(ent->origin[k] + fwd[k] * pos[0] + rgt[k] * pos[1] + top[k] * pos[2]);
     }
 
     for (int i = 0; i < hdr->numindexes; i++)
@@ -399,9 +400,9 @@ void add_geo_brush(entity_t* ent,
 
                     extra.texnum_fb_flags |= flags << 12;
                 }
-                // ?! What does that?
+                // Mark as sky
                 if (surf->flags & SURF_DRAWSKY)
-                    extra.texnum_alpha = 0xfff;
+                    extra.texnum_alpha |= 0xfff;
 
                 ext.push_back(extra);
             }
@@ -891,7 +892,9 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     }
 
     // DUMMY IMAGE as placeholder
-    binding_dummy_image = make_rgb8_texture(cmd, allocator, {0, 0, 0, 0}, 2, 2);
+    uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
+    binding_dummy_image = make_rgb8_texture(
+        cmd, allocator, {missing_rgba, missing_rgba, missing_rgba, missing_rgba}, 2, 2);
 
     // MAKE SURE ALL DESCRIPTORS ARE SET
     merian::DescriptorSetUpdate update(quake_sets);
