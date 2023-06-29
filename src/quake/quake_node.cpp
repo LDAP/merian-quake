@@ -222,10 +222,12 @@ void add_geo_alias(entity_t* ent,
     // R_SetupEntityTransform(ent, &lerpdata);
     // angles: pitch yaw roll. axes: right fwd up
     float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
-    float fwd[3], rgt[3], top[3], pos[3];
-    AngleVectors(angles, fwd, rgt, top);
-    for (int k = 0; k < 3; k++)
-        rgt[k] = -rgt[k]; // seems these come in flipped
+    glm::vec3 fwd, rgt, top, pos;
+    glm::vec3 origin = vec3_from_float(ent->origin);
+    AngleVectors(angles, &fwd.x, &rgt.x, &top.x);
+    rgt *= -1;
+    glm::mat3 mat_model(fwd, rgt, top);
+    glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
     // for(int f = 0; f < hdr->numposes; f++)
     // TODO: upload all vertices so we can just alter the indices on gpu
@@ -240,8 +242,9 @@ void add_geo_alias(entity_t* ent,
         for (int k = 0; k < 3; k++)
             pos[k] = trivertexes[i].v[k] * hdr->scale[k] + hdr->scale_origin[k];
         // convert to world space
+        pos = origin + mat_model * pos;
         for (int k = 0; k < 3; k++)
-            vtx.emplace_back(ent->origin[k] + fwd[k] * pos[0] + rgt[k] * pos[1] + top[k] * pos[2]);
+            vtx.emplace_back(pos[k]);
     }
 
     for (int i = 0; i < hdr->numindexes; i++)
@@ -256,11 +259,10 @@ void add_geo_alias(entity_t* ent,
     uint32_t* tmpn = (uint32_t*)alloca(sizeof(uint32_t) * hdr->numverts_vbo);
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i = hdr->numverts * f + desc[v].vertindex;
-        float nm[3], nw[3];
-        memcpy(nm, r_avertexnormals[trivertexes[i].lightnormalindex], sizeof(float) * 3);
-        for (int k = 0; k < 3; k++)
-            nw[k] = nm[0] * fwd[k] + nm[1] * rgt[k] + nm[2] * top[k];
-        *(tmpn + v) = merian::encode_normal(nw);
+        glm::vec3 n = vec3_from_float(r_avertexnormals[trivertexes[i].lightnormalindex]);
+        // convert to worldspace
+        n = mat_model_inv_t * n;
+        *(tmpn + v) = merian::encode_normal(&n.x);
     }
 
     // add extra data for each primitive
