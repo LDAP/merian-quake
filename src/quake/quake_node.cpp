@@ -732,8 +732,47 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             Key_Event(K_MWHEELDOWN, false);
         }
     });
-
     // clang-format on
+
+    audio_device = std::make_unique<merian::SDLAudioDevice>(
+        merian::SDLAudioDevice::FORMAT_S16_LSB, [](uint8_t* stream, int len) {
+            // from https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
+            int buffersize = shm->samples * (shm->samplebits / 8);
+            int pos, tobufend;
+            int len1, len2;
+
+            if (!shm) { /* shouldn't happen, but just in case */
+                memset(stream, 0, len);
+                return;
+            }
+
+            pos = (shm->samplepos * (shm->samplebits / 8));
+            if (pos >= buffersize)
+                shm->samplepos = pos = 0;
+
+            tobufend = buffersize - pos; /* bytes to buffer's end. */
+            len1 = len;
+            len2 = 0;
+
+            if (len1 > tobufend) {
+                len1 = tobufend;
+                len2 = len - len1;
+            }
+
+            memcpy(stream, shm->buffer + pos, len1);
+
+            if (len2 <= 0) {
+                shm->samplepos += (len1 / (shm->samplebits / 8));
+            } else { /* wraparound? */
+                memcpy(stream + len1, shm->buffer, len2);
+                shm->samplepos = (len2 / (shm->samplebits / 8));
+            }
+
+            if (shm->samplepos >= buffersize)
+                shm->samplepos = 0;
+        });
+    audio_device->unpause_audio();
+
 }
 
 QuakeNode::~QuakeNode() {

@@ -2,6 +2,7 @@
 
 #include "glm/ext/vector_float4.hpp"
 #include "merian/utils/input_controller.hpp"
+#include "merian/utils/sdl_audio_device.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -157,6 +158,8 @@ class QuakeNode : public merian::Node {
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
+
+    std::unique_ptr<merian::SDLAudioDevice> audio_device;
 
     merian::BLASBuilder blas_builder;
     merian::TLASBuilder tlas_builder;
