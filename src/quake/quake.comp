@@ -102,8 +102,8 @@ IntersectionInfo get_intersection_info_commited(rayQueryEXT ray_query) {
 }
 
 ShadingMaterial get_shading_material(const IntersectionInfo info,
-                                     const vec3 ray_dir,
-                                     const vec3 ray_origin) {
+                                     const vec3 ray_origin,
+                                     const vec3 ray_dir) {
     ShadingMaterial mat;
     
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
@@ -139,12 +139,13 @@ ShadingMaterial get_shading_material(const IntersectionInfo info,
     mat3 verts;
     get_verts_pos_geonormal(verts, mat.pos, mat.normal, info);
 
-    // If brush model: Has normal and gloss map (else has geo normals)
     if (is_brush_model) {
+        // can have normal and gloss map (else has geo normals)
         uint texnum_gloss = extra_data.n0_gloss_norm & 0xffff;
         uint texnum_normal = extra_data.n0_gloss_norm >> 16;
         
         if (texnum_normal > 0) {
+            // overwrite geo normal with normal map normal
             vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
             mat.normal = apply_normalmap(verts[0], verts[1], verts[2], st_0, st_1, st_2, mat.normal, tangent_normal);
         }
@@ -180,7 +181,7 @@ vec4 trace_ray(vec3 x0, vec3 dir, uint rng_state) {
     IntersectionInfo info = get_intersection_info_commited(ray_query);
     ShadingMaterial mat = get_shading_material(info, x0, dir);
 
-    return vec4(mat.normal, 1);
+    return vec4(mat.albedo);
 }
 
 void main() {
@@ -188,7 +189,7 @@ void main() {
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
     if (any(greaterThanEqual(pixel, resolution))) return;
 
-    uint rng_state = 19937 * params.frame;
+    uint rng_state = 19937 * (resolution.x  * pixel.y + pixel.x) * params.frame;
 
     vec3 camera_dir = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec4(rng_state));
 
