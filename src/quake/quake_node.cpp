@@ -100,7 +100,7 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
         allocator->createImage(cmd, data.size() * sizeof(uint32_t), data.data(), tex_image_info);
     tex_view_info.image = *image;
     merian::TextureHandle tex = allocator->createTexture(image, tex_view_info);
-    tex->attach_sampler(allocator->get_sampler_pool()->nearest_mirrored_repeat());
+    tex->attach_sampler(allocator->get_sampler_pool()->nearest_repeat());
     return tex;
 }
 

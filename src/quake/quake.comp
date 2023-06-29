@@ -25,14 +25,10 @@ struct Material {
     uint flags;
 };
 
-// Get texel coordinate from texture coordinate
-ivec2 texel_coord(vec2 st, const ivec2 texture_resolution, const bool warp) {
-    if (warp) {
-        st = vec2(st.x + 0.2*sin(st.y*2.0 + params.cl_time * 1.0),
-                  st.y + 0.2*sin(st.x*2.0 + params.cl_time * 1.0));
-    }
-    ivec2 tc = ivec2(texture_resolution * mod(st, vec2(1.0)));
-    return clamp(tc, ivec2(0), texture_resolution - 1);
+// Get warped texture coordinate
+void warp(inout vec2 st) {
+    st = vec2(st.x + 0.2*sin(st.y*2.0 + params.cl_time * 1.0),
+              st.y + 0.2*sin(st.x*2.0 + params.cl_time * 1.0));
 }
 
 // The the intersection info for a commited intersection
@@ -55,15 +51,16 @@ Material get_material(uint instance_custom_index, uint primitive_index, vec3 bar
     const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
     const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
 
-    const vec2 st = mat3x2(st_0, st_1, st_2) * barycentrics;
+
     const uint texnum = extra_data.texnum_alpha & 0xfff;
+    vec2 st = mat3x2(st_0, st_1, st_2) * barycentrics;
 
     mat.flags = extra_data.texnum_fb_flags >> 12;
 
-    // Coordinate in pixels
-    const ivec2 tex_resolution = textureSize(img_tex[nonuniformEXT(texnum)], 0);
-    const bool warp = mat.flags > 0 && mat.flags < 6;
-    mat.albedo = texelFetch(img_tex[nonuniformEXT(texnum)], texel_coord(st, tex_resolution, warp), 0);
+    if (mat.flags > 0 && mat.flags < 6) {
+        warp(st);
+    }
+    mat.albedo = texture(img_tex[nonuniformEXT(texnum)], st);
 
     return mat;
 }
