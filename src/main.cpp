@@ -68,7 +68,6 @@ int main() {
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
     auto ring_fences = make_shared<merian::RingFences<1, FrameData>>(context);
-    uint64_t frames = 50;
     uint64_t frame = 0;
     // quake->queue_command("game SlayerTest");
     

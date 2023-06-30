@@ -69,7 +69,8 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
                                                const merian::ResourceAllocatorHandle& allocator,
                                                const std::vector<uint32_t>& data,
                                                uint32_t width,
-                                               uint32_t height) {
+                                               uint32_t height,
+                                               bool force_linear_filter = false) {
     static vk::ImageCreateInfo tex_image_info{
         {},
         vk::ImageType::e2D,
@@ -101,7 +102,10 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
         allocator->createImage(cmd, data.size() * sizeof(uint32_t), data.data(), tex_image_info);
     tex_view_info.image = *image;
     merian::TextureHandle tex = allocator->createTexture(image, tex_view_info);
-    tex->attach_sampler(allocator->get_sampler_pool()->nearest_repeat());
+    if (force_linear_filter)
+        tex->attach_sampler(allocator->get_sampler_pool()->linear_repeat());
+    else
+        tex->attach_sampler(allocator->get_sampler_pool()->nearest_repeat());
     return tex;
 }
 
@@ -138,6 +142,31 @@ void init_quake(const char* base_dir) {
 
 void deinit_quake() {
     free(quake_data.params.membase);
+}
+
+uint16_t
+make_texnum_alpha(gltexture_s* tex, entity_t* entity = nullptr, msurface_t* surface = nullptr) {
+    uint16_t result = tex->texnum;
+    uint32_t alpha;
+    if (entity) {
+        // uint32_t alpha = CLAMP(0, (ent->alpha - 1.0) / 254.0 * 15, 15); // alpha in 4 bits
+        // if (!TEXPREF_ALPHA)
+        //     alpha = 15;
+        // TODO: 0 means default, 1 means invisible, 255 is opaque, 2--254 is
+        // really applicable
+        // TODO: default means  map_lavaalpha > 0 ? map_lavaalpha :
+        // map_wateralpha
+        // TODO: or "slime" or "tele" instead of "lava"
+    }
+    if (tex->flags & TEXPREF_ALPHA) {
+        // use texture alpha
+        alpha = 0;
+    } else {
+        // fully opaque
+        alpha = 15;
+    }
+    result |= alpha << 12;
+    return result;
 }
 
 void add_particles(std::vector<float>& vtx,
@@ -250,11 +279,6 @@ void add_geo_alias(entity_t* ent,
     for (int i = 0; i < hdr->numindexes; i++)
         idx.emplace_back(vtx_cnt + indexes[i]);
 
-    // both options fail to extract correct creases/vertex normals for health/shells
-    // in fact, the shambler has crazy artifacts all over. maybe this is all wrong and
-    // just by chance happened to produce something similar enough sometimes?
-    // TODO: fuck this vbo bs and get the mdl itself
-
     // normals for each vertex from above
     uint32_t* tmpn = (uint32_t*)alloca(sizeof(uint32_t) * hdr->numverts_vbo);
     for (int v = 0; v < hdr->numverts_vbo; v++) {
@@ -268,16 +292,17 @@ void add_geo_alias(entity_t* ent,
     // add extra data for each primitive
     for (int i = 0; i < hdr->numindexes / 3; i++) {
         const int sk = CLAMP(0, ent->skinnum, hdr->numskins - 1), fm = ((int)(cl.time * 10)) & 3;
-        const uint16_t texnum = hdr->gltextures[sk][fm]->texnum;
+        const uint16_t texnum_alpha = make_texnum_alpha(hdr->gltextures[sk][fm]);
         const uint16_t fb_texnum = hdr->fbtextures[sk][fm] ? hdr->fbtextures[sk][fm]->texnum : 0;
 
         uint32_t n0, n1, n2;
         if (hdr->nmtextures[sk][fm]) {
             // this discards the vertex normals
-            n0 = merian::pack_uint32(0, hdr->nmtextures[sk][fm]->texnum);
+            n0 = merian::pack_uint32(hdr->gstextures[sk][fm] ? hdr->gstextures[sk][fm]->texnum : 0,
+                                     hdr->nmtextures[sk][fm]->texnum);
             n1 = 0xffffffff; // mark as brush model -> to use normal map
         } else {
-            // the vertex normals -> currently not used in shader
+            // the vertex normals
             n0 = *(tmpn + indexes[3 * i + 0]);
             n1 = *(tmpn + indexes[3 * i + 1]);
             n2 = *(tmpn + indexes[3 * i + 2]);
@@ -291,7 +316,7 @@ void add_geo_alias(entity_t* ent,
             merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) / (float)hdr->skinheight),
             merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) / (float)hdr->skinwidth),
             merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) / (float)hdr->skinheight),
-            texnum, fb_texnum);
+            texnum_alpha, fb_texnum);
     }
 }
 
@@ -367,19 +392,8 @@ void add_geo_brush(entity_t* ent,
                     extra.t_1 = merian::float_to_half(p->verts[k - 1][4]);
                     extra.s_2 = merian::float_to_half(p->verts[k - 0][3]);
                     extra.t_2 = merian::float_to_half(p->verts[k - 0][4]);
-                    extra.texnum_alpha = t->gltexture->texnum;
+                    extra.texnum_alpha = make_texnum_alpha(t->gltexture, ent, surf);
                     extra.texnum_fb_flags = t->fullbright ? t->fullbright->texnum : 0;
-
-                    // alpha
-                    uint32_t ai = CLAMP(0, (ent->alpha - 1.0) / 254.0 * 15, 15); // alpha in 4 bits
-                    if (!ent->alpha)
-                        ai = 15;
-                    // TODO: 0 means default, 1 means invisible, 255 is opaque, 2--254 is
-                    // really applicable
-                    // TODO: default means  map_lavaalpha > 0 ? map_lavaalpha :
-                    // map_wateralpha
-                    // TODO: or "slime" or "tele" instead of "lava"
-                    extra.texnum_alpha |= ai << 12;
 
                     if (surf->flags & SURF_DRAWLAVA)
                         flags = MAT_FLAGS_LAVA;
@@ -542,7 +556,7 @@ void add_geo_sprite(entity_t* ent,
 
         uint16_t texnum = 0;
         if (frame->gltexture) {
-            texnum = frame->gltexture->texnum;
+            texnum = make_texnum_alpha(frame->gltexture);
         }
 
         ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half(0), merian::float_to_half(1),
@@ -1042,7 +1056,9 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
     for (auto texnum : pending_uploads) {
         std::shared_ptr<QuakeTexture>& tex = textures[texnum];
         assert(!tex->gpu_tex);
-        tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height);
+        const bool force_linear_filter = tex->flags & TEXPREF_LINEAR;
+        tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height,
+                                         force_linear_filter);
         update.write_descriptor_texture(BINDING_IMG_TEX, tex->gpu_tex, texnum);
     }
     pending_uploads.clear();
@@ -1147,7 +1163,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild |
             vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
         if (old_vtx_size == dynamic_vtx.size() && old_idx_size == dynamic_idx.size()) {
-            if (frame % 50 == 0)
+            if (frame % 100 == 0)
                 blas_builder.queue_rebuild({geometry}, {range_info}, dynamic_blas, flags);
             else
                 blas_builder.queue_update({geometry}, {range_info}, dynamic_blas, flags);

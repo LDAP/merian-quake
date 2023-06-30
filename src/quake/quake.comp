@@ -24,6 +24,11 @@ struct ShadingMaterial {
     // uint16_t flags;
 };
 
+// assert(alpha != 0)
+float decode_alpha(const uint alpha) {
+    return float(alpha - 1) / 14.;
+}
+
 // Get warped texture coordinate
 void warp(inout vec2 st) {
     st = vec2(st.x + 0.2*sin(st.y*2.0 + params.cl_time * 1.0),
@@ -85,10 +90,13 @@ vec3 apply_normalmap(const vec3 v0,
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
+    const uint alpha = extra_data.texnum_alpha >> 12;
     const uint flags = extra_data.texnum_fb_flags >> 12;
     if (flags != MAT_FLAGS_NONE) {
         // treat sky, lava, slime,... not transparent for now
         return true;
+    } else if (alpha != 0) { // 0 means use texture
+        return decode_alpha(alpha) >= ALPHA_THRESHOLD;
     } else {
         const uint texnum = extra_data.texnum_alpha & 0xfff;
         const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
@@ -110,6 +118,7 @@ void get_shading_material(const IntersectionInfo info,
                           out ShadingMaterial mat) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
     const uint flags = extra_data.texnum_fb_flags >> 12;
+
     if (flags == MAT_FLAGS_SKY) {
         mat.albedo = vec4(0, 0, 0, 1);
         mat.emission = envmap(ray_dir);
@@ -122,7 +131,6 @@ void get_shading_material(const IntersectionInfo info,
     const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
     const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
     const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
-    //const uint alpha = extra_data.texnum_alpha >> 12;
     const bool is_brush_model = (extra_data.n1_brush == 0xffffffff);
 
     vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
@@ -134,6 +142,9 @@ void get_shading_material(const IntersectionInfo info,
         // Load albedo
         const uint texnum = extra_data.texnum_alpha & 0xfff;
         mat.albedo = texture(img_tex[nonuniformEXT(texnum)], st);
+        const uint alpha = extra_data.texnum_alpha >> 12;
+        if (alpha != 0)
+            mat.albedo.a = decode_alpha(alpha);
     }
     {
         // Load emission

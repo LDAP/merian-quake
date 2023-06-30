@@ -25,7 +25,7 @@ class QuakeNode : public merian::Node {
 
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
-            : width(glt->width), height(glt->height) {
+            : width(glt->width), height(glt->height), flags(glt->flags) {
             cpu_tex.resize(width * height);
 
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
@@ -33,6 +33,8 @@ class QuakeNode : public merian::Node {
 
         uint32_t width;
         uint32_t height;
+        // bitmask of TEXPREF_* flags in gl_texmgr
+        uint32_t flags;
 
         std::vector<uint32_t> cpu_tex{};
 
@@ -79,7 +81,8 @@ class QuakeNode : public merian::Node {
         uint16_t s_2{};
         uint16_t t_2{};
 
-        // texnum and (unused) alpha in upper 4 bits
+        // texnum and alpha in upper 4 bits
+        // Alpha meaning: 0: use texture, [1,15] map to [0,1] where 15 is fully opaque and 1 transparent
         uint16_t texnum_alpha{};
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
         // for flags see MAT_FLAGS_* in config.h
