@@ -964,6 +964,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
 
     // UPDATE GAMESTATE (if not paused)
     if (!pause) {
+        MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         if (!pending_commands.empty()) {
             // only one command between each HostFrame
             Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
@@ -1000,14 +1001,26 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     fog_density *= fog_density;
     pc.fog = glm::vec4(fog_color, fog_density);
 
-    // UPDATE GEO
-    if (worldspawn) {
-        update_static_geo(cmd);
-        worldspawn = false;
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
+        if (worldspawn) {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
+            update_static_geo(cmd);
+            worldspawn = false;
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload dynamic");
+            update_dynamic_geo(cmd);
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "build acceleration structures");
+            update_as(cmd, run.get_profiler());
+        }
     }
-    update_dynamic_geo(cmd);
-    update_as(cmd);
-    update_textures(cmd);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
+        update_textures(cmd);
+    }
 
     if (!tlas) {
         // TODO: Clear output and feedback buffers
@@ -1015,13 +1028,15 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     // BIND PIPELINE
-    pipe->bind(cmd);
-    pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
-    pipe->bind_descriptor_set(cmd, quake_sets, 1);
-    pipe->push_constant(cmd, pc);
-    cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                 (height + local_size_y - 1) / local_size_y, 1);
-
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
+        pipe->bind(cmd);
+        pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        pipe->bind_descriptor_set(cmd, quake_sets, 1);
+        pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+    }
     frame++;
 }
 
@@ -1131,23 +1146,17 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         vk::AccelerationStructureBuildRangeInfoKHR range_info{
             static_cast<uint32_t>(dynamic_idx.size() / 3), 0, 0, 0};
 
+        vk::BuildAccelerationStructureFlagsKHR flags =
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild |
+            vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
         if (old_vtx_size == dynamic_vtx.size() && old_idx_size == dynamic_idx.size()) {
             if (frame % 50 == 0)
-                blas_builder.queue_rebuild(
-                    {geometry}, {range_info}, dynamic_blas,
-                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+                blas_builder.queue_rebuild({geometry}, {range_info}, dynamic_blas, flags);
             else
-                blas_builder.queue_update(
-                    {geometry}, {range_info}, dynamic_blas,
-                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+                blas_builder.queue_update({geometry}, {range_info}, dynamic_blas, flags);
         } else {
             // Build new
-            dynamic_blas = blas_builder.queue_build(
-                {geometry}, {range_info},
-                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+            dynamic_blas = blas_builder.queue_build({geometry}, {range_info}, flags);
             merian::DescriptorSetUpdate update(quake_sets);
             update.write_descriptor_buffer(BINDING_VTX_BUF, dynamic_vtx_buffer, 0, VK_WHOLE_SIZE,
                                            ARRAY_IDX_DYNAMIC);
@@ -1169,8 +1178,11 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     }
 }
 
-void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
-    blas_builder.get_cmds(cmd);
+void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHandle profiler) {
+    {
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "blas");
+        blas_builder.get_cmds(cmd);
+    }
 
     uint32_t old_instances_size = instances.size();
     instances.clear();
@@ -1182,7 +1194,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
             ARRAY_IDX_STATIC,
             0xFF,
             0,
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             static_blas->get_acceleration_structure_device_address(),
         });
     }
@@ -1192,7 +1204,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
             ARRAY_IDX_DYNAMIC,
             0xFF,
             0,
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             dynamic_blas->get_acceleration_structure_device_address(),
         });
     }
@@ -1219,9 +1231,11 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd) {
             update.write_descriptor_acceleration_structure(BINDING_TLAS, *tlas);
             update.update(context);
         }
-        tlas_builder.get_cmds(cmd);
-        tlas_builder.cmd_barrier(cmd, vk::PipelineStageFlagBits::eComputeShader);
-
+        {
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "tlas");
+            tlas_builder.get_cmds(cmd);
+            tlas_builder.cmd_barrier(cmd, vk::PipelineStageFlagBits::eComputeShader);
+        }
     } else {
         tlas = nullptr;
     }

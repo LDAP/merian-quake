@@ -22,6 +22,7 @@
 
 struct FrameData {
     merian::StagingMemoryManager::SetID staging_set_id{};
+    merian::ProfilerHandle profiler{};
 };
 
 int main() {
@@ -69,24 +70,36 @@ int main() {
     auto ring_fences = make_shared<merian::RingFences<1, FrameData>>(context);
     uint64_t frames = 50;
     uint64_t frame = 0;
+    // quake->queue_command("game SlayerTest");
+    
+    // quake->queue_command("map st1m1");
     quake->queue_command("game ad");
     quake->queue_command("map ad_tears");
+    //quake->queue_command("map e1m6");
     while (!glfwWindowShouldClose(*window)) {
-        // if (frame++ >= frames)
-        //     break;
-
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
+        if (!frame_data.user_data.profiler) {
+            frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
+        } else {
+            frame_data.user_data.profiler->collect();
+            if (frame % 500 == 0) {
+                SPDLOG_INFO(frame_data.user_data.profiler->get_report());
+            }
+        }
         alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
         auto cmd_pool = ring_cmd_pool->set_cycle();
         auto cmd = cmd_pool->create_and_begin();
         glfwPollEvents();
+        frame_data.user_data.profiler->cmd_reset(cmd);
 
-        auto& run = graph.cmd_run(cmd);
+        auto& run = graph.cmd_run(cmd, frame_data.user_data.profiler);
+        //MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
 
         frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();
         cmd_pool->end_all();
         queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),
                       run.get_wait_semaphores(), run.get_wait_stages());
         run.execute_callbacks(queue);
+        frame++;
     }
 }
