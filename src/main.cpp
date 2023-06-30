@@ -75,6 +75,8 @@ int main() {
     quake->queue_command("game ad");
     quake->queue_command("map ad_tears");
     //quake->queue_command("map e1m6");
+    merian::Stopwatch sw;
+    double avg_time = 0;
     while (!glfwWindowShouldClose(*window)) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
         if (!frame_data.user_data.profiler) {
@@ -83,8 +85,11 @@ int main() {
             frame_data.user_data.profiler->collect();
             if (frame % 500 == 0) {
                 SPDLOG_INFO(frame_data.user_data.profiler->get_report());
+                SPDLOG_INFO("avg fps: {}", 1. / avg_time);
             }
         }
+        avg_time = .7 * avg_time + .3 * sw.seconds();
+        sw.reset();
         alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
         auto cmd_pool = ring_cmd_pool->set_cycle();
         auto cmd = cmd_pool->create_and_begin();
