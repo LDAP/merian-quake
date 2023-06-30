@@ -301,6 +301,7 @@ void add_geo_alias(entity_t* ent,
             n0 = merian::pack_uint32(hdr->gstextures[sk][fm] ? hdr->gstextures[sk][fm]->texnum : 0,
                                      hdr->nmtextures[sk][fm]->texnum);
             n1 = 0xffffffff; // mark as brush model -> to use normal map
+            n2 = 0;
         } else {
             // the vertex normals
             n0 = *(tmpn + indexes[3 * i + 0]);
