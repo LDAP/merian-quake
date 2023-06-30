@@ -21,7 +21,7 @@ struct ShadingMaterial {
     vec3 pos;
     // distance to shading point
     float t;
-    // uint16_t flags;
+    float gloss;
 };
 
 // assert(alpha != 0)
@@ -118,7 +118,7 @@ void get_shading_material(const IntersectionInfo info,
                           out ShadingMaterial mat) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
     const uint flags = extra_data.texnum_fb_flags >> 12;
-
+    mat.gloss = 0;
     if (flags == MAT_FLAGS_SKY) {
         mat.albedo = vec4(0, 0, 0, 1);
         mat.emission = envmap(ray_dir);
@@ -164,6 +164,9 @@ void get_shading_material(const IntersectionInfo info,
             // overwrite geo normal with normal map normal
             vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
             mat.normal = apply_normalmap(verts[0], verts[1], verts[2], st_0, st_1, st_2, mat.normal, tangent_normal);
+        }
+        if (texnum_gloss > 0) {
+            mat.gloss = texture(img_tex[nonuniformEXT(texnum_gloss)], st).r;
         }
     } else {
         vec3 n0 = geo_decode_normal(extra_data.n0_gloss_norm);
@@ -215,5 +218,5 @@ void main() {
         get_shading_material(info, params.cam_x.xyz, camera_dir, mat);
     }
 
-    imageStore(img_albedo, pixel, vec4(mat.albedo));
+    imageStore(img_albedo, pixel, mat.gloss > 0 ? vec4(mat.gloss) : mat.albedo);
 }
