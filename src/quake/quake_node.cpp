@@ -359,6 +359,7 @@ void add_geo_brush(entity_t* ent,
                     0xffffffff,
                     0,
                 };
+                uint32_t flags = MAT_FLAGS_NONE;
                 if (surf->texinfo->texture->gltexture) {
                     extra.s_0 = merian::float_to_half(p->verts[0][3]);
                     extra.t_0 = merian::float_to_half(p->verts[0][4]);
@@ -380,31 +381,26 @@ void add_geo_brush(entity_t* ent,
                     // TODO: or "slime" or "tele" instead of "lava"
                     extra.texnum_alpha |= ai << 12;
 
-                    // max textures is 4096 (12 bit) and we have 16. so we can put 4 bits
-                    // worth of flags here:
-                    uint32_t flags = 0;
                     if (surf->flags & SURF_DRAWLAVA)
-                        flags = 1;
+                        flags = MAT_FLAGS_LAVA;
                     if (surf->flags & SURF_DRAWSLIME)
-                        flags = 2;
+                        flags = MAT_FLAGS_SLIME;
                     if (surf->flags & SURF_DRAWTELE)
-                        flags = 3;
+                        flags = MAT_FLAGS_TELE;
                     if (surf->flags & SURF_DRAWWATER)
-                        flags = 4;
-                    if (surf->flags & SURF_DRAWSKY)
-                        flags = 6;
+                        flags = MAT_FLAGS_WATER;
+                    if (strstr(t->gltexture->name, "wfall"))
+                        flags = MAT_FLAGS_WATERFALL; // hack for ad_tears and emissive waterfalls
 #if WATER_MODE == WATER_MODE_FULL
                     if (wateroffset)
-                        flags = 5; // this is our procedural water lower mark
+                        flags = MAT_FLAGS_WATER_LOWER; // this is our procedural water lower mark
 #endif
-                    if (strstr(t->gltexture->name, "wfall"))
-                        flags = 7; // hack for ad_tears and emissive waterfalls
-
-                    extra.texnum_fb_flags |= flags << 12;
                 }
-                // Mark as sky
                 if (surf->flags & SURF_DRAWSKY)
-                    extra.texnum_alpha |= 0xfff;
+                    flags = MAT_FLAGS_SKY;
+                // max textures is 4096 (12 bit) and we have 16. so we can put 4 bits
+                // worth of flags here:
+                extra.texnum_fb_flags |= flags << 12;
 
                 ext.push_back(extra);
             }
@@ -736,7 +732,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
     audio_device = std::make_unique<merian::SDLAudioDevice>(
         merian::SDLAudioDevice::FORMAT_S16_LSB, [](uint8_t* stream, int len) {
-            // from https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
+            // from
+            // https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
             int buffersize = shm->samples * (shm->samplebits / 8);
             int pos, tobufend;
             int len1, len2;
@@ -771,8 +768,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             if (shm->samplepos >= buffersize)
                 shm->samplepos = 0;
         });
-    audio_device->unpause_audio();
-
+    if (sound)
+        audio_device->unpause_audio();
 }
 
 QuakeNode::~QuakeNode() {

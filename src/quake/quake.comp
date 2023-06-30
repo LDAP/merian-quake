@@ -8,19 +8,11 @@
 #include "common/camera.glsl"
 #include "common/random.glsl"
 #include "common/normal_encode.glsl"
+#include "common/raytrace.glsl"
 
 #include "config.h"
 #include "layout.glsl"
 #include "envmap.glsl"
-
-struct IntersectionInfo {
-    int instance_custom_index;
-    // primitive index in the instance
-    int primitive_index;
-    vec3 barycentrics;
-    // distance to intersection
-    float t;
-};
 
 struct ShadingMaterial {
     vec4 albedo;
@@ -90,51 +82,64 @@ vec3 apply_normalmap(const vec3 v0,
     return n;
 }
 
-// The the intersection info for a commited intersection
-IntersectionInfo get_intersection_info_commited(rayQueryEXT ray_query) {
-    IntersectionInfo info;
-    info.instance_custom_index = rayQueryGetIntersectionInstanceCustomIndexEXT(ray_query, true);
-    info.primitive_index = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
-    info.barycentrics.yz = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
-    info.barycentrics.x = 1.0 - info.barycentrics.z - info.barycentrics.y;
-    info.t = rayQueryGetIntersectionTEXT(ray_query, true);
-    return info;
+// Checks flags and alpha to determine if the intersection should be confirmed.
+bool confirm_intersection(const IntersectionInfo info) {
+    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
+    const uint flags = extra_data.texnum_fb_flags >> 12;
+    if (flags != MAT_FLAGS_NONE) {
+        // treat sky, lava, slime,... not transparent for now
+        return true;
+    } else {
+        const uint texnum = extra_data.texnum_alpha & 0xfff;
+        const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
+        const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
+        const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
+
+        vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
+        if (flags > 0 && flags < 6) {
+            warp(st);
+        }
+
+        return texture(img_tex[nonuniformEXT(texnum)], st).a >= ALPHA_THRESHOLD;
+    }
 }
 
-ShadingMaterial get_shading_material(const IntersectionInfo info,
-                                     const vec3 ray_origin,
-                                     const vec3 ray_dir) {
-    ShadingMaterial mat;
-    
+void get_shading_material(const IntersectionInfo info,
+                          const vec3 ray_origin,
+                          const vec3 ray_dir,
+                          out ShadingMaterial mat) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
-    const uint texnum = extra_data.texnum_alpha & 0xfff;
-    const bool is_sky = (texnum == 0xfff);
-    if (is_sky) {
+    const uint flags = extra_data.texnum_fb_flags >> 12;
+    if (flags == MAT_FLAGS_SKY) {
         mat.albedo = vec4(0, 0, 0, 1);
         mat.emission = envmap(ray_dir);
         mat.normal = -ray_dir;
         mat.t = T_MAX - 1.0;
         mat.pos = ray_origin + mat.t * ray_dir;
-        return mat;
+        return;
     }
-
+    mat.t = info.t;
     const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
     const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
     const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
     //const uint alpha = extra_data.texnum_alpha >> 12;
-    const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
     const bool is_brush_model = (extra_data.n1_brush == 0xffffffff);
-    const uint flags = extra_data.texnum_fb_flags >> 12;
 
     vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
     if (flags > 0 && flags < 6) {
         warp(st);
     }
 
-    // Load albedo
-    mat.albedo = texture(img_tex[nonuniformEXT(texnum)], st);
-    // Load emission
-    mat.emission = get_emission(texnum_fb, st, mat.albedo.rgb, flags);
+    {
+        // Load albedo
+        const uint texnum = extra_data.texnum_alpha & 0xfff;
+        mat.albedo = texture(img_tex[nonuniformEXT(texnum)], st);
+    }
+    {
+        // Load emission
+        const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
+        mat.emission = get_emission(texnum_fb, st, mat.albedo.rgb, flags);
+    }
 
     mat3 verts;
     get_verts_pos_geonormal(verts, mat.pos, mat.normal, info);
@@ -155,33 +160,33 @@ ShadingMaterial get_shading_material(const IntersectionInfo info,
         vec3 n2 = geo_decode_normal(extra_data.n2);
         mat.normal = normalize(mat3(n0, n1, n2) * info.barycentrics);
     }
-
-
-    return mat;
 }
 
-vec4 trace_ray(vec3 x0, vec3 dir, uint rng_state) {
+void trace_ray(vec3 x0, vec3 dir, uint rng_state, out IntersectionInfo info) {
     rayQueryEXT ray_query;
-    rayQueryInitializeEXT(ray_query,              // Ray query
-                          tlas,                  // Top-level acceleration structure
-                          gl_RayFlagsOpaqueEXT,  // Ray flags, here saying "treat all geometry as opaque"
+    rayQueryInitializeEXT(ray_query,
+                          tlas,
+                          gl_RayFlagsNoneEXT,    // Ray flags, None means: If not set in the instance the triangle
+                                                 // may not be opaque. This is a major performance hit
+                                                 // since we need to load the texture to determine if we want to trace
+                                                 // further.
+                                                 // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
                           0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
-                          x0,                    // Ray origin
+                          x0,
                           1e-3,                  // Minimum t-value
-                          dir,                   // Ray direction
+                          dir,
                           T_MAX);                // Maximum t-value
 
     while(rayQueryProceedEXT(ray_query)) {
         // We are only interessted in triangles. "false" means candidates too, not only commited
         if (rayQueryGetIntersectionTypeEXT(ray_query, false) != gl_RayQueryCandidateIntersectionTriangleEXT)
             continue;
-        rayQueryConfirmIntersectionEXT(ray_query);
+
+        get_intersection_info_uncommited(ray_query, info);
+        if (confirm_intersection(info))
+            rayQueryConfirmIntersectionEXT(ray_query);
     }
-
-    IntersectionInfo info = get_intersection_info_commited(ray_query);
-    ShadingMaterial mat = get_shading_material(info, x0, dir);
-
-    return vec4(mat.albedo);
+    get_intersection_info_commited(ray_query, info);
 }
 
 void main() {
@@ -191,10 +196,13 @@ void main() {
 
     uint rng_state = 19937 * (resolution.x  * pixel.y + pixel.x) * params.frame;
 
-    vec3 camera_dir = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec4(rng_state));
+    ShadingMaterial mat;
+    {
+        vec3 camera_dir = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec4(rng_state));
+        IntersectionInfo info;
+        trace_ray(params.cam_x.xyz, camera_dir, rng_state, info);
+        get_shading_material(info, params.cam_x.xyz, camera_dir, mat);
+    }
 
-    vec4 diff = trace_ray(params.cam_x.xyz, camera_dir, rng_state);
-
-    imageStore(img_albedo, pixel, vec4(diff));
-    return;
+    imageStore(img_albedo, pixel, vec4(mat.albedo));
 }

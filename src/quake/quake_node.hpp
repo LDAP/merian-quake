@@ -9,6 +9,7 @@
 #include "merian/vk/raytrace/blas_builder.hpp"
 #include "merian/vk/raytrace/tlas_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include <queue>
 #include <unordered_set>
@@ -79,18 +80,9 @@ class QuakeNode : public merian::Node {
         uint16_t t_2{};
 
         // texnum and (unused) alpha in upper 4 bits
-        // if texnum is 0xfff then it is marked as sky
         uint16_t texnum_alpha{};
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
-        // Flags:
-        // 0 -> None
-        // 1 -> Lava
-        // 2 -> Slime
-        // 3 -> Tele
-        // 4 -> Water
-        // 5 -> Water, lower mark
-        // 6 -> Sky (unused currently)
-        // 7 -> Waterfall
+        // for flags see MAT_FLAGS_* in config.h
         uint16_t texnum_fb_flags{};
     };
 
@@ -151,7 +143,7 @@ class QuakeNode : public merian::Node {
   private:
     void update_static_geo(const vk::CommandBuffer& cmd);
     void update_dynamic_geo(const vk::CommandBuffer& cmd);
-    void update_as(const vk::CommandBuffer& cmd);
+    void update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHandle profiler);
     // processes the pending uploads and updates the current descriptor set
     void update_textures(const vk::CommandBuffer& cmd);
 
@@ -237,6 +229,7 @@ class QuakeNode : public merian::Node {
 
     double old_time = 0;
     bool pause = false;
+    bool sound = false;
 
     double mouse_oldx = 0;
     double mouse_oldy = 0;
