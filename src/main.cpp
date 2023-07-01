@@ -43,6 +43,7 @@ int main() {
     auto [window, surface] = extGLFW.get();
 
     std::shared_ptr<merian::InputController> controller = std::make_shared<merian::GLFWInputController>(window);
+    auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
     merian::Graph graph{context, alloc, queue};
     auto output =
@@ -52,7 +53,7 @@ int main() {
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black_color = std::make_shared<merian::ColorOutputNode>(
         vk::Format::eR16G16B16A16Sfloat, vk::ClearColorValue{}, vk::Extent3D{1920, 1080, 1});
-    auto quake = std::make_shared<QuakeNode>(context, alloc, controller);
+    auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size());
     graph.add_node("output", output);
     graph.add_node("black_color", black_color);
     graph.add_node("blue_noise", blue_noise);
@@ -67,14 +68,13 @@ int main() {
 
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-    auto ring_fences = make_shared<merian::RingFences<1, FrameData>>(context);
     uint64_t frame = 0;
-    // quake->queue_command("game SlayerTest");
-    
-    // quake->queue_command("map st1m1");
+    //quake->queue_command("game SlayerTest");
+    //quake->queue_command("map st1m1");
     quake->queue_command("game ad");
     quake->queue_command("map ad_tears");
     //quake->queue_command("map e1m6");
+    //quake->queue_command("map e1m1");
     merian::Stopwatch sw;
     double avg_time = 0;
     while (!glfwWindowShouldClose(*window)) {

@@ -10,7 +10,9 @@
 #include "merian/vk/raytrace/blas_builder.hpp"
 #include "merian/vk/raytrace/tlas_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/utils/profiler.hpp"
+#include "quake/config.h"
 
 #include <queue>
 #include <unordered_set>
@@ -98,10 +100,13 @@ class QuakeNode : public merian::Node {
     };
 
   public:
-    /* Path to the Quake basedir. This directory must contain the id1 directory. */
+    /* Path to the Quake basedir. This directory must contain the id1 directory.
+     * It must be guaranteed that at most `ring_size` resources suffice. (A RingFence with that RING_SIZE).
+     */
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle& allocator,
               const std::shared_ptr<merian::InputController> controller,
+              const uint32_t ring_size,
               const char* base_dir = "./res/quake");
 
     ~QuakeNode();
@@ -152,8 +157,11 @@ class QuakeNode : public merian::Node {
     }
 
   private:
-    void update_static_geo(const vk::CommandBuffer& cmd);
+    // Optionally refreshes the geo and updates the current descriptor set if necessary
+    void update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo);
+    // Refreshes the geo and updates the current descriptor set
     void update_dynamic_geo(const vk::CommandBuffer& cmd);
+    // Builds the as and updates the current descriptor set
     void update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHandle profiler);
     // processes the pending uploads and updates the current descriptor set
     void update_textures(const vk::CommandBuffer& cmd);
@@ -163,9 +171,6 @@ class QuakeNode : public merian::Node {
     const merian::ResourceAllocatorHandle allocator;
 
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
-
-    merian::BLASBuilder blas_builder;
-    merian::TLASBuilder tlas_builder;
 
     merian::ShaderModuleHandle shader;
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
@@ -181,7 +186,6 @@ class QuakeNode : public merian::Node {
 
     merian::DescriptorSetLayoutHandle quake_desc_set_layout;
     merian::DescriptorPoolHandle quake_pool;
-    merian::DescriptorSetHandle quake_sets;
 
     merian::PipelineHandle pipe;
 
@@ -193,47 +197,87 @@ class QuakeNode : public merian::Node {
 
     PushConstant pc;
 
-    // ----------------------------------------------------
-    // Per-frame info, TODO: what if multiple in flight?
-
     // Store some textures for custom patches
     uint32_t texnum_blood;
     uint32_t texnum_explosion;
     std::array<uint32_t, 6> texnum_skybox;
 
-    // Textures
-    // texnum -> texture
-    std::unordered_map<uint32_t, std::shared_ptr<QuakeTexture>> textures;
-    std::unordered_set<uint32_t> pending_uploads;
+    // ----------------------------------------------------
+    // Per-frame data and updates
+    
+    struct FrameData {
+        // Needed per frame because might reallocate scratch buffer
+        std::unique_ptr<merian::BLASBuilder> blas_builder;
+        std::unique_ptr<merian::TLASBuilder> tlas_builder;
 
+        merian::DescriptorSetHandle quake_sets{nullptr};
+
+        // keep copy of current_textures to keep them alive and to know which descriptors to update
+        std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
+
+        // Static geo (copy to keep alive)
+        // Can be nullptr if idx is empty
+        merian::BufferHandle static_vtx_buffer{nullptr};
+        merian::BufferHandle static_idx_buffer{nullptr};
+        merian::BufferHandle static_ext_buffer{nullptr};
+        // Can be nullptr if idx is empty
+        merian::AccelerationStructureHandle static_blas{nullptr};
+
+        // Dynamic geo
+        // Can be nullptr if idx is empty
+        merian::BufferHandle dynamic_vtx_buffer{nullptr};
+        merian::BufferHandle dynamic_idx_buffer{nullptr};
+        merian::BufferHandle dynamic_ext_buffer{nullptr};
+        // Can be nullptr if idx is empty
+        merian::AccelerationStructureHandle dynamic_blas{nullptr};
+
+        // TLAS
+        merian::BufferHandle instances_buffer{nullptr};
+        // Can be nullptr if there is not geometry
+        merian::AccelerationStructureHandle tlas{nullptr};
+
+        // Has to be in Framedata since we use its size to decide whether
+        // to build or to rebuild
+        uint32_t last_dynamic_vtx_size = 0;
+        uint32_t last_dynamic_idx_size = 0;
+        uint32_t last_instances_size = 0;
+    };
+
+    // Access using frame % frames.size()
+    std::vector<FrameData> frames;
+    uint64_t frame = 0;
+
+    FrameData& current_frame() {
+        assert(frames.size());
+        return frames[frame % frames.size()];
+    }
+
+    // "Global" frame info
+    // texnum -> texture
+    std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
+    std::unordered_set<uint32_t> pending_uploads;
     // Static geo
+    // Can be nullptr if idx is empty
+    merian::BufferHandle current_static_vtx_buffer;
+    merian::BufferHandle current_static_idx_buffer;
+    merian::BufferHandle current_static_ext_buffer;
+    // Can be nullptr if idx is empty
+    merian::AccelerationStructureHandle current_static_blas;
+
+    // Static geo (keep to avoid reallocation)
     std::vector<float> static_vtx;
     std::vector<uint32_t> static_idx;
     std::vector<VertexExtraData> static_ext; // per primitive
-    // Can be nullptr if idx is empty
-    merian::BufferHandle static_vtx_buffer;
-    merian::BufferHandle static_idx_buffer;
-    merian::BufferHandle static_ext_buffer;
-    // Can be nullptr if idx is empty
-    merian::AccelerationStructureHandle static_blas;
 
-    // Dynamic geo
+    // Dynamic geo (keep to avoid reallocation)
     std::vector<float> dynamic_vtx;
     std::vector<uint32_t> dynamic_idx;
     std::vector<VertexExtraData> dynamic_ext;
-    // Can be nullptr if idx is empty
-    merian::BufferHandle dynamic_vtx_buffer;
-    merian::BufferHandle dynamic_idx_buffer;
-    merian::BufferHandle dynamic_ext_buffer;
-    // Can be nullptr if idx is empty
-    merian::AccelerationStructureHandle dynamic_blas;
 
-    merian::BufferHandle instances_buffer;
     std::vector<vk::AccelerationStructureInstanceKHR> instances;
-    // Can be nullptr if there is not geometry
-    merian::AccelerationStructureHandle tlas;
 
     // ----------------------------------------------------
+    // Gamestate
 
     std::queue<std::string> pending_commands;
     bool worldspawn = false;
@@ -246,6 +290,4 @@ class QuakeNode : public merian::Node {
     double mouse_oldy = 0;
     double mouse_x = 0;
     double mouse_y = 0;
-
-    uint64_t frame = 0;
 };

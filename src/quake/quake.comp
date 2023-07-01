@@ -218,5 +218,5 @@ void main() {
         get_shading_material(info, params.cam_x.xyz, camera_dir, mat);
     }
 
-    imageStore(img_albedo, pixel, mat.gloss > 0 ? vec4(mat.gloss) : mat.albedo);
+    imageStore(img_albedo, pixel, vec4(mat.albedo));
 }
