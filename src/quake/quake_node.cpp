@@ -246,34 +246,38 @@ void add_geo_alias(entity_t* ent,
     int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
     trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
 
-    // lerpdata_t  lerpdata;
-    // R_SetupAliasFrame(hdr, ent->frame, &lerpdata);
-    // R_SetupEntityTransform(ent, &lerpdata);
-    // angles: pitch yaw roll. axes: right fwd up
-    float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
-    glm::vec3 fwd, rgt, top, pos;
-    glm::vec3 origin = vec3_from_float(ent->origin);
-    AngleVectors(angles, &fwd.x, &rgt.x, &top.x);
-    rgt *= -1;
-    glm::mat3 mat_model(fwd, rgt, top);
-    glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
-
     // for(int f = 0; f < hdr->numposes; f++)
     // TODO: upload all vertices so we can just alter the indices on gpu
     int f = ent->frame;
     if (f < 0 || f >= hdr->numposes)
         return;
 
+    lerpdata_t  lerpdata;
+    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
+    R_SetupEntityTransform(ent, &lerpdata);
+    // angles: pitch yaw roll. axes: right fwd up
+    float angles[3] = {-lerpdata.angles[0], lerpdata.angles[1], lerpdata.angles[2]};
+    glm::vec3 fwd, rgt, top, pos_pose1, pos_pose2;
+    glm::vec3 origin = vec3_from_float(lerpdata.origin);
+    AngleVectors(angles, &fwd.x, &rgt.x, &top.x);
+    rgt *= -1;
+    glm::mat3 mat_model(fwd, rgt, top);
+    glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
+
     uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
-        int i = hdr->numverts * f + desc[v].vertindex;
+        int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
+        int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
         // get model pos
-        for (int k = 0; k < 3; k++)
-            pos[k] = trivertexes[i].v[k] * hdr->scale[k] + hdr->scale_origin[k];
+        for (int k = 0; k < 3; k++) {
+            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] + hdr->scale_origin[k];
+            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] + hdr->scale_origin[k];
+        }
         // convert to world space
-        pos = origin + mat_model * pos;
+
+        glm::vec3 world_pos = origin + mat_model * glm::mix(pos_pose1, pos_pose2, lerpdata.blend);
         for (int k = 0; k < 3; k++)
-            vtx.emplace_back(pos[k]);
+            vtx.emplace_back(world_pos[k]);
     }
 
     for (int i = 0; i < hdr->numindexes; i++)
@@ -282,11 +286,13 @@ void add_geo_alias(entity_t* ent,
     // normals for each vertex from above
     uint32_t* tmpn = (uint32_t*)alloca(sizeof(uint32_t) * hdr->numverts_vbo);
     for (int v = 0; v < hdr->numverts_vbo; v++) {
-        int i = hdr->numverts * f + desc[v].vertindex;
-        glm::vec3 n = vec3_from_float(r_avertexnormals[trivertexes[i].lightnormalindex]);
+        int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
+        int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
+        glm::vec3 n_pose1 = vec3_from_float(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
+        glm::vec3 n_pose2 = vec3_from_float(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
         // convert to worldspace
-        n = mat_model_inv_t * n;
-        *(tmpn + v) = merian::encode_normal(&n.x);
+        glm::vec3 world_n = mat_model_inv_t * glm::mix(n_pose1, n_pose2, lerpdata.blend);
+        *(tmpn + v) = merian::encode_normal(world_n);
     }
 
     // add extra data for each primitive
