@@ -4,6 +4,7 @@
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/string.hpp"
+#include "merian/utils/threads.hpp"
 #include "merian/utils/xorshift.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
@@ -248,7 +249,10 @@ void add_geo_alias(entity_t* ent,
     // fprintf(stderr, "alias origin and angles %g %g %g -- %g %g %g\n",
     //     ent->origin[0], ent->origin[1], ent->origin[2],
     //     ent->angles[0], ent->angles[1], ent->angles[2]);
+    static std::mutex quake_mutex;
+    quake_mutex.lock();
     aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
+    quake_mutex.unlock();
     aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
     // the plural here really hurts but it's from quakespasm code:
     int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
@@ -1166,11 +1170,32 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     dynamic_ext.clear();
 
     add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
-    for (int i = 0; i < cl_numvisedicts; i++)
-        add_geo(cl_visedicts[i], dynamic_vtx, dynamic_idx, dynamic_ext);
-    for (int i = 0; i < cl.num_statics; i++)
-        add_geo(cl_static_entities + i, dynamic_vtx, dynamic_idx, dynamic_ext);
     add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
+
+    std::vector<std::vector<float>> thread_dynamic_vtx(std::thread::hardware_concurrency());
+    std::vector<std::vector<uint32_t>> thread_dynamic_idx(std::thread::hardware_concurrency());
+    std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(
+        std::thread::hardware_concurrency());
+
+    merian::parallel_for(cl_numvisedicts, [&](uint32_t index, uint32_t thread_index) {
+        add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
+                thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+    });
+    merian::parallel_for(cl.num_statics, [&](uint32_t index, uint32_t thread_index) {
+        add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
+                thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+    });
+
+    for (uint32_t i = 0; i < thread_dynamic_idx.size(); i++) {
+        uint32_t old_vtx_count = dynamic_vtx.size() / 3;
+
+        merian::insert_all(dynamic_vtx, thread_dynamic_vtx[i]);
+        merian::insert_all(dynamic_ext, thread_dynamic_ext[i]);
+
+        for (auto& idx : thread_dynamic_idx[i]) {
+            dynamic_idx.emplace_back(old_vtx_count + idx);
+        }
+    }
 
     // for (int i=1 ; i<MAX_MODELS ; i++)
     //     add_geo(cl.model_precache+i, p->vtx + 3*vtx_cnt, p->idx + idx_cnt, 0, &vtx_cnt,
@@ -1286,9 +1311,10 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         if (cur_frame.last_instances_size == instances.size()) {
             // rebuild
             cur_frame.tlas_builder->queue_rebuild(instances.size(), cur_frame.instances_buffer,
-                                       cur_frame.tlas);
+                                                  cur_frame.tlas);
         } else {
-            cur_frame.tlas = cur_frame.tlas_builder->queue_build(instances.size(), cur_frame.instances_buffer);
+            cur_frame.tlas =
+                cur_frame.tlas_builder->queue_build(instances.size(), cur_frame.instances_buffer);
 
             merian::DescriptorSetUpdate update(cur_frame.quake_sets);
             update.write_descriptor_acceleration_structure(BINDING_TLAS, *cur_frame.tlas);
