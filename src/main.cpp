@@ -48,7 +48,7 @@ int main() {
     merian::Graph graph{context, alloc, queue};
     auto output =
         std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
-    output->get_swapchain()->set_vsync(true);
+    //output->get_swapchain()->set_vsync(true);
     auto blue_noise = std::make_shared<merian::ImageNode>(
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black_color = std::make_shared<merian::ColorOutputNode>(
