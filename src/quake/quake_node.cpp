@@ -753,6 +753,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                 controller.request_raw_mouse_input(true);
                 this->mouse_oldx = this->mouse_x;
                 this->mouse_oldy = this->mouse_y;
+                return;
             }
         }
         const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
