@@ -79,13 +79,15 @@ int main() {
     double avg_time = 0;
     while (!glfwWindowShouldClose(*window)) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
+        bool clear_profiler = false;
         if (!frame_data.user_data.profiler) {
             frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
         } else {
             frame_data.user_data.profiler->collect();
-            if (frame % 500 == 0) {
+            if (frame % 200 == 0) {
                 SPDLOG_INFO(frame_data.user_data.profiler->get_report());
                 SPDLOG_INFO("avg fps: {}", 1. / avg_time);
+                clear_profiler = true;
             }
         }
         avg_time = .7 * avg_time + .3 * sw.seconds();
@@ -94,7 +96,7 @@ int main() {
         auto cmd_pool = ring_cmd_pool->set_cycle();
         auto cmd = cmd_pool->create_and_begin();
         glfwPollEvents();
-        frame_data.user_data.profiler->cmd_reset(cmd);
+        frame_data.user_data.profiler->cmd_reset(cmd, clear_profiler);
 
         auto& run = graph.cmd_run(cmd, frame_data.user_data.profiler);
         //MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
