@@ -3,6 +3,7 @@
 #include "glm/ext/vector_float4.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/sdl_audio_device.hpp"
+#include "merian/utils/string.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -29,12 +30,18 @@ class QuakeNode : public merian::Node {
             cpu_tex.resize(width * height);
 
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
+
+            linear = false;
+            linear |= merian::ends_with(glt->name, "_norm");
+            linear |= merian::ends_with(glt->name, "_gloss");
         }
 
         uint32_t width;
         uint32_t height;
         // bitmask of TEXPREF_* flags in gl_texmgr
         uint32_t flags;
+        // if true interpret linearly (Unorm) else as Srgb.
+        bool linear;
 
         std::vector<uint32_t> cpu_tex{};
 
@@ -55,8 +62,8 @@ class QuakeNode : public merian::Node {
         // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
         std::array<uint32_t, 6> sky;
 
-        float cl_time; // quake time
-        int ref{false};       // use reference sampling
+        float cl_time;  // quake time
+        int ref{false}; // use reference sampling
 
         int health;
         int armor;
@@ -82,7 +89,8 @@ class QuakeNode : public merian::Node {
         uint16_t t_2{};
 
         // texnum and alpha in upper 4 bits
-        // Alpha meaning: 0: use texture, [1,15] map to [0,1] where 15 is fully opaque and 1 transparent
+        // Alpha meaning: 0: use texture, [1,15] map to [0,1] where 15 is fully opaque and 1
+        // transparent
         uint16_t texnum_alpha{};
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
         // for flags see MAT_FLAGS_* in config.h

@@ -70,7 +70,8 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
                                                const std::vector<uint32_t>& data,
                                                uint32_t width,
                                                uint32_t height,
-                                               bool force_linear_filter = false) {
+                                               bool force_linear_filter = false,
+                                               bool srgb = true) {
     static vk::ImageCreateInfo tex_image_info{
         {},
         vk::ImageType::e2D,
@@ -97,6 +98,14 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
 
     tex_image_info.extent.width = width;
     tex_image_info.extent.height = height;
+
+    if (srgb) {
+        tex_image_info.format = vk::Format::eR8G8B8A8Srgb;
+        tex_view_info.format = vk::Format::eR8G8B8A8Srgb;
+    } else {
+        tex_image_info.format = vk::Format::eR8G8B8A8Unorm;
+        tex_view_info.format = vk::Format::eR8G8B8A8Unorm;
+    }
 
     merian::ImageHandle image =
         allocator->createImage(cmd, data.size() * sizeof(uint32_t), data.data(), tex_image_info);
@@ -1065,7 +1074,7 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
         assert(!tex->gpu_tex);
         const bool force_linear_filter = tex->flags & TEXPREF_LINEAR;
         tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height,
-                                         force_linear_filter);
+                                         force_linear_filter, !tex->linear);
         update.write_descriptor_texture(BINDING_IMG_TEX, tex->gpu_tex, texnum);
     }
     pending_uploads.clear();
