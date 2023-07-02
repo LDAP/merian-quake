@@ -1164,7 +1164,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
     });
 
-    const uint32_t concurrency = std::thread::hardware_concurrency() / 2;
+    const uint32_t concurrency = std::thread::hardware_concurrency();
 
     std::vector<std::vector<float>> thread_dynamic_vtx(concurrency);
     std::vector<std::vector<uint32_t>> thread_dynamic_idx(concurrency);
