@@ -353,11 +353,6 @@ void add_geo_brush(entity_t* ent,
     AngleVectors(angles, fwd, rgt, top);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
-#if WATER_MODE == WATER_MODE_FULL
-        int wateroffset = 0;
-    again:;
-#endif
-
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
         if (!strcmp(surf->texinfo->texture->name, "skip"))
             continue;
@@ -369,16 +364,6 @@ void add_geo_brush(entity_t* ent,
                 for (int l = 0; l < 3; l++) {
                     float coord = p->verts[k][0] * fwd[l] - p->verts[k][1] * rgt[l] +
                                   p->verts[k][2] * top[l] + ent->origin[l];
-#if WATER_MODE == WATER_MODE_FULL
-                    if (wateroffset) {
-                        // clang-format off
-                        coord += fwd[l] * (p->verts[k][0] > (surf->mins[0] + surf->maxs[0]) / 2.0 ? WATER_DEPTH : -WATER_DEPTH);
-                        coord -= rgt[l] * (p->verts[k][1] > (surf->mins[1] + surf->maxs[1]) / 2.0 ? WATER_DEPTH : -WATER_DEPTH);
-                        if (l == 2)
-                            coord -= WATER_DEPTH;
-                        // clang-format on
-                    }
-#endif
                     vtx.emplace_back(coord);
                 }
             }
@@ -422,10 +407,6 @@ void add_geo_brush(entity_t* ent,
                         flags = MAT_FLAGS_WATER;
                     if (strstr(t->gltexture->name, "wfall"))
                         flags = MAT_FLAGS_WATERFALL; // hack for ad_tears and emissive waterfalls
-#if WATER_MODE == WATER_MODE_FULL
-                    if (wateroffset)
-                        flags = MAT_FLAGS_WATER_LOWER; // this is our procedural water lower mark
-#endif
                 }
                 if (surf->flags & SURF_DRAWSKY)
                     flags = MAT_FLAGS_SKY;
@@ -435,14 +416,6 @@ void add_geo_brush(entity_t* ent,
 
                 ext.push_back(extra);
             }
-
-#if WATER_MODE == WATER_MODE_FULL
-            if (!wateroffset && (surf->flags & SURF_DRAWWATER)) {
-                // TODO: and normal points the right way?
-                wateroffset = 1;
-                goto again;
-            }
-#endif
             // p = p->next;
             p = 0; // XXX
         }
