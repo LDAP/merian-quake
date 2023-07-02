@@ -29,7 +29,7 @@ int main() {
     spdlog::set_level(spdlog::level::debug);
     merian::FileLoader loader{{"/", "./", "./build", "./res", "./res/shaders"}};
 
-    merian::ExtensionVkDebugUtils debugUtils;
+    merian::ExtensionVkDebugUtils debugUtils(true);
     merian::ExtensionVkGLFW extGLFW;
     merian::ExtensionResources resources;
     merian::ExtensionVkAccelerationStructure extAS;
