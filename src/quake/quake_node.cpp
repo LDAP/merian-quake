@@ -264,12 +264,14 @@ void add_geo_alias(entity_t* ent,
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
     R_SetupEntityTransform(ent, &lerpdata);
     // angles: pitch yaw roll. axes: right fwd up
-    float angles[3] = {-lerpdata.angles[0], lerpdata.angles[1], lerpdata.angles[2]};
-    glm::vec3 fwd, rgt, top, pos_pose1, pos_pose2;
+    lerpdata.angles[0] *= -1;
+    glm::mat3 mat_model;
+    glm::vec3 pos_pose1, pos_pose2;
+
     glm::vec3 origin = vec3_from_float(lerpdata.origin);
-    AngleVectors(angles, &fwd.x, &rgt.x, &top.x);
-    rgt *= -1;
-    glm::mat3 mat_model(fwd, rgt, top);
+    AngleVectors(lerpdata.angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
+    mat_model[1] *= -1;
+    
     glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
     uint32_t vtx_cnt = vtx.size() / 3;
