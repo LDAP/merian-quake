@@ -600,12 +600,7 @@ void add_geo(entity_t* ent,
     qmodel_t* m = ent->model;
     if (!m)
         return;
-    // if (qs_data.worldspawn)
-    //     return;
 
-    // TODO: lerp between lerpdata.pose1 and pose2 using blend
-    // TODO: apply transformation matrix cpu side, whatever.
-    // TODO: later: put into rt animation kernel
     if (m->type == mod_alias) { // alias model:
         add_geo_alias(ent, m, vtx, idx, ext);
         assert(ext.size() == idx.size() / 3);
