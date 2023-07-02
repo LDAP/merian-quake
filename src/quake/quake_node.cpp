@@ -1164,31 +1164,36 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
     });
 
-    std::vector<std::vector<float>> thread_dynamic_vtx(std::thread::hardware_concurrency());
-    std::vector<std::vector<uint32_t>> thread_dynamic_idx(std::thread::hardware_concurrency());
-    std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(
-        std::thread::hardware_concurrency());
+    const uint32_t concurrency = std::thread::hardware_concurrency() / 2;
+
+    std::vector<std::vector<float>> thread_dynamic_vtx(concurrency);
+    std::vector<std::vector<uint32_t>> thread_dynamic_idx(concurrency);
+    std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(concurrency);
 
     merian::parallel_for(
-        std::max(cl_numvisedicts, cl.num_statics), [&](uint32_t index, uint32_t thread_index) {
+        std::max(cl_numvisedicts, cl.num_statics),
+        [&](uint32_t index, uint32_t thread_index) {
             if (index < (uint32_t)cl_numvisedicts)
                 add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
                         thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
             if (index < (uint32_t)cl.num_statics)
                 add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
                         thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
-        });
+        },
+        concurrency);
 
     particle_viewent.join();
 
-    for (uint32_t i = 0; i < thread_dynamic_idx.size(); i++) {
+    for (uint32_t i = 0; i < concurrency; i++) {
         uint32_t old_vtx_count = dynamic_vtx.size() / 3;
 
-        merian::insert_all(dynamic_vtx, thread_dynamic_vtx[i]);
-        merian::insert_all(dynamic_ext, thread_dynamic_ext[i]);
+        merian::raw_copy_back(dynamic_vtx, thread_dynamic_vtx[i]);
+        merian::raw_copy_back(dynamic_ext, thread_dynamic_ext[i]);
 
-        for (auto& idx : thread_dynamic_idx[i]) {
-            dynamic_idx.emplace_back(old_vtx_count + idx);
+        uint32_t old_idx_size = dynamic_idx.size();
+        dynamic_idx.resize(old_idx_size + thread_dynamic_idx[i].size());
+        for (uint idx = 0; idx < thread_dynamic_idx[i].size(); idx++) {
+            dynamic_idx[old_idx_size + idx] = old_vtx_count + thread_dynamic_idx[i][idx];
         }
     }
 
