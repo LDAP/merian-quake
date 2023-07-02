@@ -230,9 +230,9 @@ void add_particles(std::vector<float>& vtx,
         idx.emplace_back(vtx_cnt + 3);
 
         for (int k = 0; k < 4; k++) {
-            ext.emplace_back(0, 0, 0, merian::float_to_half(0), merian::float_to_half(1),
-                             merian::float_to_half(0), merian::float_to_half(0),
-                             merian::float_to_half(1), merian::float_to_half(0), tex_col, tex_lum);
+            ext.emplace_back(0, 0, 0, merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                             merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
+                             merian::float_to_half_aprox(1), merian::float_to_half_aprox(0), tex_col, tex_lum);
         }
     }
 }
@@ -268,10 +268,10 @@ void add_geo_alias(entity_t* ent,
     glm::mat3 mat_model;
     glm::vec3 pos_pose1, pos_pose2;
 
-    glm::vec3 origin = vec3_from_float(lerpdata.origin);
+    glm::vec3 origin = merian::vec3_from_float(lerpdata.origin);
     AngleVectors(lerpdata.angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
     mat_model[1] *= -1;
-    
+
     glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
     uint32_t vtx_cnt = vtx.size() / 3;
@@ -299,9 +299,9 @@ void add_geo_alias(entity_t* ent,
         int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
         glm::vec3 n_pose1 =
-            vec3_from_float(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
+            merian::vec3_from_float(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
         glm::vec3 n_pose2 =
-            vec3_from_float(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
+            merian::vec3_from_float(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
         // convert to worldspace
         glm::vec3 world_n = mat_model_inv_t * glm::mix(n_pose1, n_pose2, lerpdata.blend);
         *(tmpn + v) = merian::encode_normal(world_n);
@@ -329,12 +329,12 @@ void add_geo_alias(entity_t* ent,
 
         ext.emplace_back(
             n0, n1, n2,
-            merian::float_to_half((desc[indexes[3 * i + 0]].st[0] + 0.5) / (float)hdr->skinwidth),
-            merian::float_to_half((desc[indexes[3 * i + 0]].st[1] + 0.5) / (float)hdr->skinheight),
-            merian::float_to_half((desc[indexes[3 * i + 1]].st[0] + 0.5) / (float)hdr->skinwidth),
-            merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) / (float)hdr->skinheight),
-            merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) / (float)hdr->skinwidth),
-            merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 1]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 1]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[1] + 0.5) / (float)hdr->skinheight),
             texnum_alpha, fb_texnum);
     }
 }
@@ -351,8 +351,10 @@ void add_geo_brush(entity_t* ent,
     //     ent->angles[0], ent->angles[1], ent->angles[2],
     //     m->nummodelsurfaces);
     float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
-    float fwd[3], rgt[3], top[3];
-    AngleVectors(angles, fwd, rgt, top);
+    glm::mat3 mat_model;
+    AngleVectors(angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
+    mat_model[1] *= -1;
+    glm::vec3 origin = merian::vec3_from_float(ent->origin);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
@@ -363,10 +365,10 @@ void add_geo_brush(entity_t* ent,
         while (p) {
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
+                glm::vec3 coord = mat_model * merian::vec3_from_float(p->verts[k]) + origin;
+
                 for (int l = 0; l < 3; l++) {
-                    float coord = p->verts[k][0] * fwd[l] - p->verts[k][1] * rgt[l] +
-                                  p->verts[k][2] * top[l] + ent->origin[l];
-                    vtx.emplace_back(coord);
+                    vtx.emplace_back(coord[l]);
                 }
             }
 
@@ -390,12 +392,12 @@ void add_geo_brush(entity_t* ent,
                 };
                 uint32_t flags = MAT_FLAGS_NONE;
                 if (surf->texinfo->texture->gltexture) {
-                    extra.s_0 = merian::float_to_half(p->verts[0][3]);
-                    extra.t_0 = merian::float_to_half(p->verts[0][4]);
-                    extra.s_1 = merian::float_to_half(p->verts[k - 1][3]);
-                    extra.t_1 = merian::float_to_half(p->verts[k - 1][4]);
-                    extra.s_2 = merian::float_to_half(p->verts[k - 0][3]);
-                    extra.t_2 = merian::float_to_half(p->verts[k - 0][4]);
+                    extra.s_0 = merian::float_to_half_aprox(p->verts[0][3]);
+                    extra.t_0 = merian::float_to_half_aprox(p->verts[0][4]);
+                    extra.s_1 = merian::float_to_half_aprox(p->verts[k - 1][3]);
+                    extra.t_1 = merian::float_to_half_aprox(p->verts[k - 1][4]);
+                    extra.s_2 = merian::float_to_half_aprox(p->verts[k - 0][3]);
+                    extra.t_2 = merian::float_to_half_aprox(p->verts[k - 0][4]);
                     extra.texnum_alpha = make_texnum_alpha(t->gltexture, ent, surf);
                     extra.texnum_fb_flags = t->fullbright ? t->fullbright->texnum : 0;
 
@@ -551,14 +553,14 @@ void add_geo_sprite(entity_t* ent,
             texnum = make_texnum_alpha(frame->gltexture);
         }
 
-        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half(0), merian::float_to_half(1),
-                         merian::float_to_half(0), merian::float_to_half(0),
-                         merian::float_to_half(1), merian::float_to_half(0), texnum,
+        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                         merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(1), merian::float_to_half_aprox(0), texnum,
                          texnum // sprite allways emits
         );
-        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half(0), merian::float_to_half(1),
-                         merian::float_to_half(1), merian::float_to_half(0),
-                         merian::float_to_half(1), merian::float_to_half(1), texnum,
+        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                         merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(1), merian::float_to_half_aprox(1), texnum,
                          texnum // sprite allways emits
         );
 
@@ -1004,8 +1006,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     pc.cl_time = cl.time;
     float rgt[3];
     AngleVectors(r_refdef.viewangles, &pc.cam_w.x, rgt, &pc.cam_u.x);
-    copy_to_vec4(r_refdef.vieworg, pc.cam_x);
-    glm::vec3 fog_color = vec3_from_float(Fog_GetColor());
+    merian::copy_to_vec4(r_refdef.vieworg, pc.cam_x);
+    glm::vec3 fog_color = merian::vec3_from_float(Fog_GetColor());
     float fog_density = Fog_GetDensity();
     fog_density *= fog_density;
     pc.fog = glm::vec4(fog_color, fog_density);
