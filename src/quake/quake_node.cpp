@@ -1159,22 +1159,27 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     dynamic_idx.clear();
     dynamic_ext.clear();
 
-    add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
-    add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
+    std::thread particle_viewent([&]() {
+        add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+        add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
+    });
 
     std::vector<std::vector<float>> thread_dynamic_vtx(std::thread::hardware_concurrency());
     std::vector<std::vector<uint32_t>> thread_dynamic_idx(std::thread::hardware_concurrency());
     std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(
         std::thread::hardware_concurrency());
 
-    merian::parallel_for(cl_numvisedicts, [&](uint32_t index, uint32_t thread_index) {
-        add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
-                thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
-    });
-    merian::parallel_for(cl.num_statics, [&](uint32_t index, uint32_t thread_index) {
-        add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
-                thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
-    });
+    merian::parallel_for(
+        std::max(cl_numvisedicts, cl.num_statics), [&](uint32_t index, uint32_t thread_index) {
+            if (index < (uint32_t)cl_numvisedicts)
+                add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
+                        thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+            if (index < (uint32_t)cl.num_statics)
+                add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
+                        thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+        });
+
+    particle_viewent.join();
 
     for (uint32_t i = 0; i < thread_dynamic_idx.size(); i++) {
         uint32_t old_vtx_count = dynamic_vtx.size() / 3;
