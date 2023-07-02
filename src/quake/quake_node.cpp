@@ -714,9 +714,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
             .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
             .add_binding_acceleration_structure()
             .build_layout(context);
@@ -1291,9 +1291,10 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         if (cur_frame.last_instances_size == instances.size()) {
             // rebuild
             cur_frame.tlas_builder->queue_rebuild(instances.size(), cur_frame.instances_buffer,
-                                       cur_frame.tlas);
+                                                  cur_frame.tlas);
         } else {
-            cur_frame.tlas = cur_frame.tlas_builder->queue_build(instances.size(), cur_frame.instances_buffer);
+            cur_frame.tlas =
+                cur_frame.tlas_builder->queue_build(instances.size(), cur_frame.instances_buffer);
 
             merian::DescriptorSetUpdate update(cur_frame.quake_sets);
             update.write_descriptor_acceleration_structure(BINDING_TLAS, *cur_frame.tlas);

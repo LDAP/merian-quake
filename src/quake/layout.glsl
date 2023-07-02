@@ -53,17 +53,17 @@ struct VertexExtraData {
 layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
     // vertex positons
     vec3 v[];
-} buf_vtx[2];
+} buf_vtx[GEO_DESC_ARRAY_SIZE];
 
 layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer buf_idx_t {
     // index data for every instance
     uvec3 i[];
-} buf_idx[2];
+} buf_idx[GEO_DESC_ARRAY_SIZE];
 
 layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer buf_ext_t {
     // extra geo info
     VertexExtraData v[];
-} buf_ext[2];
+} buf_ext[GEO_DESC_ARRAY_SIZE];
 
 layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[MAX_GLTEXTURES];
 
