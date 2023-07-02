@@ -718,9 +718,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
-            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, 2)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, GEO_DESC_ARRAY_SIZE)
             .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
             .add_binding_acceleration_structure()
             .build_layout(context);
@@ -753,7 +753,12 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     });
     controller->set_mouse_button_callback([&](merian::InputController& controller, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
         if (button == merian::InputController::MOUSE1) {
-            controller.request_raw_mouse_input(true);
+            if (!controller.get_raw_mouse_input()) {
+                controller.request_raw_mouse_input(true);
+                this->mouse_oldx = this->mouse_x;
+                this->mouse_oldy = this->mouse_y;
+                return;
+            }
         }
         const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
         Key_Event(remap[button], status == merian::InputController::PRESS);

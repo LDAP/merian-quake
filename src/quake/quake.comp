@@ -104,9 +104,10 @@ bool confirm_intersection(const IntersectionInfo info) {
         const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
 
         vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
-        if (flags > 0 && flags < 6) {
-            warp(st);
-        }
+        // We covered the flags already, this surface cannot warp
+        // if (flags > 0 && flags < 6) {
+        //     warp(st);
+        // }
 
         return texture(img_tex[nonuniformEXT(texnum)], st).a >= ALPHA_THRESHOLD;
     }
