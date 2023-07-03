@@ -314,7 +314,8 @@ void add_geo_alias(entity_t* ent,
         const glm::vec3* n_pose2 =
             merian::as_vec3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
         // convert to worldspace
-        const glm::vec3 world_n = mat_model_inv_t * glm::mix(*n_pose1, *n_pose2, lerpdata.blend);
+        const glm::vec3 world_n =
+            glm::normalize(mat_model_inv_t * glm::mix(*n_pose1, *n_pose2, lerpdata.blend));
         *(tmpn + v) = merian::encode_normal(world_n);
     }
 
