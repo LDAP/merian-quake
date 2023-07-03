@@ -14,7 +14,6 @@ layout(push_constant) uniform PushConstant {
     int water;
     uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
     float cl_time; // quake time
-    int   ref;     // use reference sampling
     int   health;
     int   armor;
     int frame;

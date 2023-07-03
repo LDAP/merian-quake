@@ -65,7 +65,6 @@ class QuakeNode : public merian::Node {
         std::array<uint32_t, 6> sky;
 
         float cl_time;  // quake time
-        int ref{false}; // use reference sampling
 
         int health;
         int armor;
