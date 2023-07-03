@@ -1016,10 +1016,11 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
 
     // UPDATE PUSH CONSTANT (with player data)
     pc.frame = frame;
-    pc.torch = sv_player->v.weapon == 1; // shotgun has torch
-    pc.water = sv_player->v.waterlevel >= 3;
-    pc.health = sv_player->v.health;
-    pc.armor = sv_player->v.armorvalue;
+    pc.player.health = sv_player->v.health;
+    pc.player.armor = sv_player->v.armorvalue;
+    pc.player.flags = 0;
+    pc.player.flags |= sv_player->v.weapon == 1 ? PLAYER_FLAGS_TORCH : 0; // shotgun has torch
+    pc.player.flags |= sv_player->v.waterlevel >= 3 ? PLAYER_FLAGS_UNDERWATER : 0;
     pc.sky = texnum_skybox;
     pc.cl_time = cl.time;
     float rgt[3];

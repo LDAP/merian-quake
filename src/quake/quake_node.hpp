@@ -51,6 +51,14 @@ class QuakeNode : public merian::Node {
         merian::TextureHandle gpu_tex{};
     };
 
+    struct PlayerData {
+        // see PLAYER_* in config.h
+        unsigned char flags;
+        unsigned char health;
+        unsigned char armor;
+        unsigned char padding;
+    };
+
     struct PushConstant {
         glm::vec4 cam_x; // pos
         glm::vec4 cam_w; // forward
@@ -58,18 +66,14 @@ class QuakeNode : public merian::Node {
 
         glm::vec4 fog; // xyz: color, w: density
 
-        int torch;
-        int water; // player is underwater -> 1 means apply water effect
-
         // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
         std::array<uint32_t, 6> sky;
 
-        float cl_time;  // quake time
-
-        int health;
-        int armor;
-
+        // quake time
+        float cl_time;
         int frame;
+
+        PlayerData player;
     };
 
     struct VertexExtraData {

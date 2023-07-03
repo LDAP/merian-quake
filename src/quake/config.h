@@ -33,6 +33,8 @@
 #define ARRAY_IDX_STATIC 0
 #define ARRAY_IDX_DYNAMIC 1
 
+// Material flags
+
 #define MAT_FLAGS_NONE 0
 #define MAT_FLAGS_LAVA 1
 #define MAT_FLAGS_SLIME 2
@@ -41,5 +43,10 @@
 #define MAT_FLAGS_WATER_LOWER 5
 #define MAT_FLAGS_SKY 6
 #define MAT_FLAGS_WATERFALL 7
+
+// Player flags
+
+#define PLAYER_FLAGS_TORCH 1
+#define PLAYER_FLAGS_UNDERWATER 2
 
 #endif

@@ -10,13 +10,10 @@ layout(push_constant) uniform PushConstant {
     vec4 cam_w;
     vec4 cam_u;
     vec4 fog;
-    int torch;
-    int water;
     uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
     float cl_time; // quake time
-    int   health;
-    int   armor;
     int frame;
+    uint player; // see `PlayerData` in quake_node.hpp
 } params;
 
 // GRAPH IN/OUTs
