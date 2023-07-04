@@ -81,11 +81,11 @@ vec3 apply_normalmap(const vec3 v0,
     const vec2 duv1 = st2 - st0, duv2 = st1 - st0;
     const float det = duv1.x * duv2.y - duv2.x * duv1.y;
     if(abs(det) > 1e-8) {
-      vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
+      const vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
       dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
       du = du2;
     }
-    vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
+    const vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
     //if(dot(w,n) > 0) n -= w * dot(w,n);
     return n;
 }
@@ -100,18 +100,17 @@ bool confirm_intersection(const IntersectionInfo info) {
     } else if (alpha != 0) { // 0 means use texture
         return decode_alpha(alpha) >= ALPHA_THRESHOLD;
     } else {
-        const uint texnum = extra_data.texnum_alpha & 0xfff;
-        const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
-        const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
-        const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
+        const vec2 st = unpackHalf2x16(extra_data.st_0) * info.barycentrics.x
+                      + unpackHalf2x16(extra_data.st_1) * info.barycentrics.y
+                      + unpackHalf2x16(extra_data.st_2) * info.barycentrics.z;
 
-        vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
-        // We covered the flags already, this surface cannot warp
+        // We covered the flags above, this surface cannot warp
         // if (flags > 0 && flags < 6) {
         //     warp(st);
         // }
 
-        return texture(img_tex[nonuniformEXT(texnum)], st).a >= ALPHA_THRESHOLD;
+        // const uint texnum = extra_data.texnum_alpha & 0xfff;
+        return texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st).a >= ALPHA_THRESHOLD;
     }
 }
 
@@ -133,7 +132,10 @@ void get_shading_material(const IntersectionInfo info,
     const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
     const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
 
-    vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
+    vec2 st = st_0 * info.barycentrics.x
+            + st_1 * info.barycentrics.y
+            + st_2 * info.barycentrics.z;
+
     if (flags > 0 && flags < 6) {
         warp(st);
     }
