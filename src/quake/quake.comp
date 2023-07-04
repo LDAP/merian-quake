@@ -9,6 +9,7 @@
 #include "common/random.glsl"
 #include "common/normal_encode.glsl"
 #include "common/raytrace.glsl"
+#include "common/bsdf_diffuse.glsl"
 
 #include "config.h"
 #include "layout.glsl"
@@ -17,10 +18,8 @@
 struct ShadingMaterial {
     vec4 albedo;
     vec3 emission;
-    vec3 normal;
+    vec3 normal; // normalized
     vec3 pos;
-    // distance to shading point
-    float t;
     float gloss;
 };
 
@@ -31,8 +30,8 @@ float decode_alpha(const uint alpha) {
 
 // Get warped texture coordinate
 void warp(inout vec2 st) {
-    st = vec2(st.x + 0.2*sin(st.y*2.0 + params.cl_time * 1.0),
-              st.y + 0.2*sin(st.x*2.0 + params.cl_time * 1.0));
+    st = vec2(st.x + 0.2 * sin(st.y * 2.0 + params.cl_time * 1.0),
+              st.y + 0.2 * sin(st.x * 2.0 + params.cl_time * 1.0));
 }
 
 vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const uint flags) {
@@ -48,22 +47,26 @@ vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const 
     if (texnum_fb > 0) {
         vec3 emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
         const float sum = emission.x + emission.y + emission.z;
-        emission /= sum;
-        emission *= 10.0 * (exp2(4.0 * sum) - 1.0);
+        if (sum > 0) {
+            emission /= sum;
+            emission *= 10.0 * (exp2(4.0 * sum) - 1.0);
+        }
         return emission;
     }
 
     return vec3(0.);
 }
 
-void get_verts_pos_geonormal(out mat3 verts, out vec3 pos, out vec3 geo_normal, const IntersectionInfo info) {
+void get_verts_pos_geonormal(out mat3 verts,
+                             out vec3 pos,
+                             out vec3 geo_normal,
+                             const IntersectionInfo info) {
     const uvec3 prim_indexes = buf_idx[nonuniformEXT(info.instance_custom_index)].i[info.primitive_index];
-    const vec3 v0 = buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.x];
-    const vec3 v1 = buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.y];
-    const vec3 v2 = buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.z];
-    verts = mat3(v0, v1, v2);
+    verts = mat3(buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.x],
+                 buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.y],
+                 buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.z]);
     pos = verts * info.barycentrics;
-    geo_normal = normalize(cross(v2 - v0, v1 - v0));
+    geo_normal = normalize(cross(verts[2] - verts[0], verts[1] - verts[0]));
 }
 
 vec3 apply_normalmap(const vec3 v0,
@@ -75,8 +78,8 @@ vec3 apply_normalmap(const vec3 v0,
                      const vec3 geo_normal,
                      const vec3 tangent_normal) {
     vec3 du = v2 - v0, dv = v1 - v0;
-    vec2 duv1 = st2 - st0, duv2 = st1 - st0;
-    float det = duv1.x * duv2.y - duv2.x * duv1.y;
+    const vec2 duv1 = st2 - st0, duv2 = st1 - st0;
+    const float det = duv1.x * duv2.y - duv2.x * duv1.y;
     if(abs(det) > 1e-8) {
       vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
       dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
@@ -91,8 +94,7 @@ vec3 apply_normalmap(const vec3 v0,
 bool confirm_intersection(const IntersectionInfo info) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
     const uint alpha = extra_data.texnum_alpha >> 12;
-    const uint flags = extra_data.texnum_fb_flags >> 12;
-    if (flags != MAT_FLAGS_NONE) {
+    if ((extra_data.texnum_fb_flags >> 12) != MAT_FLAGS_NONE) {
         // treat sky, lava, slime,... not transparent for now
         return true;
     } else if (alpha != 0) { // 0 means use texture
@@ -119,20 +121,17 @@ void get_shading_material(const IntersectionInfo info,
                           out ShadingMaterial mat) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
     const uint flags = extra_data.texnum_fb_flags >> 12;
-    mat.gloss = 0;
     if (flags == MAT_FLAGS_SKY) {
         mat.albedo = vec4(0, 0, 0, 1);
         mat.emission = envmap(ray_dir);
         mat.normal = -ray_dir;
-        mat.t = T_MAX - 1.0;
-        mat.pos = ray_origin + mat.t * ray_dir;
+        mat.pos = ray_origin + info.t * ray_dir;
+        mat.gloss = 0;
         return;
     }
-    mat.t = info.t;
     const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
     const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
     const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
-    const bool is_brush_model = (extra_data.n1_brush == 0xffffffff);
 
     vec2 st = mat3x2(st_0, st_1, st_2) * info.barycentrics;
     if (flags > 0 && flags < 6) {
@@ -141,43 +140,44 @@ void get_shading_material(const IntersectionInfo info,
 
     {
         // Load albedo
-        const uint texnum = extra_data.texnum_alpha & 0xfff;
-        mat.albedo = texture(img_tex[nonuniformEXT(texnum)], st);
+        // const uint texnum = extra_data.texnum_alpha & 0xfff;
+        mat.albedo = texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st);
         const uint alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
             mat.albedo.a = decode_alpha(alpha);
     }
     {
         // Load emission
-        const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
-        mat.emission = get_emission(texnum_fb, st, mat.albedo.rgb, flags);
+        // const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
+        mat.emission = get_emission(extra_data.texnum_fb_flags & 0xfff, st, mat.albedo.rgb, flags);
     }
 
     mat3 verts;
     get_verts_pos_geonormal(verts, mat.pos, mat.normal, info);
 
-    if (is_brush_model) {
+    if (extra_data.n1_brush == 0xffffffff) { // is brush model
         // can have normal and gloss map (else has geo normals)
-        uint texnum_gloss = extra_data.n0_gloss_norm & 0xffff;
-        uint texnum_normal = extra_data.n0_gloss_norm >> 16;
+        const uint texnum_gloss = extra_data.n0_gloss_norm & 0xffff;
+        const uint texnum_normal = extra_data.n0_gloss_norm >> 16;
         
         if (texnum_normal > 0) {
             // overwrite geo normal with normal map normal
-            vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
+            const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
             mat.normal = apply_normalmap(verts[0], verts[1], verts[2], st_0, st_1, st_2, mat.normal, tangent_normal);
         }
         if (texnum_gloss > 0) {
             mat.gloss = texture(img_tex[nonuniformEXT(texnum_gloss)], st).r;
         }
     } else {
-        vec3 n0 = geo_decode_normal(extra_data.n0_gloss_norm);
-        vec3 n1 = geo_decode_normal(extra_data.n1_brush);
-        vec3 n2 = geo_decode_normal(extra_data.n2);
+        const vec3 n0 = geo_decode_normal(extra_data.n0_gloss_norm);
+        const vec3 n1 = geo_decode_normal(extra_data.n1_brush);
+        const vec3 n2 = geo_decode_normal(extra_data.n2);
         mat.normal = normalize(mat3(n0, n1, n2) * info.barycentrics);
+        mat.gloss = 0;
     }
 }
 
-void trace_ray(vec3 x0, vec3 dir, uint rng_state, out IntersectionInfo info) {
+void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
     rayQueryEXT ray_query;
     rayQueryInitializeEXT(ray_query,
                           tlas,
@@ -207,17 +207,61 @@ void trace_ray(vec3 x0, vec3 dir, uint rng_state, out IntersectionInfo info) {
 void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
-    if (any(greaterThanEqual(pixel, resolution))) return;
+    if (any(greaterThanEqual(pixel, resolution)))
+        return;
 
     uint rng_state = 19937 * (resolution.x  * pixel.y + pixel.x) * params.frame;
+    vec3 contribution = vec3(0);
 
-    ShadingMaterial mat;
+    ShadingMaterial first_mat;
+    // first pos is params.cam_x.xyz
+    const vec3 first_wi = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec4(rng_state));
     {
-        vec3 camera_dir = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec4(rng_state));
         IntersectionInfo info;
-        trace_ray(params.cam_x.xyz, camera_dir, rng_state, info);
-        get_shading_material(info, params.cam_x.xyz, camera_dir, mat);
+        trace_ray(params.cam_x.xyz, first_wi, info);
+        get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
 
-    imageStore(img_albedo, pixel, vec4(mat.albedo));
+    // direct light
+    if (MAX_PATH_LENGHT > 0)
+        contribution = first_mat.emission;// * dot(-first_wi, first_mat.normal);
+
+    // TODO: if albedo == 0: skip indirect
+
+    // indirect light
+    for (int smp = 0; smp < SAMPLES_PER_PIXEL; smp++) {
+        vec3 wi = first_wi;
+        ShadingMaterial current_mat = first_mat;
+        vec3 current_albedo = current_mat.albedo.rgb;  // already has albedo of current mat multiplied
+        vec3 f = vec3(0);
+        float p_diff = 1;
+
+        for (int segment = 1; segment < MAX_PATH_LENGHT; segment++) {
+            const vec3 up = (abs(current_mat.normal.x) > abs(current_mat.normal.y)) ? vec3(0,1,0) : vec3(1,0,0);
+            const vec3 du = normalize(cross(up, current_mat.normal));
+            const vec3 dv = normalize(cross(du, current_mat.normal));
+            const vec3 wo = bsdf_diffuse_sample(wi, du, dv, current_mat.normal, vec2(XorShift32(rng_state), XorShift32(rng_state)));
+
+            ShadingMaterial next_mat;
+            {
+                IntersectionInfo info;
+                trace_ray(current_mat.pos, wo, info);
+                get_shading_material(info, current_mat.pos, wo, next_mat);
+            }
+
+            p_diff *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
+            f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p_diff;
+
+            current_albedo *= next_mat.albedo.rgb;
+            if (all(lessThan(current_albedo, vec3(1e-7))))
+                break;
+
+            wi = wo;
+            current_mat = next_mat;
+        }
+
+        contribution += f / SAMPLES_PER_PIXEL;
+    }
+
+    imageStore(img_albedo, pixel, vec4(contribution, 1));
 }

@@ -32,9 +32,7 @@ layout(set = 0, binding = 7) uniform writeonly uimage2D img_nee_out; // mc state
 
 // See quake_node.hpp
 struct VertexExtraData {
-
     uint n0_gloss_norm;
-
     uint n1_brush;
     uint n2;
 

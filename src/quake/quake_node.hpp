@@ -23,8 +23,8 @@ extern "C" {
 
 class QuakeNode : public merian::Node {
   public:
-    static constexpr uint32_t local_size_x = 16;
-    static constexpr uint32_t local_size_y = 16;
+    static constexpr uint32_t local_size_x = 8;
+    static constexpr uint32_t local_size_y = 8;
 
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)

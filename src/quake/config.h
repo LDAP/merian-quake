@@ -12,6 +12,7 @@
 #define ALPHA_THRESHOLD .666 
 
 #define SAMPLES_PER_PIXEL 4
+#define MAX_PATH_LENGHT 3
 
 // Configure MC
 
@@ -26,7 +27,6 @@
 #define BINDING_EXT_BUF 2
 #define BINDING_IMG_TEX 3
 #define BINDING_TLAS 4
-
 
 #define GEO_DESC_ARRAY_SIZE 2
 
