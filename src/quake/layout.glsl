@@ -32,6 +32,9 @@ layout(set = 0, binding = 7) uniform writeonly uimage2D img_nee_out; // mc state
 
 // See quake_node.hpp
 struct VertexExtraData {
+    uint16_t texnum_alpha;
+    uint16_t texnum_fb_flags;
+    
     uint n0_gloss_norm;
     uint n1_brush;
     uint n2;
@@ -39,9 +42,6 @@ struct VertexExtraData {
     uint st_0;
     uint st_1;
     uint st_2;
-
-    uint16_t texnum_alpha;
-    uint16_t texnum_fb_flags;
 };
 
 layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {

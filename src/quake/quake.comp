@@ -110,7 +110,7 @@ bool confirm_intersection(const IntersectionInfo info) {
         // }
 
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
-        return texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st).a >= ALPHA_THRESHOLD;
+        return textureGather(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st, 3).r >= ALPHA_THRESHOLD;
     }
 }
 
@@ -265,5 +265,5 @@ void main() {
         contribution += f / SAMPLES_PER_PIXEL;
     }
 
-    imageStore(img_albedo, pixel, vec4(contribution, 1));
+    imageStore(img_albedo, pixel, vec4(contribution + first_mat.albedo.rgb * .3, 1));
 }

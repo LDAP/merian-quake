@@ -23,6 +23,7 @@ extern "C" {
 
 class QuakeNode : public merian::Node {
   public:
+    // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
     static constexpr uint32_t local_size_x = 8;
     static constexpr uint32_t local_size_y = 8;
 
@@ -77,6 +78,14 @@ class QuakeNode : public merian::Node {
     };
 
     struct VertexExtraData {
+        // texnum and alpha in upper 4 bits
+        // Alpha meaning: 0: use texture, [1,15] map to [0,1] where 15 is fully opaque and 1
+        // transparent
+        uint16_t texnum_alpha{};
+        // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
+        // for flags see MAT_FLAGS_* in config.h
+        uint16_t texnum_fb_flags{};
+        
         // Normals encoded using encode_normal
         // or glossmap texnum and normalmap texnum
         // if n1_brush = ~0.
@@ -92,14 +101,6 @@ class QuakeNode : public merian::Node {
         uint16_t t_1{};
         uint16_t s_2{};
         uint16_t t_2{};
-
-        // texnum and alpha in upper 4 bits
-        // Alpha meaning: 0: use texture, [1,15] map to [0,1] where 15 is fully opaque and 1
-        // transparent
-        uint16_t texnum_alpha{};
-        // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
-        // for flags see MAT_FLAGS_* in config.h
-        uint16_t texnum_fb_flags{};
     };
 
   public:

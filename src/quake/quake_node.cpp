@@ -237,10 +237,10 @@ void add_particles(std::vector<float>& vtx,
         idx.emplace_back(vtx_cnt + 3);
 
         for (int k = 0; k < 4; k++) {
-            ext.emplace_back(0, 0, 0, merian::float_to_half_aprox(0),
+            ext.emplace_back(tex_col, tex_lum, 0, 0, 0, merian::float_to_half_aprox(0),
                              merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
                              merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                             merian::float_to_half_aprox(0), tex_col, tex_lum);
+                             merian::float_to_half_aprox(0));
         }
     }
 }
@@ -339,7 +339,7 @@ void add_geo_alias(entity_t* ent,
             n2 = *(tmpn + indexes[3 * i + 2]);
         }
 
-        ext.emplace_back(n0, n1, n2,
+        ext.emplace_back(texnum_alpha, fb_texnum, n0, n1, n2,
                          merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[0] + 0.5) /
                                                      (float)hdr->skinwidth),
                          merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[1] + 0.5) /
@@ -351,8 +351,7 @@ void add_geo_alias(entity_t* ent,
                          merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[0] + 0.5) /
                                                      (float)hdr->skinwidth),
                          merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[1] + 0.5) /
-                                                     (float)hdr->skinheight),
-                         texnum_alpha, fb_texnum);
+                                                     (float)hdr->skinheight));
     }
 }
 
@@ -402,10 +401,10 @@ void add_geo_brush(entity_t* ent,
 
             for (int k = 2; k < p->numverts; k++) {
                 QuakeNode::VertexExtraData extra{
-                    merian::pack_uint32(t->gloss ? t->gloss->texnum : 0,
-                                        t->norm ? t->norm->texnum : 0),
-                    0xffffffff,
-                    0,
+                    .n0_gloss_norm = merian::pack_uint32(t->gloss ? t->gloss->texnum : 0,
+                                                         t->norm ? t->norm->texnum : 0),
+                    .n1_brush = 0xffffffff,
+                    .n2 = 0,
                 };
                 uint32_t flags = MAT_FLAGS_NONE;
                 if (surf->texinfo->texture->gltexture) {
@@ -570,18 +569,18 @@ void add_geo_sprite(entity_t* ent,
             texnum = make_texnum_alpha(frame->gltexture);
         }
 
-        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
+        ext.emplace_back(texnum,
+                         texnum, // sprite allways emits
+                         n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                         merian::float_to_half_aprox(0), texnum,
-                         texnum // sprite allways emits
-        );
-        ext.emplace_back(n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(0));
+        ext.emplace_back(texnum,
+                         texnum, // sprite allways emits
+                         n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(1), merian::float_to_half_aprox(1),
                          merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                         merian::float_to_half_aprox(1), texnum,
-                         texnum // sprite allways emits
-        );
+                         merian::float_to_half_aprox(1));
 
     } // end three axes
 }
@@ -1231,7 +1230,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
             static_cast<uint32_t>(dynamic_idx.size() / 3), 0, 0, 0};
 
         vk::BuildAccelerationStructureFlagsKHR flags =
-            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild |
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
             vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
         if (cur_frame.last_dynamic_vtx_size == dynamic_vtx.size() &&
             cur_frame.last_dynamic_idx_size == dynamic_idx.size()) {
