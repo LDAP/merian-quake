@@ -735,14 +735,15 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         if (controller.get_raw_mouse_input()) {
             this->mouse_x = xpos;
             this->mouse_y = ypos;
+        } else {
+            this->mouse_oldx = this->mouse_x = xpos;
+            this->mouse_oldy = this->mouse_y = ypos;
         }
     });
     controller->set_mouse_button_callback([&](merian::InputController& controller, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
         if (button == merian::InputController::MOUSE1) {
             if (!controller.get_raw_mouse_input()) {
                 controller.request_raw_mouse_input(true);
-                this->mouse_oldx = this->mouse_x;
-                this->mouse_oldy = this->mouse_y;
                 return;
             }
         }
