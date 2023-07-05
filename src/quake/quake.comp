@@ -19,6 +19,7 @@ struct ShadingMaterial {
     vec4 albedo;
     vec3 emission;
     vec3 normal; // normalized
+    vec3 geo_normal;
     vec3 pos;
     float gloss;
 };
@@ -85,8 +86,8 @@ vec3 apply_normalmap(const vec3 v0,
       dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
       du = du2;
     }
-    const vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
-    //if(dot(w,n) > 0) n -= w * dot(w,n);
+    vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
+    // if (dot(geo_normal, n) <= 0) n -= geo_normal * dot(geo_normal, n);
     return n;
 }
 
@@ -124,6 +125,7 @@ void get_shading_material(const IntersectionInfo info,
         mat.albedo = vec4(0, 0, 0, 1);
         mat.emission = envmap(ray_dir);
         mat.normal = -ray_dir;
+        mat.geo_normal = -ray_dir;
         mat.pos = ray_origin + info.t * ray_dir;
         mat.gloss = 0;
         return;
@@ -155,7 +157,8 @@ void get_shading_material(const IntersectionInfo info,
     }
 
     mat3 verts;
-    get_verts_pos_geonormal(verts, mat.pos, mat.normal, info);
+    get_verts_pos_geonormal(verts, mat.pos, mat.geo_normal, info);
+    mat.normal = mat.geo_normal;
 
     if (extra_data.n1_brush == 0xffffffff) { // is brush model
         // can have normal and gloss map (else has geo normals)
@@ -179,6 +182,7 @@ void get_shading_material(const IntersectionInfo info,
     }
 }
 
+// Sets t < 0 if nothing was hit
 void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
     rayQueryEXT ray_query;
     rayQueryInitializeEXT(ray_query,
@@ -190,7 +194,8 @@ void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
                                                  // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
                           0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
                           x0,
-                          1e-3,                  // Minimum t-value
+                          0,                     // Minimum t-value (we set it here to 0 and pull back the ray)
+                                                 // such that the ray cannot escape in corners.
                           dir,
                           T_MAX);                // Maximum t-value
 
@@ -203,7 +208,11 @@ void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
         if (confirm_intersection(info))
             rayQueryConfirmIntersectionEXT(ray_query);
     }
-    get_intersection_info_commited(ray_query, info);
+
+    if(rayQueryGetIntersectionTypeEXT(ray_query, true) == gl_RayQueryCommittedIntersectionTriangleEXT)
+        get_intersection_info_commited(ray_query, info);
+    else
+        info.t = -1;
 }
 
 void main() {
@@ -221,6 +230,8 @@ void main() {
     {
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
+        if (info.t <= 0)
+            return;
         get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
 
@@ -244,10 +255,16 @@ void main() {
             const vec3 dv = normalize(cross(du, current_mat.normal));
             const vec3 wo = bsdf_diffuse_sample(wi, du, dv, current_mat.normal, XorShift32Vec2(rng_state));
 
+            if (dot(wo, current_mat.geo_normal) <= 1e-2)
+                break;
+
             ShadingMaterial next_mat;
             {
                 IntersectionInfo info;
-                trace_ray(current_mat.pos, wo, info);
+                // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                trace_ray(current_mat.pos - wi * 1e-3, wo, info);
+                if (info.t <= 0)
+                    break;
                 get_shading_material(info, current_mat.pos, wo, next_mat);
             }
 
@@ -265,5 +282,5 @@ void main() {
         contribution += f / SAMPLES_PER_PIXEL;
     }
 
-    imageStore(img_albedo, pixel, vec4(contribution + first_mat.albedo.rgb * .3, 1));
+    imageStore(img_albedo, pixel, vec4(contribution * 10 + first_mat.albedo.rgb * .1, 1));
 }
