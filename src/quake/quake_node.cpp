@@ -846,10 +846,14 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
         texnum_explosion = glt->texnum;
 
     // classic quake sky
-    if (merian::ends_with(glt->name, "_front"))
+    if (merian::ends_with(glt->name, "_front")) {
         texnum_skybox[1] = glt->texnum;
-    if (merian::ends_with(glt->name, "_back"))
+        texnum_skybox[2] = -1u;
+    }
+    if (merian::ends_with(glt->name, "_back")) {
         texnum_skybox[0] = glt->texnum;
+        texnum_skybox[2] = -1u;
+    }
 
     // full featured cube map/arcane dimensions
     if (merian::starts_with(glt->name, "gfx/env/")) {
