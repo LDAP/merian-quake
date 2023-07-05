@@ -231,7 +231,7 @@ void main() {
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
         if (info.t <= 0)
-            return;
+            return; // should not happen in Quake but it does :o
         get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
 
@@ -264,7 +264,7 @@ void main() {
                 // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
                 trace_ray(current_mat.pos - wi * 1e-3, wo, info);
                 if (info.t <= 0)
-                    break;
+                    break;  // should not happen in Quake but it does :o
                 get_shading_material(info, current_mat.pos, wo, next_mat);
             }
 
