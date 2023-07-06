@@ -1282,6 +1282,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     FrameData& cur_frame = current_frame();
 
     if (!dynamic_idx.empty()) {
+
+        // Allows to find a old geometry that is large enough to be reused.
         std::map<std::pair<uint32_t, uint32_t>, std::vector<RTGeometry>> vtx_prim_cnt_to_geo;
         for (auto& geo : cur_frame.dynamic_geometries) {
             std::pair<uint32_t, uint32_t> vtx_prim_cnt =
