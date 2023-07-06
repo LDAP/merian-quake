@@ -259,7 +259,7 @@ void add_geo_alias(entity_t* ent,
     // fprintf(stderr, "alias origin and angles %g %g %g -- %g %g %g\n",
     //     ent->origin[0], ent->origin[1], ent->origin[2],
     //     ent->angles[0], ent->angles[1], ent->angles[2]);
-    
+
     aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
     aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
     // the plural here really hurts but it's from quakespasm code:
@@ -1352,6 +1352,12 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         update.write_descriptor_buffer(BINDING_VTX_BUF, geo.vtx_buffer, 0, VK_WHOLE_SIZE, i);
         update.write_descriptor_buffer(BINDING_IDX_BUF, geo.idx_buffer, 0, VK_WHOLE_SIZE, i);
         update.write_descriptor_buffer(BINDING_EXT_BUF, geo.ext_buffer, 0, VK_WHOLE_SIZE, i);
+    }
+
+    for (uint32_t i = all_geometries.size(); i < MAX_GEOMETRIES; i++) {
+        update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
     }
 
     const vk::BufferUsageFlags instances_buffer_usage =
