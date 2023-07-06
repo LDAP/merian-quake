@@ -3,6 +3,7 @@
 
 // same as in gl_texmgr.c
 #define MAX_GLTEXTURES 4096
+#define MAX_GEOMETRIES 512
 
 // Configure ray tracing
 
@@ -27,11 +28,6 @@
 #define BINDING_EXT_BUF 2
 #define BINDING_IMG_TEX 3
 #define BINDING_TLAS 4
-
-#define GEO_DESC_ARRAY_SIZE 2
-
-#define ARRAY_IDX_STATIC 0
-#define ARRAY_IDX_DYNAMIC 1
 
 // Material flags
 

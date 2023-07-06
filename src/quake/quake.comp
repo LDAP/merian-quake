@@ -62,10 +62,10 @@ void get_verts_pos_geonormal(out mat3 verts,
                              out vec3 pos,
                              out vec3 geo_normal,
                              const IntersectionInfo info) {
-    const uvec3 prim_indexes = buf_idx[nonuniformEXT(info.instance_custom_index)].i[info.primitive_index];
-    verts = mat3(buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.x],
-                 buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.y],
-                 buf_vtx[nonuniformEXT(info.instance_custom_index)].v[prim_indexes.z]);
+    const uvec3 prim_indexes = buf_idx[nonuniformEXT(info.instance_id)].i[info.primitive_index];
+    verts = mat3(buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.x],
+                 buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.y],
+                 buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.z]);
     pos = verts * info.barycentrics;
     geo_normal = normalize(cross(verts[2] - verts[0], verts[1] - verts[0]));
 }
@@ -93,7 +93,7 @@ vec3 apply_normalmap(const vec3 v0,
 
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
-    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
+    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
     const uint alpha = extra_data.texnum_alpha >> 12;
     if ((extra_data.texnum_fb_flags >> 12) != MAT_FLAGS_NONE) {
         // treat sky, lava, slime,... not transparent for now
@@ -119,7 +119,7 @@ void get_shading_material(const IntersectionInfo info,
                           const vec3 ray_origin,
                           const vec3 ray_dir,
                           out ShadingMaterial mat) {
-    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_custom_index)].v[info.primitive_index];
+    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
     const uint flags = extra_data.texnum_fb_flags >> 12;
     if (flags == MAT_FLAGS_SKY) {
         mat.albedo = vec4(0, 0, 0, 1);

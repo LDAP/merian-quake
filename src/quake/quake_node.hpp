@@ -85,7 +85,7 @@ class QuakeNode : public merian::Node {
         // 12 bit fullbright_texnum or 0 if not bright, 4 bit flags (most significant)
         // for flags see MAT_FLAGS_* in config.h
         uint16_t texnum_fb_flags{};
-        
+
         // Normals encoded using encode_normal
         // or glossmap texnum and normalmap texnum
         // if n1_brush = ~0.
@@ -103,9 +103,26 @@ class QuakeNode : public merian::Node {
         uint16_t t_2{};
     };
 
+    struct RTGeometry {
+        merian::BufferHandle vtx_buffer{nullptr};
+        merian::BufferHandle idx_buffer{nullptr};
+        merian::BufferHandle ext_buffer{nullptr};
+        merian::AccelerationStructureHandle blas{nullptr};
+        vk::BuildAccelerationStructureFlagsKHR blas_flags{};
+        vk::GeometryInstanceFlagsKHR instance_flags{};
+
+        // vtx.size() / 3
+        uint32_t vtx_count = 0;
+        // idx.size() / 3
+        uint32_t primitive_count = 0;
+
+        uint64_t last_rebuild = 0;
+    };
+
   public:
     /* Path to the Quake basedir. This directory must contain the id1 directory.
-     * It must be guaranteed that at most `ring_size` resources suffice. (A RingFence with that RING_SIZE).
+     * It must be guaranteed that at most `ring_size` resources suffice. (A RingFence with that
+     * RING_SIZE).
      */
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle& allocator,
@@ -161,6 +178,17 @@ class QuakeNode : public merian::Node {
     }
 
   private:
+    // Attemps to reuse the supplied old_geo (by update, buffer reuse).
+    // Uses "flags" if building, else old_geo.flags.
+    // If force_rebuild is false and an update is possible an update is queued instead if a rebuild.
+    QuakeNode::RTGeometry get_rt_geometry(const vk::CommandBuffer& cmd,
+                                          const std::vector<float>& vtx,
+                                          const std::vector<uint32_t>& idx,
+                                          const std::vector<QuakeNode::VertexExtraData>& ext,
+                                          const std::unique_ptr<merian::BLASBuilder>& blas_builder,
+                                          const QuakeNode::RTGeometry old_geometry,
+                                          const bool force_rebuild,
+                                          const vk::BuildAccelerationStructureFlagsKHR flags);
     // Optionally refreshes the geo and updates the current descriptor set if necessary
     void update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo);
     // Refreshes the geo and updates the current descriptor set
@@ -208,7 +236,7 @@ class QuakeNode : public merian::Node {
 
     // ----------------------------------------------------
     // Per-frame data and updates
-    
+
     struct FrameData {
         // Needed per frame because might reallocate scratch buffer
         std::unique_ptr<merian::BLASBuilder> blas_builder;
@@ -219,32 +247,14 @@ class QuakeNode : public merian::Node {
         // keep copy of current_textures to keep them alive and to know which descriptors to update
         std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
 
-        // Static geo (copy to keep alive)
-        // Can be nullptr if idx is empty
-        merian::BufferHandle static_vtx_buffer{nullptr};
-        merian::BufferHandle static_idx_buffer{nullptr};
-        merian::BufferHandle static_ext_buffer{nullptr};
-        // Can be nullptr if idx is empty
-        merian::AccelerationStructureHandle static_blas{nullptr};
-
-        // Dynamic geo
-        // Can be nullptr if idx is empty
-        merian::BufferHandle dynamic_vtx_buffer{nullptr};
-        merian::BufferHandle dynamic_idx_buffer{nullptr};
-        merian::BufferHandle dynamic_ext_buffer{nullptr};
-        // Can be nullptr if idx is empty
-        merian::AccelerationStructureHandle dynamic_blas{nullptr};
+        std::vector<RTGeometry> static_geometries;
+        std::vector<RTGeometry> dynamic_geometries;
 
         // TLAS
         merian::BufferHandle instances_buffer{nullptr};
         // Can be nullptr if there is not geometry
         merian::AccelerationStructureHandle tlas{nullptr};
-
-        // Has to be in Framedata since we use its size to decide whether
-        // to build or to rebuild
-        uint32_t last_dynamic_vtx_size = 0;
-        uint32_t last_dynamic_idx_size = 0;
-        uint32_t last_instances_size = 0;
+        uint32_t last_instances_size{};
     };
 
     // Access using frame % frames.size()
@@ -260,25 +270,9 @@ class QuakeNode : public merian::Node {
     // texnum -> texture
     std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
     std::unordered_set<uint32_t> pending_uploads;
+
     // Static geo
-    // Can be nullptr if idx is empty
-    merian::BufferHandle current_static_vtx_buffer;
-    merian::BufferHandle current_static_idx_buffer;
-    merian::BufferHandle current_static_ext_buffer;
-    // Can be nullptr if idx is empty
-    merian::AccelerationStructureHandle current_static_blas;
-
-    // Static geo (keep to avoid reallocation)
-    std::vector<float> static_vtx;
-    std::vector<uint32_t> static_idx;
-    std::vector<VertexExtraData> static_ext; // per primitive
-
-    // Dynamic geo (keep to avoid reallocation)
-    std::vector<float> dynamic_vtx;
-    std::vector<uint32_t> dynamic_idx;
-    std::vector<VertexExtraData> dynamic_ext;
-
-    std::vector<vk::AccelerationStructureInstanceKHR> instances;
+    std::vector<RTGeometry> current_static_geo;
 
     // ----------------------------------------------------
     // Gamestate
