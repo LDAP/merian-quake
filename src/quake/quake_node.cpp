@@ -877,8 +877,6 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // and upload in cmd_process later
     std::shared_ptr<QuakeTexture> texture = std::make_shared<QuakeTexture>(glt, data);
     // If we replace an existing texture the old texture is automatically freed.
-    // TODO: Multiple frames in flight? (For each in flight an array, then copy from last, and
-    // replace pending?)
     current_textures[glt->texnum] = texture;
     pending_uploads.insert(glt->texnum);
 }
@@ -1297,7 +1295,8 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
             ARRAY_IDX_STATIC,
             0xFF,
             0,
-            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            vk::GeometryInstanceFlagBitsKHR::
+                eTriangleFrontCounterclockwise, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             cur_frame.static_blas->get_acceleration_structure_device_address(),
         });
     }
@@ -1307,7 +1306,8 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
             ARRAY_IDX_DYNAMIC,
             0xFF,
             0,
-            {}, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
+            vk::GeometryInstanceFlagBitsKHR::
+                eTriangleFrontCounterclockwise, // vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable,
             cur_frame.dynamic_blas->get_acceleration_structure_device_address(),
         });
     }

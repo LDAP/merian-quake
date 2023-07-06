@@ -187,11 +187,11 @@ void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
     rayQueryEXT ray_query;
     rayQueryInitializeEXT(ray_query,
                           tlas,
-                          gl_RayFlagsNoneEXT,    // Ray flags, None means: If not set in the instance the triangle
-                                                 // may not be opaque. This is a major performance hit
-                                                 // since we need to load the texture to determine if we want to trace
-                                                 // further.
-                                                 // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
+                          gl_RayFlagsCullBackFacingTrianglesEXT,    // Ray flags, None means: If not set in the instance the triangle
+                                                                    // may not be opaque. This is a major performance hit
+                                                                    // since we need to load the texture to determine if we want to trace
+                                                                    // further.
+                                                                    // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
                           0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
                           x0,
                           0,                     // Minimum t-value (we set it here to 0 and pull back the ray)
