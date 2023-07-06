@@ -251,15 +251,16 @@ void add_geo_alias(entity_t* ent,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext) {
     assert(m->type == mod_alias);
+    static std::mutex quake_mutex;
+    // An internal cache shifts the hdr pointer... :/
+    std::lock_guard<std::mutex> lock(quake_mutex);
 
     // TODO: e->model->flags & MF_HOLEY <= enable alpha test
     // fprintf(stderr, "alias origin and angles %g %g %g -- %g %g %g\n",
     //     ent->origin[0], ent->origin[1], ent->origin[2],
     //     ent->angles[0], ent->angles[1], ent->angles[2]);
-    static std::mutex quake_mutex;
-    quake_mutex.lock();
+    
     aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
-    quake_mutex.unlock();
     aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
     // the plural here really hurts but it's from quakespasm code:
     int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
@@ -1170,7 +1171,6 @@ QuakeNode::get_rt_geometry(const vk::CommandBuffer& cmd,
             blas_builder->queue_rebuild({geometry}, {range_info}, old_geo.blas, old_geo.blas_flags);
             geo.last_rebuild = frame;
         } else {
-            SPDLOG_DEBUG("update");
             blas_builder->queue_update({geometry}, {range_info}, old_geo.blas, old_geo.blas_flags);
         }
         geo.blas = old_geo.blas;
