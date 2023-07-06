@@ -250,10 +250,7 @@ void main() {
         float p_diff = 1;
 
         for (int segment = 1; segment < MAX_PATH_LENGHT; segment++) {
-            const vec3 up = (abs(current_mat.normal.x) > abs(current_mat.normal.y)) ? vec3(0,1,0) : vec3(1,0,0);
-            const vec3 du = normalize(cross(up, current_mat.normal));
-            const vec3 dv = normalize(cross(du, current_mat.normal));
-            const vec3 wo = bsdf_diffuse_sample(wi, du, dv, current_mat.normal, XorShift32Vec2(rng_state));
+            const vec3 wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
 
             if (dot(wo, current_mat.geo_normal) <= 1e-2)
                 break;
