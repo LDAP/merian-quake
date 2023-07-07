@@ -274,6 +274,15 @@ class QuakeNode : public merian::Node {
     // Static geo
     std::vector<RTGeometry> current_static_geo;
 
+    // Keep to avoid reallocation
+    std::vector<float> dynamic_vtx;
+    std::vector<uint32_t> dynamic_idx;
+    std::vector<QuakeNode::VertexExtraData> dynamic_ext;
+
+    std::vector<float> static_vtx;
+    std::vector<uint32_t> static_idx;
+    std::vector<QuakeNode::VertexExtraData> static_ext;
+
     // ----------------------------------------------------
     // Gamestate
 

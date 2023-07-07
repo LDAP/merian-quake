@@ -3,7 +3,7 @@
 
 // same as in gl_texmgr.c
 #define MAX_GLTEXTURES 4096
-#define MAX_GEOMETRIES 512
+#define MAX_GEOMETRIES 16
 
 // Configure ray tracing
 

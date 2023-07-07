@@ -1192,34 +1192,31 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         current_static_geo.clear();
 
         // clang-format off
-        std::vector<float> vtx;
-        vtx.reserve(old_static_geo.empty() ? 1024 : old_static_geo[0].vtx_count * 3);
-        std::vector<uint32_t> idx;
-        idx.reserve(old_static_geo.empty() ? 1024 :  old_static_geo[0].primitive_count * 3);
-        std::vector<QuakeNode::VertexExtraData> ext;
-        ext.reserve(old_static_geo.empty() ? 1024 : old_static_geo[0].primitive_count);
+        static_vtx.clear();
+        static_idx.clear();
+        static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, vtx, idx, ext, true);
-        if (!idx.empty()) {
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, true);
+        if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, vtx, idx, ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise
             | vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
         }
-        SPDLOG_DEBUG("static opaque geo: vtx size: {} idx size: {} ext size: {}", vtx.size(), idx.size(), ext.size());
+        SPDLOG_DEBUG("static opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
 
-        vtx.clear();
-        idx.clear();
-        ext.clear();
+        static_vtx.clear();
+        static_idx.clear();
+        static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, vtx, idx, ext, false);
-        if (!idx.empty()) {
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, false);
+        if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, vtx, idx, ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
 
-        SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", vtx.size(), idx.size(), ext.size());
+        SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
 
         // clang-format on
     }
@@ -1228,9 +1225,9 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
 }
 
 void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
-    std::vector<float> dynamic_vtx;
-    std::vector<uint32_t> dynamic_idx;
-    std::vector<QuakeNode::VertexExtraData> dynamic_ext;
+    dynamic_vtx.clear();
+    dynamic_idx.clear();
+    dynamic_ext.clear();
 
     std::thread particle_viewent([&]() {
         add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
@@ -1337,6 +1334,8 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         cur_frame.tlas = nullptr;
         return;
     }
+
+    assert(all_geometries.size() < MAX_GEOMETRIES);
 
     merian::DescriptorSetUpdate update(cur_frame.quake_sets);
     std::vector<vk::AccelerationStructureInstanceKHR> inst;
