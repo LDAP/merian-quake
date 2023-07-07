@@ -362,13 +362,13 @@ void add_geo_alias(entity_t* ent,
     }
 }
 
-// select opaque: true -> only opace, false -> can have alpha
+// geo_selector: 0 -> all, 1 -> opaque, 2 -> transparent
 void add_geo_brush(entity_t* ent,
                    qmodel_t* m,
                    std::vector<float>& vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
-                   bool select_opaque) {
+                   int geo_selector = 0) {
     assert(m->type == mod_brush);
 
     // fprintf(stderr, "brush origin and angles %g %g %g -- %g %g %g with %d surfs\n",
@@ -391,10 +391,10 @@ void add_geo_brush(entity_t* ent,
         // animate their textures
         texture_t* t = R_TextureAnimation(surf->texinfo->texture, ent->frame);
 
-        if (select_opaque && t->gltexture && (t->gltexture->flags & TEXPREF_ALPHA)) {
+        if (geo_selector == 1 && t->gltexture && (t->gltexture->flags & TEXPREF_ALPHA)) {
             continue;
-        } else if (!select_opaque &&
-                   (!t->gltexture || (t->gltexture->flags & TEXPREF_ALPHA) == 0)) {
+        }
+        if (geo_selector == 2 && (!t->gltexture || (t->gltexture->flags & TEXPREF_ALPHA) == 0)) {
             continue;
         }
 
@@ -623,8 +623,7 @@ void add_geo(entity_t* ent,
         assert(ext.size() == idx.size() / 3);
         assert(vtx.size() % 3 == 0);
     } else if (m->type == mod_brush) { // brush model:
-        add_geo_brush(ent, m, vtx, idx, ext, true);
-        add_geo_brush(ent, m, vtx, idx, ext, false);
+        add_geo_brush(ent, m, vtx, idx, ext);
         assert(ext.size() == idx.size() / 3);
         assert(vtx.size() % 3 == 0);
     } else if (m->type == mod_sprite) {
@@ -1196,7 +1195,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         static_idx.clear();
         static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, true);
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 1);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
             current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
@@ -1209,13 +1208,12 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         static_idx.clear();
         static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, false);
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 2);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
             current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
-
         SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
 
         // clang-format on
