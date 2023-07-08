@@ -1394,7 +1394,7 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
         audio_device->unpause_audio();
     if (sound != old_sound && !sound)
         audio_device->pause_audio();
-
+    config.st_no_space();
     config.config_bool("pause game", pause);
     std::vector<char> cmd_buffer(128);
 

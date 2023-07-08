@@ -118,8 +118,12 @@ int main() {
         if (output->current_aquire_result().has_value()) {
             imgui.new_frame(cmd, *window, output->current_aquire_result().value());
 
+            ImGui::Begin("Quake Debug");
+
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
+
+            ImGui::End();
 
             imgui.render(cmd);
             controller->set_active(!(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
