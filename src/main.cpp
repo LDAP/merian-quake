@@ -78,36 +78,32 @@ int main() {
 
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-    uint64_t frame = 0;
     // quake->queue_command("game SlayerTest");
     // quake->queue_command("map st1m1");
     quake->queue_command("game ad");
     quake->queue_command("map ad_tears");
     // quake->queue_command("map e1m6");
     // quake->queue_command("map e1m1");
-    merian::Stopwatch sw;
-    double frame_time_sum = 0;
-
     merian::GLFWImGui imgui(context, true);
-
+    merian::Profiler::Report report;
+    bool clear_profiler = false;
+    merian::Stopwatch sw;
     while (!glfwWindowShouldClose(*window)) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
 
-        bool clear_profiler = false;
         if (!frame_data.user_data.profiler) {
             frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
         } else {
-            frame_data.user_data.profiler->collect();
-            if (frame % 200 == 0) {
-                SPDLOG_INFO(frame_data.user_data.profiler->get_report());
-                SPDLOG_INFO("avg fps: {}", 1. / (frame_time_sum / 200));
+            if (sw.millis() > 100) {
+                frame_data.user_data.profiler->collect();
+                report = frame_data.user_data.profiler->get_report();
                 clear_profiler = true;
-                frame_time_sum = 0;
-            }
+                sw.reset();
+            } else {
+                clear_profiler = false;
+            } 
         }
 
-        frame_time_sum += sw.seconds();
-        sw.reset();
         alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
         auto cmd_pool = ring_cmd_pool->set_cycle();
         auto cmd = cmd_pool->create_and_begin();
@@ -119,6 +115,9 @@ int main() {
 
         if (output->current_aquire_result().has_value()) {
             imgui.new_frame(cmd, *window, output->current_aquire_result().value());
+
+            frame_data.user_data.profiler->get_report_imgui(report);
+
             imgui.render(cmd);
             controller->set_active(!(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
         }
@@ -128,6 +127,5 @@ int main() {
         queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),
                       run.get_wait_semaphores(), run.get_wait_stages());
         run.execute_callbacks(queue);
-        frame++;
     }
 }
