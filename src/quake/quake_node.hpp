@@ -177,6 +177,8 @@ class QuakeNode : public merian::Node {
         pending_commands.push(command);
     }
 
+    void get_configuration(merian::Configuration& config) override;
+
   private:
     // Attemps to reuse the supplied old_geo (by update, buffer reuse).
     // Uses "flags" if building, else old_geo.flags.

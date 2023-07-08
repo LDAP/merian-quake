@@ -8,6 +8,7 @@
 #include "merian-nodes/taa/taa.hpp"
 #include "merian-nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/io/file_loader.hpp"
+#include "merian/utils/configuration_imgui.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/vk/command/ring_command_pool.hpp"
 #include "merian/vk/context.hpp"
@@ -56,25 +57,26 @@ int main() {
     auto blue_noise = std::make_shared<merian::ImageNode>(
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black_color = std::make_shared<merian::ColorOutputNode>(
-        vk::Format::eR16G16B16A16Sfloat, vk::ClearColorValue{}, vk::Extent3D{1920, 1080, 1});
+        vk::Format::eR16G16B16A16Sfloat, vk::Extent3D{1920, 1080, 1});
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size());
     auto taa = std::make_shared<merian::TAANode>(context, alloc);
     graph.add_node("output", output);
     graph.add_node("black_color", black_color);
     graph.add_node("blue_noise", blue_noise);
     graph.add_node("quake", quake);
-    // graph.add_node("taa", taa);
+    graph.add_node("taa", taa);
 
     graph.connect_image(quake, quake, 2, 0); // gbuffer
     graph.connect_image(quake, quake, 3, 3); // nee
     graph.connect_image(black_color, quake, 0, 1);
     graph.connect_image(blue_noise, quake, 0, 2);
 
-    // graph.connect_image(black_color, taa, 0, 2);
-    // graph.connect_image(taa, taa, 0, 1);
-    // graph.connect_image(quake, taa, 1, 0);
+    graph.connect_image(black_color, taa, 0, 2);
+    graph.connect_image(taa, taa, 0, 1);
+    graph.connect_image(quake, taa, 1, 0);
 
-    graph.connect_image(quake, output, 1, 0);
+    graph.connect_image(taa, output, 0, 0);
+    merian::ImGuiConfiguration config;
 
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
@@ -117,6 +119,7 @@ int main() {
             imgui.new_frame(cmd, *window, output->current_aquire_result().value());
 
             frame_data.user_data.profiler->get_report_imgui(report);
+            graph.get_configuration(config);
 
             imgui.render(cmd);
             controller->set_active(!(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));

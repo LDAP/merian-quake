@@ -279,5 +279,5 @@ void main() {
         contribution += f / SAMPLES_PER_PIXEL;
     }
 
-    imageStore(img_albedo, pixel, vec4(contribution * 10 + first_mat.albedo.rgb * .1, 1));
+    imageStore(img_albedo, pixel, vec4(contribution * 10 + first_mat.albedo.rgb * 0., 1));
 }

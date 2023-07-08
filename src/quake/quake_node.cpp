@@ -822,8 +822,6 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             if (shm->samplepos >= buffersize)
                 shm->samplepos = 0;
         });
-    if (sound)
-        audio_device->unpause_audio();
 }
 
 QuakeNode::~QuakeNode() {
@@ -1387,4 +1385,19 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         cur_frame.tlas_builder->get_cmds(cmd);
         cur_frame.tlas_builder->cmd_barrier(cmd, vk::PipelineStageFlagBits::eComputeShader);
     }
+}
+
+void QuakeNode::get_configuration(merian::Configuration& config) {
+    bool old_sound = sound;
+    config.config_bool("sound", sound);
+    if (sound != old_sound && sound)
+        audio_device->unpause_audio();
+    if (sound != old_sound && !sound)
+        audio_device->pause_audio();
+
+    config.config_bool("pause game", pause);
+    std::vector<char> cmd_buffer(128);
+
+    if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true))
+        queue_command(cmd_buffer.data());
 }
