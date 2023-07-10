@@ -3,11 +3,11 @@
 vec3 envmap(in vec3 w) {
     if(params.sky_lf == -1u) {
         // classic quake sky
-        vec2 st = 0.5 + 0.5*vec2(-w.y,w.x) / abs(w.z);
-        vec2 t = params.cl_time * vec2(0.12, 0.06);
-        vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt)], st + 0.1 * t);
-        vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_bk)], st + t);
-        vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
+        const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
+        const vec2 t = params.cl_time * vec2(0.12, 0.06);
+        const vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt)], st + 0.1 * t);
+        const vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_bk)], st + t);
+        const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         return 100 * tex;
     } else {
         // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
