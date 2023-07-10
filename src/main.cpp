@@ -96,8 +96,8 @@ int main() {
         if (!frame_data.user_data.profiler) {
             frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
         } else {
+            frame_data.user_data.profiler->collect();
             if (sw.millis() > 100) {
-                frame_data.user_data.profiler->collect();
                 report = frame_data.user_data.profiler->get_report();
                 clear_profiler = true;
                 sw.reset();
