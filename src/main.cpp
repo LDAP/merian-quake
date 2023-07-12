@@ -51,7 +51,7 @@ int main() {
         std::make_shared<merian::GLFWInputController>(window);
     auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
-    merian::Graph graph{context, alloc, queue};
+    merian::Graph graph{context, alloc, queue, debugUtils};
     auto output =
         std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
     // output->get_swapchain()->set_vsync(true);
