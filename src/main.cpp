@@ -35,18 +35,17 @@ int main() {
     spdlog::set_level(spdlog::level::debug);
     merian::FileLoader loader{{"/", "./", "./build", "./res", "./res/shaders"}};
 
-    merian::ExtensionVkDebugUtils debugUtils(true);
-    merian::ExtensionVkGLFW extGLFW;
-    merian::ExtensionResources resources;
-    merian::ExtensionVkAccelerationStructure extAS;
-    merian::ExtensionVkRayQuery extRQ;
-    std::vector<merian::Extension*> extensions = {&extGLFW, &debugUtils, &resources, &extAS,
-                                                  &extRQ};
+    auto debugUtils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
+    auto extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
+    auto resources = std::make_shared<merian::ExtensionResources>();
+    auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
+    auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, debugUtils, resources, extAS, extRQ};
 
-    merian::SharedContext context = merian::Context::make_context(extensions, "merian-cornell-box");
-    auto alloc = resources.resource_allocator();
+    merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
+    auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
-    auto [window, surface] = extGLFW.get();
+    auto [window, surface] = extGLFW->get();
 
     std::shared_ptr<merian::InputController> controller =
         std::make_shared<merian::GLFWInputController>(window);
