@@ -75,6 +75,7 @@ class QuakeNode : public merian::Node {
         int frame;
 
         PlayerData player;
+        int spp = 4;
     };
 
     struct VertexExtraData {

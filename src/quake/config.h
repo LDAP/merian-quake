@@ -12,7 +12,6 @@
 // continue tracing if alpha of texture is smaller
 #define ALPHA_THRESHOLD .666 
 
-#define SAMPLES_PER_PIXEL 8
 #define MAX_PATH_LENGHT 2
 
 // Configure MC

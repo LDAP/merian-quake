@@ -10,6 +10,7 @@
 #include "common/normal_encode.glsl"
 #include "common/raytrace.glsl"
 #include "common/bsdf_diffuse.glsl"
+#include "common/grid.glsl"
 
 #include "config.h"
 #include "layout.glsl"
@@ -221,8 +222,8 @@ void main() {
     if (any(greaterThanEqual(pixel, resolution)))
         return;
 
-    uint rng_state = 19937 * (resolution.x  * pixel.y + pixel.x) * params.frame;
-    vec3 contribution = vec3(0);
+    uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
+    vec3 irr = vec3(0);
 
     ShadingMaterial first_mat;
     // first pos is params.cam_x.xyz
@@ -234,18 +235,32 @@ void main() {
             return; // should not happen in Quake but it does :o
         get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
+    
+    //uvec3 idx = grid_idx_interpolate(first_mat.pos, 100, XorShift32(rng_state)) * uvec3(37000, 637899, 52368) + uvec3(0, 236747, 276348);
+    //imageStore(img_albedo, pixel, vec4(XorShift32(idx.x), XorShift32(idx.y), XorShift32(idx.z), 1));
+    //return;
+    
+    {
+        // Store albedo
+        if (any(greaterThanEqual(first_mat.emission, vec3(1e-3)))) {
+            // Required for albedo demodulation, keep detail in fb texture
+            imageStore(img_albedo, pixel, vec4(first_mat.emission, 1));
+            first_mat.emission = vec3(1);
+        } else {
+            imageStore(img_albedo, pixel, vec4(first_mat.albedo.rgb, 1));
+        }
+    }
 
     // direct light
     if (MAX_PATH_LENGHT > 0)
-        contribution = first_mat.emission;// * dot(-first_wi, first_mat.normal);
+        irr = first_mat.emission;// * dot(-first_wi, first_mat.normal);
 
-    // TODO: if albedo == 0: skip indirect
 
-    // indirect light
-    for (int smp = 0; smp < SAMPLES_PER_PIXEL; smp++) {
+    if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))))
+    for (int smp = 0; smp < params.spp; smp++) {
         vec3 wi = first_wi;
         ShadingMaterial current_mat = first_mat;
-        vec3 current_albedo = current_mat.albedo.rgb;  // already has albedo of current mat multiplied
+        vec3 current_albedo = vec3(1);
         vec3 f = vec3(0);
         float p_diff = 1;
 
@@ -276,8 +291,15 @@ void main() {
             current_mat = next_mat;
         }
 
-        contribution += f / SAMPLES_PER_PIXEL;
+        const vec3 contrib = f / params.spp;
+        if(!any(isinf(contrib)) && !any(isnan(contrib)))
+            irr += contrib;
     }
 
-    imageStore(img_albedo, pixel, vec4(contribution * 10 + first_mat.albedo.rgb * 0., 1));
+    {
+        // Write irradiance
+        imageStore(img_irradiance, pixel, vec4(irr, 1));
+        // Write gbuffer
+        imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
+    }
 }

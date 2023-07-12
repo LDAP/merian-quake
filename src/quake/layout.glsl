@@ -14,19 +14,17 @@ layout(push_constant) uniform PushConstant {
     float cl_time; // quake time
     int frame;
     uint player; // see `PlayerData` in quake_node.hpp
+    int spp;
 } params;
 
 // GRAPH IN/OUTs
 
-layout(set = 0, binding = 0) uniform sampler2D img_gbuf_in;
-layout(set = 0, binding = 1) uniform sampler2D img_mv;
-layout(set = 0, binding = 2) uniform sampler2D img_blue;
-layout(set = 0, binding = 3) uniform usampler2D img_nee_in; // mc states
+layout(set = 0, binding = 0) uniform sampler2D img_blue;
 
-layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly image2D img_gbuf_out;
-layout(set = 0, binding = 7) uniform writeonly uimage2D img_nee_out; // mc states
+layout(set = 0, binding = 1) uniform writeonly image2D img_irradiance;
+layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
+layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
+layout(set = 0, binding = 4) uniform writeonly uimage2D img_nee_out; // mc states
 
 // QUAKE 
 

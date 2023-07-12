@@ -1,10 +1,12 @@
 #include "imgui.h"
 #include "merian-nodes/ab_compare/ab_compare.hpp"
+#include "merian-nodes/accumulate/accumulate.hpp"
 #include "merian-nodes/blit_external/blit_external.hpp"
 #include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
 #include "merian-nodes/color_output/color_output.hpp"
 #include "merian-nodes/image/image.hpp"
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
+#include "merian-nodes/svgf/svgf.hpp"
 #include "merian-nodes/taa/taa.hpp"
 #include "merian-nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/io/file_loader.hpp"
@@ -56,26 +58,42 @@ int main() {
     // output->get_swapchain()->set_vsync(true);
     auto blue_noise = std::make_shared<merian::ImageNode>(
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
-    auto black_color = std::make_shared<merian::ColorOutputNode>(
-        vk::Format::eR16G16B16A16Sfloat, vk::Extent3D{1920, 1080, 1});
+    auto black = std::make_shared<merian::ColorOutputNode>(vk::Format::eR16G16B16A16Sfloat,
+                                                                 vk::Extent3D{1920, 1080, 1});
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size());
-    auto taa = std::make_shared<merian::TAANode>(context, alloc);
+    auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
+    auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
+    auto filmcurv = std::make_shared<merian::VKDTFilmcurv>(context, alloc);
+
     graph.add_node("output", output);
-    graph.add_node("black_color", black_color);
+    graph.add_node("black_color", black);
     graph.add_node("blue_noise", blue_noise);
     graph.add_node("quake", quake);
-    graph.add_node("taa", taa);
+    graph.add_node("accum", accum);
+    graph.add_node("denoiser", svgf);
+    graph.add_node("colorgrade", filmcurv);
 
-    graph.connect_image(quake, quake, 2, 0); // gbuffer
-    graph.connect_image(quake, quake, 3, 3); // nee
-    graph.connect_image(black_color, quake, 0, 1);
-    graph.connect_image(blue_noise, quake, 0, 2);
+    graph.connect_image(blue_noise, quake, 0, 0);
 
-    graph.connect_image(black_color, taa, 0, 2);
-    graph.connect_image(taa, taa, 0, 1);
-    graph.connect_image(quake, taa, 1, 0);
+    graph.connect_image(accum, accum, 0, 0); // feedback
+    graph.connect_image(accum, accum, 1, 1);
+    graph.connect_image(quake, accum, 0, 2); // irr
+    graph.connect_image(quake, accum, 2, 3); // gbuf
+    graph.connect_image(quake, accum, 2, 4);
+    graph.connect_image(black, accum, 0, 5); // mv
 
-    graph.connect_image(taa, output, 0, 0);
+    graph.connect_image(svgf, svgf, 0, 0); // feedback
+    graph.connect_image(accum, svgf, 0, 1); // irr
+    graph.connect_image(accum, svgf, 1, 2); // moments
+    graph.connect_image(quake, svgf, 2, 3); // gbuf
+    graph.connect_image(quake, svgf, 2, 4);
+    graph.connect_image(quake, svgf, 1, 5); // albedo
+    graph.connect_image(black, svgf, 0, 6); // mv
+
+    graph.connect_image(svgf, filmcurv, 0, 0);
+
+    graph.connect_image(filmcurv, output, 0, 0);
+
     merian::ImGuiConfiguration config;
 
     auto ring_cmd_pool =
@@ -103,7 +121,7 @@ int main() {
                 sw.reset();
             } else {
                 clear_profiler = false;
-            } 
+            }
         }
 
         alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
@@ -126,7 +144,8 @@ int main() {
             ImGui::End();
 
             imgui.render(cmd);
-            controller->set_active(!(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
+            controller->set_active(
+                !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
         }
 
         frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();

@@ -934,10 +934,7 @@ std::tuple<std::vector<merian::NodeInputDescriptorImage>,
 QuakeNode::describe_inputs() {
     return {
         {
-            merian::NodeInputDescriptorImage::compute_read("gbuffer", 1),
-            merian::NodeInputDescriptorImage::compute_read("mv", 0),
             merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
-            merian::NodeInputDescriptorImage::compute_read("nee_in", 1),
         },
         {},
     };
@@ -1400,4 +1397,5 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
 
     if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true))
         queue_command(cmd_buffer.data());
+    config.config_int("samples per pixel", pc.spp, 0, 32);
 }

@@ -8,7 +8,7 @@ vec3 envmap(in vec3 w) {
         const vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt)], st + 0.1 * t);
         const vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_bk)], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
-        return 100 * tex;
+        return 50 * tex;
     } else {
         // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
         // vec3 sundir = normalize(vec3(1, 1, 1)); // this where the moon is in ad_azad
