@@ -79,7 +79,7 @@ int main() {
     graph.connect_image(quake, accum, 0, 2); // irr
     graph.connect_image(quake, accum, 2, 3); // gbuf
     graph.connect_image(quake, accum, 2, 4);
-    graph.connect_image(black, accum, 0, 5); // mv
+    graph.connect_image(quake, accum, 3, 5); // mv
 
     graph.connect_image(svgf, svgf, 0, 0); // feedback
     graph.connect_image(accum, svgf, 0, 1); // irr
@@ -87,7 +87,7 @@ int main() {
     graph.connect_image(quake, svgf, 2, 3); // gbuf
     graph.connect_image(quake, svgf, 2, 4);
     graph.connect_image(quake, svgf, 1, 5); // albedo
-    graph.connect_image(black, svgf, 0, 6); // mv
+    graph.connect_image(quake, svgf, 3, 6); // mv
 
     graph.connect_image(svgf, filmcurv, 0, 0);
 

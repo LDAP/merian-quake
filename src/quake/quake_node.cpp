@@ -953,8 +953,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "gbuffer", vk::Format::eR32G32B32A32Sfloat, width, height),
-            merian::NodeOutputDescriptorImage::compute_write(
-                "nee_out", vk::Format::eR32G32B32A32Uint, width, height),
+            merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16B16A16Sfloat,
+                                                             width, height),
         },
         {},
     };
@@ -1054,12 +1054,15 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     pc.player.flags |= sv_player->v.waterlevel >= 3 ? PLAYER_FLAGS_UNDERWATER : 0;
     pc.sky = texnum_skybox;
     pc.cl_time = cl.time;
+    pc.prev_cam_x = pc.cam_x;
+    pc.prev_cam_w = pc.cam_w;
+    pc.prev_cam_u = pc.cam_u;
     float rgt[3];
     AngleVectors(r_refdef.viewangles, &pc.cam_w.x, rgt, &pc.cam_u.x);
     pc.cam_x = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
-    float fog_density = Fog_GetDensity();
-    fog_density *= fog_density;
-    pc.fog = glm::vec4(*merian::as_vec3(Fog_GetColor()), fog_density);
+    // float fog_density = Fog_GetDensity();
+    // fog_density *= fog_density;
+    // pc.fog = glm::vec4(*merian::as_vec3(Fog_GetColor()), fog_density);
 
     FrameData& cur_frame = current_frame();
     {

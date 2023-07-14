@@ -16,7 +16,4 @@ void
 main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if(any(greaterThanEqual(ipos, imageSize(img_irradiance)))) return;
-
-  imageStore(img_gbuf, ipos, vec4(0));
-  imageStore(img_nee_out, ipos, uvec4(0));
 }

@@ -9,8 +9,12 @@ layout(push_constant) uniform PushConstant {
     vec4 cam_x;
     vec4 cam_w;
     vec4 cam_u;
-    vec4 fog;
-    uint sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
+    vec4 prev_cam_x;
+    vec4 prev_cam_w;
+    vec4 prev_cam_u;
+
+    uint sky_rt_bk, sky_lf_ft, sky_up_dn;
+
     float cl_time; // quake time
     int frame;
     uint player; // see `PlayerData` in quake_node.hpp
@@ -24,7 +28,7 @@ layout(set = 0, binding = 0) uniform sampler2D img_blue;
 layout(set = 0, binding = 1) uniform writeonly image2D img_irradiance;
 layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
-layout(set = 0, binding = 4) uniform writeonly uimage2D img_nee_out; // mc states
+layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
 
 // QUAKE 
 

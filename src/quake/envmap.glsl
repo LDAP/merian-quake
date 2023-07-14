@@ -1,12 +1,12 @@
 #include "common/von_mises_fisher.glsl"
 
 vec3 envmap(in vec3 w) {
-    if(params.sky_lf == -1u) {
+    if((params.sky_lf_ft & 0xffff) == 0xffff) {
         // classic quake sky
         const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
         const vec2 t = params.cl_time * vec2(0.12, 0.06);
-        const vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt)], st + 0.1 * t);
-        const vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_bk)], st + t);
+        const vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt_bk & 0xffff)], st + 0.1 * t);
+        const vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_rt_bk >> 16   )], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         return 50 * tex;
     } else {
@@ -27,12 +27,12 @@ vec3 envmap(in vec3 w) {
         if(abs(w.z) > abs(w.x) && abs(w.z) > abs(w.y)) m = 2;
         uint side = 0;
         vec2 st;
-        if     (m == 0 && w.x > 0) { side = params.sky_rt; st = 0.5 + 0.5*vec2(-w.y, -w.z) / abs(w.x);} // rt
-        else if(m == 0 && w.x < 0) { side = params.sky_lf; st = 0.5 + 0.5*vec2( w.y, -w.z) / abs(w.x);} // lf
-        else if(m == 1 && w.y > 0) { side = params.sky_bk; st = 0.5 + 0.5*vec2( w.x, -w.z) / abs(w.y);} // bk
-        else if(m == 1 && w.y < 0) { side = params.sky_ft; st = 0.5 + 0.5*vec2(-w.x, -w.z) / abs(w.y);} // ft
-        else if(m == 2 && w.z > 0) { side = params.sky_up; st = 0.5 + 0.5*vec2(-w.y,  w.x) / abs(w.z);} // up
-        else if(m == 2 && w.z < 0) { side = params.sky_dn; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z);} // dn
+        if     (m == 0 && w.x > 0) { side = params.sky_rt_bk & 0xffff; st = 0.5 + 0.5*vec2(-w.y, -w.z) / abs(w.x);} // rt
+        else if(m == 0 && w.x < 0) { side = params.sky_lf_ft & 0xffff; st = 0.5 + 0.5*vec2( w.y, -w.z) / abs(w.x);} // lf
+        else if(m == 1 && w.y > 0) { side = params.sky_rt_bk >> 16   ; st = 0.5 + 0.5*vec2( w.x, -w.z) / abs(w.y);} // bk
+        else if(m == 1 && w.y < 0) { side = params.sky_lf_ft >> 16   ; st = 0.5 + 0.5*vec2(-w.x, -w.z) / abs(w.y);} // ft
+        else if(m == 2 && w.z > 0) { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5*vec2(-w.y,  w.x) / abs(w.z);} // up
+        else if(m == 2 && w.z < 0) { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z);} // dn
         emcol += texture(img_tex[nonuniformEXT(side)], st).rgb;
         return emcol;
     }

@@ -227,7 +227,7 @@ void main() {
 
     ShadingMaterial first_mat;
     // first pos is params.cam_x.xyz
-    const vec3 first_wi = get_camera_ray_dir_bh(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, XorShift32Vec2(rng_state));
+    const vec3 first_wi = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
     {
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
@@ -249,6 +249,13 @@ void main() {
         } else {
             imageStore(img_albedo, pixel, vec4(first_mat.albedo.rgb, 1));
         }
+    }
+
+    {
+        // Store motion vector
+        const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
+        const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, radians(90));
+        imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 
     // direct light

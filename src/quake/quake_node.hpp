@@ -65,10 +65,12 @@ class QuakeNode : public merian::Node {
         glm::vec4 cam_w; // forward
         glm::vec4 cam_u; // up
 
-        glm::vec4 fog; // xyz: color, w: density
+        glm::vec4 prev_cam_x;
+        glm::vec4 prev_cam_w;
+        glm::vec4 prev_cam_u;
 
         // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
-        std::array<uint32_t, 6> sky;
+        std::array<uint16_t, 6> sky;
 
         // quake time
         float cl_time;
@@ -235,7 +237,7 @@ class QuakeNode : public merian::Node {
     // Store some textures for custom patches
     uint32_t texnum_blood = 0;
     uint32_t texnum_explosion = 0;
-    std::array<uint32_t, 6> texnum_skybox;
+    std::array<uint16_t, 6> texnum_skybox;
 
     // ----------------------------------------------------
     // Per-frame data and updates
