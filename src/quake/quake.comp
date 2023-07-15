@@ -223,7 +223,7 @@ void main() {
         return;
 
     uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
-    vec3 irr = vec3(0);
+    vec4 irr = vec4(0);
 
     ShadingMaterial first_mat;
     // first pos is params.cam_x.xyz
@@ -258,7 +258,7 @@ void main() {
 
     // direct light
     if (MAX_PATH_LENGHT > 0)
-        irr = first_mat.emission;// * dot(-first_wi, first_mat.normal);
+        irr = vec4(first_mat.emission, 1);// * dot(-first_wi, first_mat.normal);
 
 
     if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))))
@@ -296,14 +296,14 @@ void main() {
             current_mat = next_mat;
         }
 
-        const vec3 contrib = f / params.spp;
+        const vec4 contrib = vec4(f / params.spp, 1);
         if(!any(isinf(contrib)) && !any(isnan(contrib)))
             irr += contrib;
     }
 
     {
         // Write irradiance
-        imageStore(img_irradiance, pixel, vec4(irr, 1));
+        imageStore(img_irradiance, pixel, irr);
         // Write gbuffer
         imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
     }
