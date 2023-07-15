@@ -16,7 +16,7 @@ layout(push_constant) uniform PushConstant {
     uint sky_rt_bk, sky_lf_ft, sky_up_dn;
 
     float cl_time; // quake time
-    int frame;
+    uint frame;
     uint player; // see `PlayerData` in quake_node.hpp
     int spp;
 } params;

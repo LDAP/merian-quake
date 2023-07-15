@@ -74,7 +74,7 @@ class QuakeNode : public merian::Node {
 
         // quake time
         float cl_time;
-        int frame;
+        uint frame;
 
         PlayerData player;
         int spp = 4;

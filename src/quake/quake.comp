@@ -228,6 +228,7 @@ void main() {
     ShadingMaterial first_mat;
     // first pos is params.cam_x.xyz
     const vec3 first_wi = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
+
     {
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
@@ -235,10 +236,6 @@ void main() {
             return; // should not happen in Quake but it does :o
         get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
-    
-    //uvec3 idx = grid_idx_interpolate(first_mat.pos, 100, XorShift32(rng_state)) * uvec3(37000, 637899, 52368) + uvec3(0, 236747, 276348);
-    //imageStore(img_albedo, pixel, vec4(XorShift32(idx.x), XorShift32(idx.y), XorShift32(idx.z), 1));
-    //return;
     
     {
         // Store albedo
@@ -254,6 +251,7 @@ void main() {
     {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
+        // Should compensate pixel filter..
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, radians(90));
         imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
