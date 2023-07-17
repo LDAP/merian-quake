@@ -1,4 +1,5 @@
 #include "config.h"
+#include "grid.h"
 
 #extension GL_EXT_scalar_block_layout       : require
 #extension GL_EXT_shader_16bit_storage      : enable
@@ -29,6 +30,9 @@ layout(set = 0, binding = 1) uniform writeonly image2D img_irradiance;
 layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
 layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
+layout(set = 0, binding = 5, scalar) buffer buf_cells {
+    GridCell cells[];
+};
 
 // QUAKE 
 

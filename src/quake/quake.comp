@@ -15,84 +15,7 @@
 #include "config.h"
 #include "layout.glsl"
 #include "envmap.glsl"
-
-struct ShadingMaterial {
-    vec4 albedo;
-    vec3 emission;
-    vec3 normal; // normalized
-    vec3 geo_normal;
-    vec3 pos;
-    float gloss;
-};
-
-// assert(alpha != 0)
-float decode_alpha(const uint alpha) {
-    return float(alpha - 1) / 14.;
-}
-
-// Get warped texture coordinate
-void warp(inout vec2 st) {
-    st += vec2(0.1 * sin(st.y * 1.5 + params.cl_time * 1.0),
-              0.1 * sin(st.x * 1.4 + params.cl_time * 1.0));
-    st -= vec2(.1, 0) * cos(st.x * 5 + params.cl_time * 2) * pow(max(sin(st.x * 5 + params.cl_time * 2), 0), 5);
-    st -= vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5);
-}
-
-vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const uint flags) {
-    if (flags == 1) // lava
-        return 20.0 * albedo;
-    if (flags == 2) // slime
-        return 0.5 * albedo;
-    if (flags == 3) // tele
-        return 5.0 * albedo;
-    if (flags == 7) // ad_tears emissive waterfall hack
-        return albedo;
-
-    if (texnum_fb > 0) {
-        vec3 emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
-        const float sum = emission.x + emission.y + emission.z;
-        if (sum > 0) {
-            emission /= sum;
-            emission *= 10.0 * (exp2(4.0 * sum) - 1.0);
-        }
-        return emission;
-    }
-
-    return vec3(0.);
-}
-
-void get_verts_pos_geonormal(out mat3 verts,
-                             out vec3 pos,
-                             out vec3 geo_normal,
-                             const IntersectionInfo info) {
-    const uvec3 prim_indexes = buf_idx[nonuniformEXT(info.instance_id)].i[info.primitive_index];
-    verts = mat3(buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.x],
-                 buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.y],
-                 buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.z]);
-    pos = verts * info.barycentrics;
-    geo_normal = normalize(cross(verts[2] - verts[0], verts[1] - verts[0]));
-}
-
-vec3 apply_normalmap(const vec3 v0,
-                     const vec3 v1,
-                     const vec3 v2,
-                     const vec2 st0,
-                     const vec2 st1,
-                     const vec2 st2,
-                     const vec3 geo_normal,
-                     const vec3 tangent_normal) {
-    vec3 du = v2 - v0, dv = v1 - v0;
-    const vec2 duv1 = st2 - st0, duv2 = st1 - st0;
-    const float det = duv1.x * duv2.y - duv2.x * duv1.y;
-    if(abs(det) > 1e-8) {
-      const vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
-      dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
-      du = du2;
-    }
-    vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
-    // if (dot(geo_normal, n) <= 0) n -= geo_normal * dot(geo_normal, n);
-    return n;
-}
+#include "shading.glsl"
 
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
@@ -115,73 +38,6 @@ bool confirm_intersection(const IntersectionInfo info) {
 
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
         return textureGather(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st, 3).r >= ALPHA_THRESHOLD;
-    }
-}
-
-void get_shading_material(const IntersectionInfo info,
-                          const vec3 ray_origin,
-                          const vec3 ray_dir,
-                          out ShadingMaterial mat) {
-    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
-    const uint flags = extra_data.texnum_fb_flags >> 12;
-    if (flags == MAT_FLAGS_SKY) {
-        mat.albedo = vec4(0, 0, 0, 1);
-        mat.emission = envmap(ray_dir);
-        mat.normal = -ray_dir;
-        mat.geo_normal = -ray_dir;
-        mat.pos = ray_origin + info.t * ray_dir;
-        mat.gloss = 0;
-        return;
-    }
-    const vec2 st_0 = unpackHalf2x16(extra_data.st_0);
-    const vec2 st_1 = unpackHalf2x16(extra_data.st_1);
-    const vec2 st_2 = unpackHalf2x16(extra_data.st_2);
-
-    vec2 st = st_0 * info.barycentrics.x
-            + st_1 * info.barycentrics.y
-            + st_2 * info.barycentrics.z;
-
-    if (flags > 0 && flags < 6) {
-        warp(st);
-    }
-
-    {
-        // Load albedo
-        // const uint texnum = extra_data.texnum_alpha & 0xfff;
-        mat.albedo = texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st);
-        const uint alpha = extra_data.texnum_alpha >> 12;
-        if (alpha != 0)
-            mat.albedo.a = decode_alpha(alpha);
-    }
-    {
-        // Load emission
-        // const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
-        mat.emission = get_emission(extra_data.texnum_fb_flags & 0xfff, st, mat.albedo.rgb, flags);
-    }
-
-    mat3 verts;
-    get_verts_pos_geonormal(verts, mat.pos, mat.geo_normal, info);
-    mat.normal = mat.geo_normal;
-
-    if (extra_data.n1_brush == 0xffffffff) { // is brush model
-        // can have normal and gloss map (else has geo normals)
-        const uint texnum_gloss = extra_data.n0_gloss_norm & 0xffff;
-        const uint texnum_normal = extra_data.n0_gloss_norm >> 16;
-        
-        if (texnum_normal > 0) {
-            // overwrite geo normal with normal map normal
-            const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
-            mat.normal = apply_normalmap(verts[0], verts[1], verts[2], st_0, st_1, st_2, mat.normal, tangent_normal);
-        }
-        if (texnum_gloss > 0) {
-            mat.gloss = texture(img_tex[nonuniformEXT(texnum_gloss)], st).r;
-        }
-    } else {
-        const vec3 n0 = geo_decode_normal(extra_data.n0_gloss_norm);
-        const vec3 n1 = geo_decode_normal(extra_data.n1_brush);
-        const vec3 n2 = geo_decode_normal(extra_data.n2);
-        mat.normal = normalize(mat3(n0, n1, n2) * info.barycentrics);
-        mat.gloss = 0;
     }
 }
 
@@ -225,29 +81,34 @@ void main() {
         return;
 
     uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
-    vec4 irr = vec4(0);
+    vec4 irr_samples = vec4(0); // store sample count in `a` for accum node
 
     ShadingMaterial first_mat;
-    // first pos is params.cam_x.xyz
     const vec3 first_wi = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
-
     {
+        // Find first surface
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
         if (info.t <= 0)
             return; // should not happen in Quake but it does :o
         get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
     }
-    
+
+    {
+        // Write gbuffer
+        imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
+    }
+
     {
         // Store albedo
+        vec3 albedo = first_mat.albedo.rgb;
         if (any(greaterThanEqual(first_mat.emission, vec3(1e-3)))) {
-            // Required for albedo demodulation, keep detail in fb texture
-            imageStore(img_albedo, pixel, vec4(first_mat.emission, 1));
+            // Required for albedo demodulation
+            // Since irradiance is blurred set it to 1 and keep detail in albedo texture
+            albedo = first_mat.emission;
             first_mat.emission = vec3(1);
-        } else {
-            imageStore(img_albedo, pixel, vec4(first_mat.albedo.rgb, 1));
         }
+        imageStore(img_albedo, pixel, vec4(albedo, 1));
     }
 
     {
@@ -258,55 +119,59 @@ void main() {
         imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 
-    // direct light
-    if (MAX_PATH_LENGHT > 0)
-        irr = vec4(first_mat.emission, 1);// * dot(-first_wi, first_mat.normal);
+    {
+        // Evaluate direct light
+        if (MAX_PATH_LENGHT > 0)
+            irr_samples = vec4(first_mat.emission, 1);
+    }
 
+    {
+        // Evaluate indirect light
+        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))))
+        for (int smp = 0; smp < params.spp; smp++) {
+            vec3 wi = first_wi;
+            ShadingMaterial current_mat = first_mat;
+            vec3 current_albedo = vec3(1);
+            vec3 f = vec3(0);
+            float p_diff = 1;
 
-    if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))))
-    for (int smp = 0; smp < params.spp; smp++) {
-        vec3 wi = first_wi;
-        ShadingMaterial current_mat = first_mat;
-        vec3 current_albedo = vec3(1);
-        vec3 f = vec3(0);
-        float p_diff = 1;
+            for (int segment = 1; segment < MAX_PATH_LENGHT; segment++) {
+                const vec3 wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
+                p_diff *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
 
-        for (int segment = 1; segment < MAX_PATH_LENGHT; segment++) {
-            const vec3 wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
+                // ray is below geometric normal surface
+                if (dot(wo, current_mat.geo_normal) <= 1e-2)
+                    break;
 
-            if (dot(wo, current_mat.geo_normal) <= 1e-2)
-                break;
+                ShadingMaterial next_mat;
+                {
+                    IntersectionInfo info;
+                    // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                    trace_ray(current_mat.pos - wi * 1e-3, wo, info);
+                    if (info.t <= 0)
+                        break;  // should not happen in Quake but it does :o
+                    get_shading_material(info, current_mat.pos, wo, next_mat);
+                }
 
-            ShadingMaterial next_mat;
-            {
-                IntersectionInfo info;
-                // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
-                trace_ray(current_mat.pos - wi * 1e-3, wo, info);
-                if (info.t <= 0)
-                    break;  // should not happen in Quake but it does :o
-                get_shading_material(info, current_mat.pos, wo, next_mat);
+                f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p_diff;
+
+                current_albedo *= next_mat.albedo.rgb;
+                // we stop if we won't transport any more light or if we found emissive material
+                if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
+                    break;
+
+                wi = wo;
+                current_mat = next_mat;
             }
 
-            p_diff *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
-            f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p_diff;
-
-            current_albedo *= next_mat.albedo.rgb;
-            if (all(lessThan(current_albedo, vec3(1e-7))))
-                break;
-
-            wi = wo;
-            current_mat = next_mat;
+            const vec4 contrib = vec4(f / params.spp, 1);
+            if(!any(isinf(contrib)) && !any(isnan(contrib)))
+                irr_samples += contrib;
         }
-
-        const vec4 contrib = vec4(f / params.spp, 1);
-        if(!any(isinf(contrib)) && !any(isnan(contrib)))
-            irr += contrib;
     }
 
     {
         // Write irradiance
-        imageStore(img_irradiance, pixel, irr);
-        // Write gbuffer
-        imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
+        imageStore(img_irradiance, pixel, irr_samples);
     }
 }

@@ -7,6 +7,8 @@ included_files = files(
     'config.h',
     'layout.glsl',
     'envmap.glsl',
+    'grid.h',
+    'shading.glsl',
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',

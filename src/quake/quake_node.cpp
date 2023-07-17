@@ -1,5 +1,6 @@
 #include "quake/quake_node.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "grid.h"
 #include "merian/utils/bitpacking.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/glm.hpp"
@@ -956,7 +957,14 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
             merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16B16A16Sfloat,
                                                              width, height),
         },
-        {},
+        {
+            merian::NodeOutputDescriptorBuffer(
+                "cells", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{
+                    {}, BUFFER_SIZE * sizeof(GridCell), vk::BufferUsageFlagBits::eStorageBuffer},
+                true),
+        },
     };
 }
 
