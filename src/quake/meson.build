@@ -9,6 +9,7 @@ included_files = files(
     'envmap.glsl',
     'grid.h',
     'shading.glsl',
+    'mc.glsl',
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',

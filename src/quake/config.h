@@ -12,13 +12,8 @@
 // continue tracing if alpha of texture is smaller
 #define ALPHA_THRESHOLD .666 
 
-#define MAX_PATH_LENGHT 2
+#define MAX_PATH_LENGHT 3
 
-// Configure MC
-
-#define MCMC_KAPPA 1
-#define MCMC_ML 2
-#define MCMC_ADAPTATION MCMC_ML
 
 // BINDINGS
 

@@ -60,6 +60,13 @@ class QuakeNode : public merian::Node {
         unsigned char padding;
     };
 
+    struct RTConfig {
+        unsigned char spp = 4;
+        unsigned char path_length = 2;
+        unsigned char padding;
+        unsigned char padding2;
+    };
+
     struct PushConstant {
         glm::vec4 cam_x; // pos
         glm::vec4 cam_w; // forward
@@ -77,7 +84,7 @@ class QuakeNode : public merian::Node {
         uint frame;
 
         PlayerData player;
-        int spp = 4;
+        RTConfig rt_config;
     };
 
     struct VertexExtraData {

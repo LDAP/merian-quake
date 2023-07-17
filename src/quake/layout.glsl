@@ -19,8 +19,12 @@ layout(push_constant) uniform PushConstant {
     float cl_time; // quake time
     uint frame;
     uint player; // see `PlayerData` in quake_node.hpp
-    int spp;
+    uint rt_config; // see `RTConfig` in in quake_node.hpp
 } params;
+
+uint spp()             { return (params.rt_config >> 0) & 0xff; }
+uint max_path_length() { return (params.rt_config >> 8) & 0xff; }
+
 
 // GRAPH IN/OUTs
 

@@ -10,18 +10,22 @@ vec3 envmap(in vec3 w) {
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         return 50 * tex;
     } else {
-        // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
+        // Add a custom sun using vmf lobe
         // vec3 sundir = normalize(vec3(1, 1, 1)); // this where the moon is in ad_azad
         // vec3 sundir = normalize(vec3(1, -1, 1)); // this comes in more nicely through the windows for debugging
         vec3 sundir = normalize(vec3(1, -1, 1)); // ad_tears
+        
         const float k0 = 4.0, k1 = 30.0, k2 = 4.0, k3 = 3000.0;
         vec3 emcol = vec3(0.0);
-        emcol  = vec3(0.50, 0.50, 0.50) * /*(k0+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k0);
+        emcol += vec3(0.50, 0.50, 0.50) * /*(k0+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k0);
         emcol += vec3(1.00, 0.70, 0.30) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k1);
-        // emcol += 1000*vec3(1.00, 1.00, 1.00) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k3);
-        emcol += 30.0*vec3(1.1, 1.0, 0.9)*vmf_eval(k3, dot(sundir, w));
+        emcol += 30.0*vec3(1.1, 1.0, 0.9)*vmf_pdf(k3, dot(sundir, w));
         emcol += vec3(0.20, 0.08, 0.02) * /*(k2+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0-w.z), k2);
+        // emcol += 1000*vec3(1.00, 1.00, 1.00) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k3);
         // emcol *= 2.0;
+        
+        // Evaluate cubemap
+        // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
         int m = 0;
         if(abs(w.y) > abs(w.x) && abs(w.y) > abs(w.z)) m = 1;
         if(abs(w.z) > abs(w.x) && abs(w.z) > abs(w.y)) m = 2;

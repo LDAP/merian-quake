@@ -1408,5 +1408,13 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
 
     if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true))
         queue_command(cmd_buffer.data());
-    config.config_int("samples per pixel", pc.spp, 0, 32);
+    int spp = pc.rt_config.spp;
+    int path_lenght = pc.rt_config.path_length;
+    config.config_int("spp", spp, 0, std::numeric_limits<decltype(pc.rt_config.spp)>::max(),
+                      "samples per pixel");
+    config.config_int("max path lenght", path_lenght, 0,
+                      std::numeric_limits<decltype(pc.rt_config.path_length)>::max(),
+                      "maximum path length");
+    pc.rt_config.spp = spp;
+    pc.rt_config.path_length = path_lenght;
 }

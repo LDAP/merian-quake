@@ -35,7 +35,7 @@ vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const 
         const float sum = emission.x + emission.y + emission.z;
         if (sum > 0) {
             emission /= sum;
-            emission *= 10.0 * (exp2(3.5 * sum) - 1.0);
+            emission *= 10.0 * (exp2(2.5 * sum) - 1.0);
         }
         return emission;
     }

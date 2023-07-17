@@ -16,6 +16,7 @@
 #include "layout.glsl"
 #include "envmap.glsl"
 #include "shading.glsl"
+#include "mc.glsl"
 
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
@@ -121,26 +122,26 @@ void main() {
 
     {
         // Evaluate direct light
-        if (MAX_PATH_LENGHT > 0)
+        if (max_path_length() > 0)
             irr_samples = vec4(first_mat.emission, 1);
     }
 
     {
-        // Evaluate indirect light
-        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))))
-        for (int smp = 0; smp < params.spp; smp++) {
+        // Evaluate indirect light (if light can be transported and the material is not emissive)
+        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
+        for (int s = 0; s < spp(); s++) {
             vec3 wi = first_wi;
             ShadingMaterial current_mat = first_mat;
             vec3 current_albedo = vec3(1);
             vec3 f = vec3(0);
-            float p_diff = 1;
+            float p = 1;
 
-            for (int segment = 1; segment < MAX_PATH_LENGHT; segment++) {
+            for (int segment = 1; segment < max_path_length(); segment++) {
                 const vec3 wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                p_diff *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
+                p *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
 
                 // ray is below geometric normal surface
-                if (dot(wo, current_mat.geo_normal) <= 1e-2)
+                if (dot(wo, current_mat.geo_normal) <= 1e-3)
                     break;
 
                 ShadingMaterial next_mat;
@@ -153,9 +154,9 @@ void main() {
                     get_shading_material(info, current_mat.pos, wo, next_mat);
                 }
 
-                f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p_diff;
-
+                f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p;
                 current_albedo *= next_mat.albedo.rgb;
+
                 // we stop if we won't transport any more light or if we found emissive material
                 if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                     break;
@@ -164,7 +165,7 @@ void main() {
                 current_mat = next_mat;
             }
 
-            const vec4 contrib = vec4(f / params.spp, 1);
+            const vec4 contrib = vec4(f / spp(), 1);
             if(!any(isinf(contrib)) && !any(isnan(contrib)))
                 irr_samples += contrib;
         }
