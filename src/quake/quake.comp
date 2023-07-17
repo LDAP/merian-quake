@@ -32,8 +32,10 @@ float decode_alpha(const uint alpha) {
 
 // Get warped texture coordinate
 void warp(inout vec2 st) {
-    st = vec2(st.x + 0.2 * sin(st.y * 2.0 + params.cl_time * 1.0),
-              st.y + 0.2 * sin(st.x * 2.0 + params.cl_time * 1.0));
+    st += vec2(0.1 * sin(st.y * 1.5 + params.cl_time * 1.0),
+              0.1 * sin(st.x * 1.4 + params.cl_time * 1.0));
+    st -= vec2(.1, 0) * cos(st.x * 5 + params.cl_time * 2) * pow(max(sin(st.x * 5 + params.cl_time * 2), 0), 5);
+    st -= vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5);
 }
 
 vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const uint flags) {
