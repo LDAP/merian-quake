@@ -91,7 +91,8 @@ int main() {
 
     graph.connect_image(svgf, filmcurv, 0, 0);
 
-    graph.connect_image(filmcurv, output, 0, 0);
+    //graph.connect_image(filmcurv, output, 0, 0);
+    graph.connect_image(quake, output, 1, 0);
 
     merian::ImGuiConfiguration config;
 

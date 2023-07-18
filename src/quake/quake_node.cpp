@@ -1016,6 +1016,10 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
 
         update.update(context);
     }
+
+    // ZERO MC STATES
+    std::vector<char> zero(buffer_outputs[0][0]->get_size(), 0);
+    allocator->getStaging()->cmdToBuffer(cmd, *buffer_outputs[0][0], 0, buffer_outputs[0][0]->get_size(), zero.data());
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -1025,10 +1029,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             const std::vector<merian::BufferHandle>& buffer_inputs,
                             const std::vector<merian::ImageHandle>& image_outputs,
                             const std::vector<merian::BufferHandle>& buffer_outputs) {
-
-    if (run.get_iteration() == 0) {
-        // TODO: Clear output and feedback buffers
-    }
 
     // UPDATE GAMESTATE (if not paused)
     if (!pause) {

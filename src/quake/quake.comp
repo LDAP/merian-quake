@@ -11,6 +11,7 @@
 #include "common/raytrace.glsl"
 #include "common/bsdf_diffuse.glsl"
 #include "common/grid.glsl"
+#include "common/colors_yuv.glsl"
 
 #include "config.h"
 #include "layout.glsl"
@@ -96,7 +97,7 @@ void main() {
     }
 
     {
-        // Write gbuffer
+        // Store GBuffer
         imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
     }
 
@@ -110,6 +111,8 @@ void main() {
             first_mat.emission = vec3(1);
         }
         imageStore(img_albedo, pixel, vec4(albedo, 1));
+        // for albedo demodulation
+        first_mat.albedo = vec4(1);
     }
 
     {
@@ -137,13 +140,30 @@ void main() {
             float p = 1;
 
             for (int segment = 1; segment < max_path_length(); segment++) {
-                const vec3 wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                p *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
+                // SAMPLE NEXT OUTGOING DIRECTION
+                vec3 wo;
+                MCState mc_state;
+                bool used_vmf = false;
+                if (XorShift32(rng_state) > MCMC_BSDP_P
+                    && mc_state_load(mc_state, current_mat.pos, rng_state, pixel)) { // geo_normal?
+                    // VMF Sampling
+                    const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
+                    wo = vmf_sample(vmf.xyz, vmf.w, XorShift32Vec2(rng_state));
+                    p *= vmf_pdf(vmf.w, dot(wo, vmf.xyz));
+                    // todo: p *= (1 - MCMC_BSDP_P)?
+                    used_vmf = true;
+                } else {
+                    // BSDF Sampling
+                    wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
+                    p *= bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
+                    mc_state = mc_state_new();
+                }
 
-                // ray is below geometric normal surface
+                // ray is below geometric surface
                 if (dot(wo, current_mat.geo_normal) <= 1e-3)
                     break;
 
+                // TRACE RAY TO NEXT SURFACE
                 ShadingMaterial next_mat;
                 {
                     IntersectionInfo info;
@@ -154,9 +174,24 @@ void main() {
                     get_shading_material(info, current_mat.pos, wo, next_mat);
                 }
 
-                f += (current_albedo * next_mat.emission * bsdf_diffuse_eval()) / p;
-                current_albedo *= next_mat.albedo.rgb;
+                // EVALUATE BSDF
+                current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal); // todo? is dot() here correct?
+                f += current_albedo * next_mat.emission;
 
+                // UPDATE MARKOV CHAIN
+                {
+                    // goodness function
+                    const float mc_f = yuv_luminance(next_mat.emission) / dot(wo, current_mat.normal);
+                    if (mc_f > 0 && XorShift32(rng_state) < min(1.0, mc_f / mc_state.f)) {
+                        // add if we found light and we are better or the random god wants us to add our worse value to the state. 
+                        mc_state.f = mc_f;
+                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, wo, next_mat.pos, false);
+                        mc_state_save(mc_state, current_mat.pos, rng_state); // todo, only last?
+                    }
+                    //imageStore(img_albedo, pixel, vec4(used_vmf && mc_f > 0));
+                }
+
+                // PREPARE NEXT ITERATION
                 // we stop if we won't transport any more light or if we found emissive material
                 if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                     break;
@@ -165,7 +200,7 @@ void main() {
                 current_mat = next_mat;
             }
 
-            const vec4 contrib = vec4(f / spp(), 1);
+            const vec4 contrib = vec4((1.0 / spp()) * (f / p), 1);
             if(!any(isinf(contrib)) && !any(isnan(contrib)))
                 irr_samples += contrib;
         }
