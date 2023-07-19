@@ -142,11 +142,11 @@ void main() {
             for (int segment = 1; segment < max_path_length(); segment++) {
                 // SAMPLE NEXT OUTGOING DIRECTION
                 vec3 wo;
-                MCState mc_state;
+                MCState mc_state = mc_state_new();
+                bool mc_valid = mc_state_load(mc_state, current_mat.pos, rng_state, pixel);
                 bool used_vmf = false;
                 float wo_p;
-                if (XorShift32(rng_state) > bsdp_p()
-                    && mc_state_load(mc_state, current_mat.pos, rng_state, pixel)) { // geo_normal?
+                if (XorShift32(rng_state) > bsdp_p() && mc_valid) { // geo_normal?
                     // VMF Sampling
                     const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
                     wo = vmf_sample(vmf.xyz, vmf.w, XorShift32Vec2(rng_state));
@@ -155,8 +155,7 @@ void main() {
                 } else {
                     // BSDF Sampling
                     wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                    wo_p = bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p();
-                    mc_state = mc_state_new();
+                    wo_p = bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * (mc_valid ? bsdp_p() : 1.0);
                 }
 
                 // ray is below geometric surface
@@ -176,21 +175,32 @@ void main() {
 
                 // EVALUATE BSDF
                 current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal); // todo? is dot() here correct?
-                f = current_albedo * next_mat.emission;
+                // todo: Is this unbiased?
+                float mis_w = 1.0;
+                // this reduces the bsdf noise
+                // if (mc_valid) {
+                //     const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
+                //     mis_w = wo_p / (vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p()) + bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p());
+                // }
+
+                f = current_albedo * next_mat.emission * mis_w;
                 p *= wo_p;
 
                 // UPDATE MARKOV CHAIN
                 {
-                    // goodness function
-                    const float mc_f = yuv_luminance(next_mat.emission) / wo_p; // TOOODO: / p fixes everything, why?   // * dot()
+                    // todo incorporate bsdf * dot() into lum?
+                    const float mc_f = yuv_luminance(next_mat.emission) / wo_p;
                     if (mc_f > 0 && XorShift32(rng_state) < min(1.0, mc_f / mc_state.f)) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
                         mc_state.f = mc_f;
-                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, wo, next_mat.pos, false);
+                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, wo, next_mat.pos);
                         mc_state_save(mc_state, current_mat.pos, rng_state); // todo, only last?
-                    }
+                    }// else if (mc_f == 0 && used_vmf) {
+                    //    // increase bsdf sampling if we used vmf samling and missed the light     
+                    //    mc_state_save(mc_state_new(), current_mat.pos, rng_state);
+                    //}
                     // imageStore(img_albedo, pixel, /*vec4(used_vmf && mc_f > 0));*/vec4(wo, 0));
-                } // todo: else { save (new_state) } -> leads to increased bsdf sampling in that region
+                }
 
                 // PREPARE NEXT ITERATION
                 // we stop if we won't transport any more light or if we found emissive material
