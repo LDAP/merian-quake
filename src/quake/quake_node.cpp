@@ -1412,11 +1412,8 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     int spp = pc.rt_config.spp;
     int path_lenght = pc.rt_config.path_length;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
-    config.config_int("spp", spp, 0, std::numeric_limits<decltype(pc.rt_config.spp)>::max(),
-                      "samples per pixel");
-    config.config_int("max path lenght", path_lenght, 0,
-                      std::numeric_limits<decltype(pc.rt_config.path_length)>::max(),
-                      "maximum path length");
+    config.config_int("spp", spp, 0, 16, "samples per pixel");
+    config.config_int("max path lenght", path_lenght, 0, 6, "maximum path length");
     config.config_percent("BDSF Prob", bsdp_p, "The prbability to use BSDF sampling");
     pc.rt_config.spp = spp;
     pc.rt_config.path_length = path_lenght;
