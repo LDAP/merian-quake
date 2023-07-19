@@ -63,7 +63,7 @@ class QuakeNode : public merian::Node {
     struct RTConfig {
         unsigned char spp = 4;
         unsigned char path_length = 2;
-        unsigned char padding;
+        unsigned char bsdp_p = static_cast<unsigned char>(0.125 * 255);
         unsigned char padding2;
     };
 

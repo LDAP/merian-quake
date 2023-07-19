@@ -22,8 +22,9 @@ layout(push_constant) uniform PushConstant {
     uint rt_config; // see `RTConfig` in in quake_node.hpp
 } params;
 
-uint spp()             { return (params.rt_config >> 0) & 0xff; }
-uint max_path_length() { return (params.rt_config >> 8) & 0xff; }
+uint spp()             { return (params.rt_config >> 0)  & 0xff; }
+uint max_path_length() { return (params.rt_config >> 8)  & 0xff; }
+float bsdp_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
 
 
 // GRAPH IN/OUTs

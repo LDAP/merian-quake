@@ -5,12 +5,13 @@
 
 using uint = uint32_t;
 using vec3 = glm::vec3;
+using ivec3 = glm::ivec3;
 
 #endif
 
-#define STATES_PER_CELL 1000
-#define BUFFER_SIZE 2000
-#define GRID_WIDTH 10.
+#define STATES_PER_CELL 5
+#define BUFFER_SIZE 200000
+#define GRID_WIDTH 5.
 
 struct MCState {
     vec3 sum_tgt;
@@ -23,4 +24,5 @@ struct MCState {
 
 struct GridCell {
     MCState states[STATES_PER_CELL];
+    ivec3 grid_idx;
 };

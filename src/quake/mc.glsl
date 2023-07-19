@@ -1,15 +1,7 @@
-// Configure MC
-#define MCMC_KAPPA 1
-#define MCMC_ML 2
-#define MCMC_ADAPTATION MCMC_ML
-
-#define MCMC_BSDP_P 0.125
-
 // Configure ML
 #define ML_PRIOR_N .20 // cannot be zero or else mean cos -> kappa blows up
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA 0.01
-#define ML_SCALE 100.0
 
 MCState mc_state_new() {
     MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0, false};
@@ -19,21 +11,26 @@ MCState mc_state_new() {
 // return true if a valid state was found
 // in case of false the state is reset to zero
 bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, const ivec2 pixel) {
-    float score_sum = 0;
+    // todo: Jo used a sum here instead of the "best", better/why?
+    float best_score = 0;
     for (int i = 0; i < 5; i++) {
         const ivec3 grid_idx = grid_idx_interpolate(pos, GRID_WIDTH, XorShift32(rng_state));
-        const MCState candidate = cells[hash_grid(grid_idx, BUFFER_SIZE)].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
-        // todo?: old implementaion uses gbuffer to compare weight with normal and depth difference
-        // we could store that in the cell?
+        const uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
+        const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+        // if (cells[buf_idx].grid_idx != grid_idx) {
+        //     // hash grid collision
+        //     continue;
+        // }
+        const MCState candidate = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
         const float candidate_score = candidate.f;
-        if (XorShift32(rng_state) < candidate_score / (candidate_score + score_sum)) {
+        if (XorShift32(rng_state) < candidate_score / (candidate_score + best_score)) {
             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
             mc_state = candidate;
-            score_sum += candidate_score;
+            best_score = candidate_score;
         }
     }
 
-    return score_sum > 0.0;
+    return best_score > 0.0;
 }
 
 // return normalized direction (from pos)
@@ -90,4 +87,5 @@ void mc_state_save(const MCState mc_state, const vec3 pos, inout uint rng_state)
     const uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
     const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
     cells[buf_idx].states[state_idx] = mc_state;
+    cells[buf_idx].grid_idx = grid_idx;
 }
