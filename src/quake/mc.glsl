@@ -1,5 +1,5 @@
 // Configure ML
-#define ML_PRIOR_N .20 // cannot be zero or else mean cos -> kappa blows up
+#define ML_PRIOR_N .2 // cannot be zero or else mean cos -> kappa blows up
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA 0.01
 
@@ -18,11 +18,14 @@ vec3 mc_state_dir(const MCState mc_state, const vec3 pos) {
 vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     float r = mc_state.sum_len / mc_state.sum_w; // = mean cosine in [0,1]
 
-    const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
-    const float d = length(tgt - pos);
-    const float rp = 1.0 -  1.0 / clamp(50.0 * d, 0.0, 6500.0);
+    // Jo
+    // const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
+    // const float d = length(tgt - pos);
+    // const float rp = 1.0 -  1.0 / clamp(50.0 * d, 0.0, 6500.0);
 
-    r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
+    // r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
+    // Addis
+    r = (mc_state.N * mc_state.N * r) / (mc_state.N * mc_state.N + ML_PRIOR_N);
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
@@ -30,7 +33,7 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 // in case of false the state is reset to zero
 bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, const ivec2 pixel) {
     // todo: Jo used a sum here instead of the "best", better/why?
-    float best_score = 0;
+    float score_sum = 0;
     for (int i = 0; i < 5; i++) {
         const ivec3 grid_idx = grid_idx_interpolate(pos, GRID_WIDTH, XorShift32(rng_state));
         const uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
@@ -41,14 +44,15 @@ bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, c
         // }
         const MCState candidate = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
         const float candidate_score = candidate.f;  // * dot(vmf.xyz, normal)
-        if (XorShift32(rng_state) < candidate_score / (candidate_score + best_score)) {
+        // why not best?
+        score_sum += candidate_score;
+        if (XorShift32(rng_state) < candidate_score / score_sum) {
             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
             mc_state = candidate;
-            best_score = candidate_score;
         }
     }
 
-    return best_score > 0.0;
+    return score_sum > 0.0;
 }
 
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average
@@ -63,7 +67,6 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * light_pos, alpha);
 
     vec3 to = mc_state.sum_len * mc_state_dir(mc_state, pos);
-    // todo: not normalizing helps at overfitting
     to = mix(to, w * normalize(light_pos - pos), alpha);
     mc_state.sum_len = length(to);
 }

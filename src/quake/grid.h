@@ -9,9 +9,9 @@ using ivec3 = glm::ivec3;
 
 #endif
 
-#define STATES_PER_CELL 10
+#define STATES_PER_CELL 20
 #define BUFFER_SIZE 200000
-#define GRID_WIDTH 10.
+#define GRID_WIDTH 7.3
 
 struct MCState {
     vec3 sum_tgt;

@@ -101,7 +101,8 @@ int main() {
     // quake->queue_command("game SlayerTest");
     // quake->queue_command("map st1m1");
     quake->queue_command("game ad");
-    quake->queue_command("map ad_tears");
+    quake->queue_command("map ad_azad");
+    //quake->queue_command("map ad_tears");
     // quake->queue_command("map e1m6");
     // quake->queue_command("map e1m1");
     merian::GLFWImGui imgui(context, true);
