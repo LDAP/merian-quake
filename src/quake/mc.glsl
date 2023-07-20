@@ -8,6 +8,24 @@ MCState mc_state_new() {
     return r;
 }
 
+// return normalized direction (from pos)
+vec3 mc_state_dir(const MCState mc_state, const vec3 pos) {
+    const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
+    return normalize(tgt - pos);
+}
+
+// returns the vmf lobe vec4(direction, kappa) for a position
+vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
+    float r = mc_state.sum_len / mc_state.sum_w; // = mean cosine in [0,1]
+
+    const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
+    const float d = length(tgt - pos);
+    const float rp = 1.0 -  1.0 / clamp(50.0 * d, 0.0, 6500.0);
+
+    r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
+    return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
+}
+
 // return true if a valid state was found
 // in case of false the state is reset to zero
 bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, const ivec2 pixel) {
@@ -33,24 +51,6 @@ bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, c
     return best_score > 0.0;
 }
 
-// return normalized direction (from pos)
-vec3 mc_state_dir(const MCState mc_state, const vec3 pos) {
-    const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
-    return normalize(tgt - pos);
-}
-
-// returns the vmf lobe vec4(direction, kappa) for a position
-vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
-    float r = mc_state.sum_len / mc_state.sum_w; // = mean cosine in [0,1]
-
-    const vec3 tgt = mc_state.sum_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0);
-    const float d = length(tgt - pos);
-    const float rp = 1.0 -  1.0 / clamp(50.0 * d, 0.0, 6500.0);
-
-    r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
-    return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
-}
-
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
@@ -58,12 +58,13 @@ void mc_state_add_sample(inout MCState mc_state,
                          const vec3 light_pos) { // ray hit point
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
+
     mc_state.sum_w   = mix(mc_state.sum_w,   w,             alpha);
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * light_pos, alpha);
 
     vec3 to = mc_state.sum_len * mc_state_dir(mc_state, pos);
-    // todo: normalizeing the direction here reduces noise a lot at short distances
-    to = mix(to, w * (light_pos - pos), alpha);
+    // todo: not normalizing helps at overfitting
+    to = mix(to, w * normalize(light_pos - pos), alpha);
     mc_state.sum_len = length(to);
 }
 
