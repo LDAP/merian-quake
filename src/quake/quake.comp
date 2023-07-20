@@ -150,7 +150,7 @@ void main() {
                     // VMF Sampling
                     const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
                     wo = vmf_sample(vmf.xyz, vmf.w, XorShift32Vec2(rng_state));
-                    wo_p = vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p());
+                    wo_p = vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1.0 - bsdp_p());
                     used_vmf = true;
                 } else {
                     // BSDF Sampling
@@ -188,18 +188,19 @@ void main() {
 
                 // UPDATE MARKOV CHAIN
                 {
+                    if (!used_vmf) mc_state = mc_state_new();
                     // todo incorporate bsdf * dot() into lum?
                     const float mc_f = yuv_luminance(next_mat.emission) / wo_p;
                     if (mc_f > 0 && XorShift32(rng_state) < min(1.0, mc_f / mc_state.f)) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
                         mc_state.f = mc_f;
-                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, wo, next_mat.pos);
+                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
                         mc_state_save(mc_state, current_mat.pos, rng_state); // todo, only last?
                     }// else if (mc_f == 0 && used_vmf) {
                     //    // increase bsdf sampling if we used vmf samling and missed the light     
                     //    mc_state_save(mc_state_new(), current_mat.pos, rng_state);
                     //}
-                    // imageStore(img_albedo, pixel, /*vec4(used_vmf && mc_f > 0));*/vec4(wo, 0));
+                    // imageStore(img_albedo, pixel, vec4(used_vmf && mc_f > 0));//vec4(wo, 0));
                 }
 
                 // PREPARE NEXT ITERATION

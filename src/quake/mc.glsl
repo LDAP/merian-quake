@@ -22,7 +22,7 @@ bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, c
         //     continue;
         // }
         const MCState candidate = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
-        const float candidate_score = candidate.f;
+        const float candidate_score = candidate.f;  // * dot(vmf.xyz, normal)
         if (XorShift32(rng_state) < candidate_score / (candidate_score + best_score)) {
             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
             mc_state = candidate;
@@ -55,7 +55,6 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
                          const float w,          // goodness
-                         const vec3 dir,         // raydir
                          const vec3 light_pos) { // ray hit point
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
@@ -63,7 +62,8 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * light_pos, alpha);
 
     vec3 to = mc_state.sum_len * mc_state_dir(mc_state, pos);
-    to = mix(to, w * dir, alpha);
+    // todo: normalizeing the direction here reduces noise a lot at short distances
+    to = mix(to, w * (light_pos - pos), alpha);
     mc_state.sum_len = length(to);
 }
 
