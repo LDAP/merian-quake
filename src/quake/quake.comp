@@ -115,6 +115,13 @@ void main() {
         first_mat.albedo = vec4(1);
     }
 
+    // DEBUG
+    // {
+    //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);
+    //     uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
+    //     imageStore(img_albedo, pixel, XorShift32Vec4(buf_idx));
+    // }
+
     {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
