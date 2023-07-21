@@ -153,7 +153,7 @@ void main() {
                 bool mc_valid = mc_state_load(mc_state, current_mat.pos, rng_state, pixel);
                 bool used_vmf = false;
                 float wo_p;
-                if (XorShift32(rng_state) > bsdp_p() && mc_valid) { // geo_normal?
+                if (XorShift32(rng_state) > bsdp_p() && mc_valid) {
                     // VMF Sampling
                     const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
                     wo = vmf_sample(vmf.xyz, vmf.w, XorShift32Vec2(rng_state));
@@ -166,7 +166,7 @@ void main() {
                 }
 
                 // ray is below geometric surface
-                if (dot(wo, current_mat.geo_normal) <= 1e-3)
+                if (dot(wo, current_mat.geo_normal) <= 1e-6 || dot(wo, current_mat.normal) <= 1e-3)
                     break;
 
                 // TRACE RAY TO NEXT SURFACE
@@ -207,7 +207,7 @@ void main() {
                     //     // increase bsdf sampling if we used vmf samling and missed the light
                     //     mc_state_save(mc_state_new(), current_mat.pos, rng_state);
                     // }
-                    // imageStore(img_albedo, pixel, vec4(used_vmf && mc_f > 0));//vec4(wo, 0));
+                    //imageStore(img_albedo, pixel, /*vec4(used_vmf && mc_f > 0));*/vec4(wo, 0));
                     // imageStore(img_albedo, pixel, vec4(mc_state.N / ML_MAX_N));
                 }
 
