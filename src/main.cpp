@@ -8,6 +8,7 @@
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
 #include "merian-nodes/svgf/svgf.hpp"
 #include "merian-nodes/taa/taa.hpp"
+#include "merian-nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
@@ -62,7 +63,7 @@ int main() {
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size());
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
-    auto filmcurv = std::make_shared<merian::VKDTFilmcurv>(context, alloc);
+    auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
 
     graph.add_node("output", output);
     graph.add_node("black_color", black);
@@ -70,7 +71,7 @@ int main() {
     graph.add_node("quake", quake);
     graph.add_node("accum", accum);
     graph.add_node("denoiser", svgf);
-    graph.add_node("colorgrade", filmcurv);
+    graph.add_node("tonemap", tonemap);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -88,11 +89,10 @@ int main() {
     graph.connect_image(quake, svgf, 2, 4);
     graph.connect_image(quake, svgf, 1, 5); // albedo
     graph.connect_image(quake, svgf, 3, 6); // mv
+    graph.connect_image(svgf, tonemap, 0, 0);
 
-    graph.connect_image(svgf, filmcurv, 0, 0);
-
-    graph.connect_image(filmcurv, output, 0, 0);
-    // graph.connect_image(quake, output, 1, 0);
+    graph.connect_image(tonemap, output, 0, 0);
+    //graph.connect_image(quake, output, 1, 0);
 
     merian::ImGuiConfiguration config;
 
