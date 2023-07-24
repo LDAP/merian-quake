@@ -959,10 +959,16 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
         },
         {
             merian::NodeOutputDescriptorBuffer(
-                "cells", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{
-                    {}, BUFFER_SIZE * sizeof(GridCell), vk::BufferUsageFlagBits::eStorageBuffer},
+                    {}, MC_BUFFER_SIZE * sizeof(MCVertex), vk::BufferUsageFlagBits::eStorageBuffer},
+                true),
+            merian::NodeOutputDescriptorBuffer(
+                "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{
+                    {}, LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex), vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },
     };
@@ -1412,10 +1418,13 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     int spp = pc.rt_config.spp;
     int path_lenght = pc.rt_config.path_length;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
+    float ml_prior = pc.rt_config.ml_prior / 255.;
     config.config_int("spp", spp, 0, 16, "samples per pixel");
     config.config_int("max path lenght", path_lenght, 0, 6, "maximum path length");
     config.config_percent("BDSF Prob", bsdp_p, "The prbability to use BSDF sampling");
+    config.config_percent("ML Prior", ml_prior);
     pc.rt_config.spp = spp;
     pc.rt_config.path_length = path_lenght;
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
+    pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
 }

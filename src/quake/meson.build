@@ -10,6 +10,7 @@ included_files = files(
     'grid.h',
     'shading.glsl',
     'mc.glsl',
+    'light_cache.glsl',
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',

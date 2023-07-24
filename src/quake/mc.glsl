@@ -1,10 +1,9 @@
 // Configure ML
-#define ML_PRIOR_N .2 // cannot be zero or else mean cos -> kappa blows up
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA 0.01
 
 MCState mc_state_new() {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0, ivec3(0.0)};
     return r;
 }
 
@@ -25,24 +24,35 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 
     // r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
     // Addis
-    r = (mc_state.N * mc_state.N * r) / (mc_state.N * mc_state.N + ML_PRIOR_N);
+    r = (mc_state.N * mc_state.N * r) / (mc_state.N * mc_state.N + ml_prior());
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
+MCState mc_state_load(const vec3 pos, inout uint rng_state) {
+    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+    const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+    const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+    const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+    if (grid_idx == state.grid_idx) {
+        return state;
+    } else {
+        const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+        const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+        const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+        const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+        if (grid_idx == state.grid_idx) {
+            return state;
+        } else {
+            return mc_state_new();
+        }
+    }
+}
+
 // return true if a valid state was found
-// in case of false the state is reset to zero
-bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, const ivec2 pixel) {
-    // todo: Jo used a sum here instead of the "best", better/why?
+bool mc_state_load_resample(out MCState mc_state, const vec3 pos, inout uint rng_state) {
     float score_sum = 0;
     for (int i = 0; i < 5; i++) {
-        const ivec3 grid_idx = grid_idx_interpolate(pos, GRID_WIDTH, XorShift32(rng_state));
-        const uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
-        const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
-        // if (cells[buf_idx].grid_idx != grid_idx) {
-        //     // hash grid collision
-        //     continue;
-        // }
-        const MCState candidate = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+        const MCState candidate = mc_state_load(pos, rng_state);
         const float candidate_score = candidate.f;  // * dot(vmf.xyz, normal)
         // why not best?
         score_sum += candidate_score;
@@ -59,24 +69,24 @@ bool mc_state_load(out MCState mc_state, const vec3 pos, inout uint rng_state, c
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
                          const float w,          // goodness
-                         const vec3 light_pos) { // ray hit point
+                         const vec3 target) {    // ray hit point
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
 
-    mc_state.sum_w   = mix(mc_state.sum_w,   w,             alpha);
-    mc_state.sum_tgt = mix(mc_state.sum_tgt, w * light_pos, alpha);
+    mc_state.sum_w   = mix(mc_state.sum_w,   w,          alpha);
+    mc_state.sum_tgt = mix(mc_state.sum_tgt, w * target, alpha);
+    // is this the same?
+    mc_state.sum_len = mix(mc_state.sum_len, w * dot(normalize(target - pos), mc_state_dir(mc_state, pos)), alpha);
 
-    vec3 to = mc_state.sum_len * mc_state_dir(mc_state, pos);
-    to = mix(to, w * normalize(light_pos - pos), alpha);
-    mc_state.sum_len = length(to);
+    mc_state.sum_len = max(mc_state.sum_len, 0);
 }
 
-void mc_state_save(const MCState mc_state, const vec3 pos, inout uint rng_state) {
-    const ivec3 grid_idx = grid_idx_interpolate(pos, GRID_WIDTH, XorShift32(rng_state));
-    const uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
+void mc_state_save(MCState mc_state, const vec3 pos, inout uint rng_state) {
+    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+    const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
     const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+    mc_state.grid_idx = grid_idx;
     cells[buf_idx].states[state_idx] = mc_state;
-    cells[buf_idx].grid_idx = grid_idx;
 }
 
 bool mc_state_valid(const MCState mc_state) {

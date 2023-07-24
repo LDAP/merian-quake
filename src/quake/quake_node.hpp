@@ -64,7 +64,7 @@ class QuakeNode : public merian::Node {
         unsigned char spp = 4;
         unsigned char path_length = 2;
         unsigned char bsdp_p = static_cast<unsigned char>(0.125 * 255);
-        unsigned char padding2;
+        unsigned char ml_prior = static_cast<unsigned char>(0.2 * 255);
     };
 
     struct PushConstant {

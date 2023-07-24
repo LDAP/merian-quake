@@ -25,6 +25,7 @@ layout(push_constant) uniform PushConstant {
 uint spp()             { return (params.rt_config >> 0)  & 0xff; }
 uint max_path_length() { return (params.rt_config >> 8)  & 0xff; }
 float bsdp_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
+float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 
 
 // GRAPH IN/OUTs
@@ -36,7 +37,10 @@ layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
 layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
 layout(set = 0, binding = 5, scalar) buffer buf_cells {
-    GridCell cells[];
+    MCVertex cells[];
+};
+layout(set = 0, binding = 6, scalar) buffer buf_lightcache {
+    LightCacheVertex light_cache[];
 };
 
 // QUAKE 
