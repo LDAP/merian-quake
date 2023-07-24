@@ -102,13 +102,6 @@ void main() {
         imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
     }
 
-    // DEBUG
-    // {
-    //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);
-    //     uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
-    //     imageStore(img_albedo, pixel, XorShift32Vec4(buf_idx));
-    // }
-
     {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
@@ -119,8 +112,21 @@ void main() {
 
     {
         // Evaluate direct light
-        if (max_path_length() > 0)
+        if (max_path_length() > 0) {
             irr_samples = vec4(first_mat.emission, 1);
+
+            // MCState mc_state = mc_state_new();
+            // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
+
+            // const float mc_f = yuv_luminance(first_mat.emission);
+
+            // if (XorShift32(rng_state) < mc_f / mc_state.f) {
+            //     mc_state = mc_state_new();
+            //     mc_state.f = mc_f;
+            //     mc_state_add_sample(mc_state, first_mat.pos, mc_f, first_mat.pos);
+            //     mc_state_save(mc_state, first_mat.pos, rng_state);
+            // }
+        }
     }
 
     {
@@ -229,6 +235,12 @@ void main() {
         imageStore(img_albedo, pixel, vec4(albedo, 1));
         imageStore(img_irradiance, pixel, irr_samples);
     }
+
+    // {
+    //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);
+    //     uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
+    //     imageStore(img_albedo, pixel, XorShift32Vec4(buf_idx));
+    // }
 
     // {
     //     MCState mc_state = mc_state_load(first_mat.pos, rng_state);

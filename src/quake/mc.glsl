@@ -36,15 +36,15 @@ MCState mc_state_load(const vec3 pos, inout uint rng_state) {
     if (grid_idx == state.grid_idx) {
         return state;
     } else {
-        const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-        const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
-        const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
-        const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
-        if (grid_idx == state.grid_idx) {
-            return state;
-        } else {
+        // const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+        // const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+        // const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+        // const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+        // if (grid_idx == state.grid_idx) {
+        //     return state;
+        // } else {
             return mc_state_new();
-        }
+        // }
     }
 }
 
