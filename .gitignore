@@ -9,3 +9,4 @@ vgcore.*
 
 /res/*
 imgui.ini
+config.json

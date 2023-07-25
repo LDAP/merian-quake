@@ -12,6 +12,8 @@
 #include "merian-nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
+#include "merian/utils/configuration_json_dump.hpp"
+#include "merian/utils/configuration_json_load.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/vk/command/ring_command_pool.hpp"
 #include "merian/vk/context.hpp"
@@ -41,7 +43,8 @@ int main() {
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, debugUtils, resources, extAS, extRQ};
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, debugUtils, resources,
+                                                                  extAS, extRQ};
 
     merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
     auto alloc = resources->resource_allocator();
@@ -59,7 +62,7 @@ int main() {
     auto blue_noise = std::make_shared<merian::ImageNode>(
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black = std::make_shared<merian::ColorOutputNode>(vk::Format::eR16G16B16A16Sfloat,
-                                                                 vk::Extent3D{1920, 1080, 1});
+                                                           vk::Extent3D{1920, 1080, 1});
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size());
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
@@ -82,7 +85,7 @@ int main() {
     graph.connect_image(quake, accum, 2, 4);
     graph.connect_image(quake, accum, 3, 5); // mv
 
-    graph.connect_image(svgf, svgf, 0, 0); // feedback
+    graph.connect_image(svgf, svgf, 0, 0);  // feedback
     graph.connect_image(accum, svgf, 0, 1); // irr
     graph.connect_image(accum, svgf, 1, 2); // moments
     graph.connect_image(quake, svgf, 2, 3); // gbuf
@@ -92,7 +95,7 @@ int main() {
     graph.connect_image(svgf, tonemap, 0, 0);
 
     graph.connect_image(tonemap, output, 0, 0);
-    //graph.connect_image(quake, output, 1, 0);
+    // graph.connect_image(quake, output, 1, 0);
 
     merian::ImGuiConfiguration config;
 
@@ -102,13 +105,17 @@ int main() {
     // quake->queue_command("map st1m1");
     quake->queue_command("game ad");
     quake->queue_command("map ad_azad");
-    //quake->queue_command("map ad_tears");
-    // quake->queue_command("map e1m6");
-    // quake->queue_command("map e1m1");
+    // quake->queue_command("map ad_tears");
+    //  quake->queue_command("map e1m6");
+    //  quake->queue_command("map e1m1");
     merian::GLFWImGui imgui(context, true);
     merian::Profiler::Report report;
     bool clear_profiler = false;
     merian::Stopwatch sw;
+
+    auto load = merian::JSONLoadConfiguration("config.json");
+    graph.get_configuration(load);
+
     while (!glfwWindowShouldClose(*window)) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
 
@@ -155,4 +162,7 @@ int main() {
                       run.get_wait_semaphores(), run.get_wait_stages());
         run.execute_callbacks(queue);
     }
+
+    auto dump = merian::JSONDumpConfiguration("config.json");
+    graph.get_configuration(dump);
 }
