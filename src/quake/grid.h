@@ -10,7 +10,7 @@ using vec4 = glm::vec4;
 
 #endif
 
-#define STATES_PER_CELL 20
+#define STATES_PER_CELL 50
 #define MC_BUFFER_SIZE 200000
 #define MC_GRID_WIDTH 15.3
 

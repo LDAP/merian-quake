@@ -53,7 +53,7 @@ bool mc_state_load_resample(out MCState mc_state, const vec3 pos, inout uint rng
     float score_sum = 0;
     for (int i = 0; i < 5; i++) {
         const MCState candidate = mc_state_load(pos, rng_state);
-        const float candidate_score = candidate.f;  // * dot(vmf.xyz, normal)
+        const float candidate_score = candidate.sum_w;  // * dot(vmf.xyz, normal)
         // why not best?
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {

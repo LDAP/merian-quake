@@ -192,7 +192,9 @@ void main() {
 
                     const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
                     const float mc_f = yuv_luminance(emm * bsdf_diffuse_eval(current_mat.albedo.rgb)) * dot(wo, current_mat.normal) * mis_w / wo_p;
-                    if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / mc_state.f) {
+                    // Using sum_w here instead of f fixes indirect lighting but slows down adaption.
+                    // (Use the same as in load())
+                    if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / mc_state.sum_w) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
                         mc_state.f = mc_f;
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);

@@ -21,7 +21,7 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
     const uint buf_idx = hash_grid(grid_idx, LIGHT_CACHE_BUFFER_SIZE);
 
     // TODO: Remove dirty fix
-    if (any(greaterThanEqual(irr, vec3(1000))))
+    if (any(greaterThanEqual(irr, vec3(1e7))))
         return;
 
     int i = 0;
