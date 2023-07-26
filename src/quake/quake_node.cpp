@@ -1046,32 +1046,37 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             const std::vector<merian::BufferHandle>& buffer_inputs,
                             const std::vector<merian::ImageHandle>& image_outputs,
                             const std::vector<merian::BufferHandle>& buffer_outputs) {
+    FrameData& cur_frame = current_frame();
 
-    // UPDATE GAMESTATE (if not paused)
-    if (!pause) {
+    if (update_gamestate) {
+        // UPDATE GAMESTATE
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         if (!pending_commands.empty()) {
-            // only one command between each HostFrame
             Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
             pending_commands.pop();
         }
 
         double newtime = Sys_DoubleTime();
-        // Use (1. / 60.) else the Host_Frame() does nothing and sv_player is not valid below
-        double time = old_time == 0 ? 1. / 60. : newtime - old_time;
-        Host_Frame(time);
+        double timediff;
+        if (force_timediff > 0) {
+            timediff = force_timediff / 1000.0;
+        } else {
+            timediff = old_time == 0 ? 0. : newtime - old_time;
+        }
+
+        Host_Frame(timediff);
         // init some left/right vectors also used for sound
         R_SetupView();
         old_time = newtime;
     }
 
-    FrameData& cur_frame = current_frame();
+    // UPDATE GEOMETRY
     if (cl.worldmodel) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
         if (worldspawn) {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
             update_static_geo(cmd, true);
-            worldspawn = false;
+            last_worldspawn_frame = frame;
         } else {
             update_static_geo(cmd, false);
         }
@@ -1085,12 +1090,14 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         }
     }
 
+    // UPDATE TEXTURES
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
         update_textures(cmd);
     }
 
     if (!sv_player || !cur_frame.tlas || !cl.worldmodel) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         clear_pipe->bind(cmd);
         clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         clear_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
@@ -1132,6 +1139,12 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
 
+    if (stop_after_worldspawn >= 0 &&
+        frame - last_worldspawn_frame >= (uint64_t)stop_after_worldspawn) {
+        update_gamestate = false;
+    }
+
+    worldspawn = false;
     frame++;
 }
 
@@ -1417,6 +1430,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
 }
 
 void QuakeNode::get_configuration(merian::Configuration& config) {
+    config.st_separate("General");
     bool old_sound = sound;
     config.config_bool("sound", sound);
     if (sound != old_sound && sound)
@@ -1424,11 +1438,17 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     if (sound != old_sound && !sound)
         audio_device->pause_audio();
     config.st_no_space();
-    config.config_bool("pause game", pause);
+    config.config_bool("gamestate update", update_gamestate);
     std::vector<char> cmd_buffer(128);
-
-    if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true))
+    if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true)) {
         queue_command(cmd_buffer.data());
+        if (!update_gamestate) {
+            SPDLOG_WARN("command unpaused gamestate update");
+            update_gamestate = true;
+        }
+    }
+    
+    config.st_separate("Raytrace");
     int spp = pc.rt_config.spp;
     int path_lenght = pc.rt_config.path_length;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -1441,4 +1461,10 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     pc.rt_config.path_length = path_lenght;
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
+
+    config.st_separate("Reproducibility");
+    config.config_int("stop and rebuild after worldspawn", stop_after_worldspawn,
+                      "Can be used for reference renders. -1 to disable");
+    config.config_float("force timediff (ms)", force_timediff,
+                        "For reference renders and video outputs.");
 }

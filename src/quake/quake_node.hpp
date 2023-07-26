@@ -304,9 +304,12 @@ class QuakeNode : public merian::Node {
     bool worldspawn = false;
 
     double old_time = 0;
-    bool pause = false;
+    bool update_gamestate = true;
     bool sound = true;
     bool raw_mouse_was_enabled = false;
+    int stop_after_worldspawn = -1;
+    uint64_t last_worldspawn_frame = 0;
+    float force_timediff = 0;
 
     double mouse_oldx = 0;
     double mouse_oldy = 0;
