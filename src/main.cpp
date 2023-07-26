@@ -5,6 +5,7 @@
 #include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
 #include "merian-nodes/color_output/color_output.hpp"
 #include "merian-nodes/image/image.hpp"
+#include "merian-nodes/image_write/image_write.hpp"
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
 #include "merian-nodes/svgf/svgf.hpp"
 #include "merian-nodes/taa/taa.hpp"
@@ -67,6 +68,7 @@ int main() {
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
+    auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
 
     graph.add_node("output", output);
     graph.add_node("black_color", black);
@@ -75,6 +77,7 @@ int main() {
     graph.add_node("accum", accum);
     graph.add_node("denoiser", svgf);
     graph.add_node("tonemap", tonemap);
+    graph.add_node("image writer", image_writer);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -96,6 +99,8 @@ int main() {
 
     graph.connect_image(tonemap, output, 0, 0);
     // graph.connect_image(quake, output, 1, 0);
+
+    graph.connect_image(tonemap, image_writer, 0, 0);
 
     merian::ImGuiConfiguration config;
 

@@ -1110,7 +1110,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     // UPDATE PUSH CONSTANT (with player data)
-    pc.frame = frame;
+    pc.frame = frame - last_worldspawn_frame;
     pc.player.health = sv_player->v.health;
     pc.player.armor = sv_player->v.armorvalue;
     pc.player.flags = 0;
