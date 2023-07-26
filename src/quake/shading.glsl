@@ -87,7 +87,7 @@ void get_shading_material(const IntersectionInfo info,
         mat.emission = envmap(ray_dir);
         mat.normal = -ray_dir;
         mat.geo_normal = -ray_dir;
-        mat.pos = ray_origin + info.t * ray_dir;
+        mat.pos = ray_origin + T_MAX * ray_dir;
         mat.gloss = 0;
         return;
     }

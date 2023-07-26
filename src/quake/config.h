@@ -7,7 +7,7 @@
 
 // Configure ray tracing
 
-// max ray tracing distance. sky is that -1
+// max ray tracing distance.
 #define T_MAX 10000.0
 // continue tracing if alpha of texture is smaller
 #define ALPHA_THRESHOLD .666 
