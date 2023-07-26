@@ -305,7 +305,8 @@ class QuakeNode : public merian::Node {
 
     double old_time = 0;
     bool pause = false;
-    bool sound = false;
+    bool sound = true;
+    bool raw_mouse_was_enabled = false;
 
     double mouse_oldx = 0;
     double mouse_oldy = 0;

@@ -142,9 +142,8 @@ void init_quake(const char* base_dir) {
     Sys_Printf("QuakeSpasm " QUAKESPASM_VER_STRING " (c) Ozkan Sezer, Eric Wasylishen & others\n");
 
     Sys_Printf("Host_Init\n");
-    Host_Init(); // this one has a lot of meat! we'll need to cut it short i suppose
+    Host_Init();
 
-    // S_BlockSound(); // only start when grabbing
     // close menu because we don't have an esc key:
     key_dest = key_game;
     m_state = m_none;
@@ -757,13 +756,19 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         }
     });
     controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
-        if (controller.get_raw_mouse_input()) {
+        bool raw = controller.get_raw_mouse_input();
+
+        if (raw) {
             this->mouse_x = xpos;
             this->mouse_y = ypos;
-        } else {
-            this->mouse_oldx = this->mouse_x = xpos;
-            this->mouse_oldy = this->mouse_y = ypos;
         }
+
+        if (raw != raw_mouse_was_enabled) {
+            this->mouse_oldx = xpos;
+            this->mouse_oldy = ypos;
+        }
+   
+        raw_mouse_was_enabled = raw;
     });
     controller->set_mouse_button_callback([&](merian::InputController& controller, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
         if (button == merian::InputController::MOUSE1) {
@@ -861,11 +866,11 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // classic quake sky
     if (merian::ends_with(glt->name, "_front")) {
         texnum_skybox[1] = glt->texnum;
-        texnum_skybox[2] = -1u;
+        texnum_skybox[2] = static_cast<uint16_t>(-1u);
     }
     if (merian::ends_with(glt->name, "_back")) {
         texnum_skybox[0] = glt->texnum;
-        texnum_skybox[2] = -1u;
+        texnum_skybox[2] = static_cast<uint16_t>(-1u);
     }
 
     // full featured cube map/arcane dimensions
@@ -968,8 +973,9 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
             merian::NodeOutputDescriptorBuffer(
                 "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
-                vk::BufferCreateInfo{
-                    {}, LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex), vk::BufferUsageFlagBits::eStorageBuffer},
+                vk::BufferCreateInfo{{},
+                                     LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex),
+                                     vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },
     };
@@ -1059,8 +1065,40 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         old_time = newtime;
     }
 
-    if (!sv_player) {
-        // TODO: Clear output and feedback buffers
+    FrameData& cur_frame = current_frame();
+    if (cl.worldmodel) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
+        if (worldspawn) {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
+            update_static_geo(cmd, true);
+            worldspawn = false;
+        } else {
+            update_static_geo(cmd, false);
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload dynamic");
+            update_dynamic_geo(cmd);
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "build acceleration structures");
+            update_as(cmd, run.get_profiler());
+        }
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
+        update_textures(cmd);
+    }
+
+    if (!sv_player || !cur_frame.tlas || !cl.worldmodel) {
+        clear_pipe->bind(cmd);
+        clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        clear_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
+        clear_pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+
+        frame++;
         return;
     }
 
@@ -1083,42 +1121,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     // fog_density *= fog_density;
     // pc.fog = glm::vec4(*merian::as_vec3(Fog_GetColor()), fog_density);
 
-    FrameData& cur_frame = current_frame();
-    {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
-        if (worldspawn) {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
-            update_static_geo(cmd, true);
-            worldspawn = false;
-        } else {
-            update_static_geo(cmd, false);
-        }
-        {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload dynamic");
-            update_dynamic_geo(cmd);
-        }
-        {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "build acceleration structures");
-            update_as(cmd, run.get_profiler());
-        }
-    }
-    {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
-        update_textures(cmd);
-    }
-
-    if (!sv_player || !cur_frame.tlas || !cl.worldmodel) {
-        clear_pipe->bind(cmd);
-        clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
-        clear_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
-        clear_pipe->push_constant(cmd, pc);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
-
-        frame++;
-        return;
-    }
-
     // BIND PIPELINE
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
@@ -1129,6 +1131,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
+
     frame++;
 }
 
