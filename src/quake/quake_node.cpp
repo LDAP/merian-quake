@@ -763,9 +763,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             this->mouse_y = ypos;
         }
 
-        if (raw != raw_mouse_was_enabled) {
-            this->mouse_oldx = xpos;
-            this->mouse_oldy = ypos;
+        if (raw != raw_mouse_was_enabled || !raw) {
+            this->mouse_x = this->mouse_oldx = xpos;
+            this->mouse_y = this->mouse_oldy = ypos;
         }
    
         raw_mouse_was_enabled = raw;
