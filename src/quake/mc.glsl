@@ -3,7 +3,7 @@
 #define ML_MIN_ALPHA 0.01
 
 MCState mc_state_new() {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0, ivec3(0.0)};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0, ivec3(0)};
     return r;
 }
 
@@ -28,9 +28,9 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
-MCState mc_state_load(const vec3 pos, inout uint rng_state) {
+MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-    const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
     const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
     const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
     if (grid_idx == state.grid_idx) {
@@ -49,11 +49,11 @@ MCState mc_state_load(const vec3 pos, inout uint rng_state) {
 }
 
 // return true if a valid state was found
-bool mc_state_load_resample(out MCState mc_state, const vec3 pos, inout uint rng_state) {
+bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float score_sum = 0;
     for (int i = 0; i < 5; i++) {
-        const MCState candidate = mc_state_load(pos, rng_state);
-        const float candidate_score = candidate.sum_w;  // * dot(vmf.xyz, normal)
+        const MCState candidate = mc_state_load(pos, normal, rng_state);
+        const float candidate_score = candidate.sum_w;  // * smoothstep(0.8, 1.0, dot(candidate.normal, normal))
         // why not best?
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {
@@ -81,11 +81,12 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_len = max(mc_state.sum_len, 0);
 }
 
-void mc_state_save(MCState mc_state, const vec3 pos, inout uint rng_state) {
+void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-    const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
     const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
     mc_state.grid_idx = grid_idx;
+    //mc_state.normal = normal;
     cells[buf_idx].states[state_idx] = mc_state;
 }
 

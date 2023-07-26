@@ -21,6 +21,7 @@ struct MCState {
     float sum_len;
     float f;
     ivec3 grid_idx;
+    //vec3 normal;
 };
 
 struct MCVertex {

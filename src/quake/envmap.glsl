@@ -1,4 +1,5 @@
 #include "common/von_mises_fisher.glsl"
+#include "common/cubemap.glsl"
 
 vec3 envmap(in vec3 w) {
     if((params.sky_lf_ft & 0xffff) == 0xffff) {
@@ -24,17 +25,16 @@ vec3 envmap(in vec3 w) {
         
         // Evaluate cubemap
         // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
-        int m = 0;
-        if(abs(w.y) > abs(w.x) && abs(w.y) > abs(w.z)) m = 1;
-        if(abs(w.z) > abs(w.x) && abs(w.z) > abs(w.y)) m = 2;
         uint side = 0;
         vec2 st;
-        if     (m == 0 && w.x > 0) { side = params.sky_rt_bk & 0xffff; st = 0.5 + 0.5*vec2(-w.y, -w.z) / abs(w.x);} // rt
-        else if(m == 0 && w.x < 0) { side = params.sky_lf_ft & 0xffff; st = 0.5 + 0.5*vec2( w.y, -w.z) / abs(w.x);} // lf
-        else if(m == 1 && w.y > 0) { side = params.sky_rt_bk >> 16   ; st = 0.5 + 0.5*vec2( w.x, -w.z) / abs(w.y);} // bk
-        else if(m == 1 && w.y < 0) { side = params.sky_lf_ft >> 16   ; st = 0.5 + 0.5*vec2(-w.x, -w.z) / abs(w.y);} // ft
-        else if(m == 2 && w.z > 0) { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5*vec2(-w.y,  w.x) / abs(w.z);} // up
-        else if(m == 2 && w.z < 0) { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z);} // dn
+        switch(cubemap_side(w)) {
+            case 0: { side = params.sky_rt_bk & 0xffff; st = 0.5 + 0.5*vec2(-w.y, -w.z) / abs(w.x); break; } // rt
+            case 1: { side = params.sky_lf_ft & 0xffff; st = 0.5 + 0.5*vec2( w.y, -w.z) / abs(w.x); break; } // lf
+            case 2: { side = params.sky_rt_bk >> 16   ; st = 0.5 + 0.5*vec2( w.x, -w.z) / abs(w.y); break; } // bk
+            case 3: { side = params.sky_lf_ft >> 16   ; st = 0.5 + 0.5*vec2(-w.x, -w.z) / abs(w.y); break; } // ft
+            case 4: { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5*vec2(-w.y,  w.x) / abs(w.z); break; } // up
+            case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z); break; } // dn
+        }
         emcol += texture(img_tex[nonuniformEXT(side)], st).rgb;
         return emcol;
     }
