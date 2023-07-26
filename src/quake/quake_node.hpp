@@ -216,7 +216,8 @@ class QuakeNode : public merian::Node {
 
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
 
-    merian::ShaderModuleHandle shader;
+    merian::ShaderModuleHandle rt_shader;
+    merian::ShaderModuleHandle clear_shader;
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
     merian::DescriptorPoolHandle graph_pool;
     std::vector<merian::DescriptorSetHandle> graph_sets;
@@ -232,6 +233,7 @@ class QuakeNode : public merian::Node {
     merian::DescriptorPoolHandle quake_pool;
 
     merian::PipelineHandle pipe;
+    merian::PipelineHandle clear_pipe;
 
     // ----------------------------------------------------
     // Params

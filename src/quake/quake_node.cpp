@@ -723,7 +723,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     init_quake(base_dir);
 
     // PIPELINE CREATION
-    shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);
+    rt_shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);
+    clear_shader = std::make_shared<merian::ShaderModule>(context, sizeof(clear_spv), clear_spv);
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -991,7 +992,10 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                .build_pipeline_layout();
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y);
-        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader, spec_builder.build());
+        pipe =
+            std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
+        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
+                                                               spec_builder.build());
     }
 
     // DUMMY IMAGE as placeholder
@@ -1103,8 +1107,15 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         update_textures(cmd);
     }
 
-    if (!cur_frame.tlas) {
-        // TODO: Clear output and feedback buffers
+    if (!sv_player || !cur_frame.tlas || !cl.worldmodel) {
+        clear_pipe->bind(cmd);
+        clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        clear_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
+        clear_pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+
+        frame++;
         return;
     }
 
