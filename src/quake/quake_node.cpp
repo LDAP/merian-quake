@@ -1033,10 +1033,9 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         update.update(context);
     }
 
-    // ZERO MC STATES
-    std::vector<char> zero(buffer_outputs[0][0]->get_size(), 0);
-    allocator->getStaging()->cmdToBuffer(cmd, *buffer_outputs[0][0], 0,
-                                         buffer_outputs[0][0]->get_size(), zero.data());
+    // ZERO markov chain and light cache
+    cmd.fillBuffer(*buffer_outputs[0][0], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*buffer_outputs[0][1], 0, VK_WHOLE_SIZE, 0);
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -1454,8 +1453,8 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
     config.config_int("spp", spp, 0, 16, "samples per pixel");
-    config.config_int("max path lenght", path_lenght, 0, 6, "maximum path length");
-    config.config_percent("BDSF Prob", bsdp_p, "The prbability to use BSDF sampling");
+    config.config_int("max path length", path_lenght, 0, 6, "maximum path length");
+    config.config_percent("BDSF Prob", bsdp_p, "The probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
     pc.rt_config.spp = spp;
     pc.rt_config.path_length = path_lenght;
