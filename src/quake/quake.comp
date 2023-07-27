@@ -83,6 +83,26 @@ void main() {
     if (any(greaterThanEqual(pixel, resolution)))
         return;
 
+    if (pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
+        // simple health + armor indicators
+        float val = 0.0;
+        vec3 col;
+        if (pixel.y > imageSize(img_irradiance).y * 0.98) {
+            val = (params.player >> 8) & 0xff;
+            col = vec3(1e7, 0, 0);
+        } else {
+            val = (params.player >> 16) & 0xff;
+            col = vec3(0, 0, 1e7);
+        }
+        float off = (pixel.x / float(imageSize(img_irradiance).x) - 0.8)/0.1;
+        if (off * 100 < val) {
+            imageStore(img_irradiance, pixel, vec4(1));
+            imageStore(img_gbuf, pixel, vec4(0));
+            imageStore(img_albedo, pixel, vec4(col, 1));
+            return;
+        }
+    }
+
     uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
     vec4 irr_samples = vec4(0); // store sample count in `a` for accum node
 
@@ -222,6 +242,10 @@ void main() {
                 irr_samples += contrib;
         }
     }
+
+    // if (all(lessThan(irr_samples.rgb, vec3(1e-7)))) {
+    //     irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state).rgb, 1);
+    // }
 
     {
         // Store albedo and irradiance
