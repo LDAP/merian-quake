@@ -1,5 +1,5 @@
 
-#define LIGHT_CACHE_MAX_N 4096
+#define LIGHT_CACHE_MAX_N 1024
 #define LIGHT_CACHE_MIN_ALPHA 0.00
 
 vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
