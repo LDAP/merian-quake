@@ -35,7 +35,7 @@ struct MCVertex {
 struct LightCacheEntry {
     ivec3 grid_idx;
     vec4 irr_N;
-    vec3 n;
+    //vec3 n;
 };
 
 struct LightCacheVertex {
