@@ -4,6 +4,7 @@
 #include "merian-nodes/blit_external/blit_external.hpp"
 #include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
 #include "merian-nodes/color_output/color_output.hpp"
+#include "merian-nodes/exposure/exposure.hpp"
 #include "merian-nodes/image/image.hpp"
 #include "merian-nodes/image_write/image_write.hpp"
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
@@ -69,6 +70,7 @@ int main() {
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
+    auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
 
     graph.add_node("output", output);
     graph.add_node("black_color", black);
@@ -78,6 +80,7 @@ int main() {
     graph.add_node("denoiser", svgf);
     graph.add_node("tonemap", tonemap);
     graph.add_node("image writer", image_writer);
+    graph.add_node("exposure", exposure);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -95,12 +98,14 @@ int main() {
     graph.connect_image(quake, svgf, 2, 4);
     graph.connect_image(quake, svgf, 1, 5); // albedo
     graph.connect_image(quake, svgf, 3, 6); // mv
-    graph.connect_image(svgf, tonemap, 0, 0);
+    graph.connect_image(svgf, exposure, 0, 0);
+
+    graph.connect_image(exposure, tonemap, 0, 0);
 
     graph.connect_image(tonemap, output, 0, 0);
     // graph.connect_image(quake, output, 1, 0);
 
-    graph.connect_image(tonemap, image_writer, 0, 0);
+    graph.connect_image(svgf, image_writer, 0, 0);
 
     merian::ImGuiConfiguration config;
 
