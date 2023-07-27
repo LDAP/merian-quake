@@ -243,9 +243,8 @@ void main() {
         }
     }
 
-    // if (all(lessThan(irr_samples.rgb, vec3(1e-7)))) {
-    //     irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state).rgb, 1);
-    // }
+    // show light cache
+    // irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state).rgb, 1);
 
     {
         // Store albedo and irradiance
