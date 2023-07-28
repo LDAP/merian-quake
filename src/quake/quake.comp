@@ -203,8 +203,7 @@ void main() {
                 //     mis_w = wo_p / (vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p()) + bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p());
                 // }
 
-                // Using the light cache provides full global GI but is currently temporally unstable
-                //const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
+                // const vec3 incident = segment == max_path_length() - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
                 f = current_albedo * next_mat.emission * mis_w;
                 p *= wo_p;
 
