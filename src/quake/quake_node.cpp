@@ -1070,7 +1070,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     // UPDATE GEOMETRY
-    if (cl.worldmodel) {
+    {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
         if (worldspawn) {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
@@ -1095,7 +1095,17 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         update_textures(cmd);
     }
 
-    if (!sv_player || !cur_frame.tlas || !cl.worldmodel) {
+    if (worldspawn) {
+        sv_player = nullptr;
+        worldspawn = false;
+    }
+
+    if (stop_after_worldspawn >= 0 &&
+        frame - last_worldspawn_frame >= (uint64_t)stop_after_worldspawn) {
+        update_gamestate = false;
+    }
+
+    if (!cur_frame.tlas || !cl.worldmodel) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         clear_pipe->bind(cmd);
         clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
@@ -1103,18 +1113,22 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         clear_pipe->push_constant(cmd, pc);
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
-
         frame++;
         return;
     }
 
-    // UPDATE PUSH CONSTANT (with player data)
+    // UPDATE PUSH CONSTANT
     pc.frame = frame - last_worldspawn_frame;
-    pc.player.health = sv_player->v.health;
-    pc.player.armor = sv_player->v.armorvalue;
-    pc.player.flags = 0;
-    pc.player.flags |= sv_player->v.weapon == 1 ? PLAYER_FLAGS_TORCH : 0; // shotgun has torch
-    pc.player.flags |= sv_player->v.waterlevel >= 3 ? PLAYER_FLAGS_UNDERWATER : 0;
+    if (sv_player) {
+        // Demos do not have a player set
+        pc.player.health = sv_player->v.health;
+        pc.player.armor = sv_player->v.armorvalue;
+        pc.player.flags = 0;
+        pc.player.flags |= sv_player->v.weapon == 1 ? PLAYER_FLAGS_TORCH : 0; // shotgun has torch
+        pc.player.flags |= sv_player->v.waterlevel >= 3 ? PLAYER_FLAGS_UNDERWATER : 0;
+    } else {
+        pc.player = {0, 0, 0, 0};
+    }
     pc.sky = texnum_skybox;
     pc.cl_time = cl.time;
     pc.prev_cam_x = pc.cam_x;
@@ -1138,12 +1152,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
 
-    if (stop_after_worldspawn >= 0 &&
-        frame - last_worldspawn_frame >= (uint64_t)stop_after_worldspawn) {
-        update_gamestate = false;
-    }
-
-    worldspawn = false;
     frame++;
 }
 
@@ -1446,7 +1454,7 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
             update_gamestate = true;
         }
     }
-    
+
     config.st_separate("Raytrace");
     int spp = pc.rt_config.spp;
     int path_lenght = pc.rt_config.path_length;
