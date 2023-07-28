@@ -99,6 +99,7 @@ void main() {
             imageStore(img_irradiance, pixel, vec4(1));
             imageStore(img_gbuf, pixel, vec4(0));
             imageStore(img_albedo, pixel, vec4(col, 1));
+            imageStore(img_mv, pixel, vec4(0));
             return;
         }
     }
