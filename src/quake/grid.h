@@ -29,7 +29,7 @@ struct MCVertex {
 };
 
 #define LIGHT_CACHE_BUFFER_SIZE 100000
-#define LIGHT_CACHE_GRID_WIDTH 20.3
+#define LIGHT_CACHE_GRID_WIDTH 15.3
 #define LIGHT_CACHE_ENTRIES_PER_VERTEX 6
 
 struct LightCacheEntry {
