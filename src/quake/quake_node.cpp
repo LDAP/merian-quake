@@ -1456,18 +1456,22 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     }
 
     config.st_separate("Raytrace");
-    int spp = pc.rt_config.spp;
-    int path_lenght = pc.rt_config.path_length;
+    int spp = pc.rt_config.spp_path_length & 0xf;
+    int path_lenght = (pc.rt_config.spp_path_length) >> 4 & 0xf;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
-    config.config_int("spp", spp, 0, 16, "samples per pixel");
-    config.config_int("max path length", path_lenght, 0, 6, "maximum path length");
-    config.config_percent("BDSF Prob", bsdp_p, "The probability to use BSDF sampling");
+    bool light_cache_tail = pc.rt_config.flags & RT_FLAG_LIGHT_CACHE_TAIL;
+    config.config_int("spp", spp, 0, 15, "samples per pixel");
+    config.config_int("max path length", path_lenght, 0, 15, "maximum path length");
+    config.config_percent("BDSF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
-    pc.rt_config.spp = spp;
-    pc.rt_config.path_length = path_lenght;
+    config.config_bool("light cache tail", light_cache_tail, "use the light cache for the path tail");
+    pc.rt_config.spp_path_length = spp;
+    pc.rt_config.spp_path_length |= path_lenght << 4;
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
+    pc.rt_config.flags = 0;
+    pc.rt_config.flags |= light_cache_tail ? RT_FLAG_LIGHT_CACHE_TAIL : 0;
 
     config.st_separate("Reproducibility");
     config.config_int("stop and rebuild after worldspawn", stop_after_worldspawn,

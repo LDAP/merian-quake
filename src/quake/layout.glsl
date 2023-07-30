@@ -22,8 +22,9 @@ layout(push_constant) uniform PushConstant {
     uint rt_config; // see `RTConfig` in in quake_node.hpp
 } params;
 
-uint spp()             { return (params.rt_config >> 0)  & 0xff; }
-uint max_path_length() { return (params.rt_config >> 8)  & 0xff; }
+uint rt_flags()        { return params.rt_config & 0xff; }
+uint spp()             { return (params.rt_config >> 8)  & 0xf; }
+uint max_path_length() { return (params.rt_config >> 12)  & 0xf; }
 float bsdp_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
 float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 

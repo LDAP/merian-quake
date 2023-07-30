@@ -39,4 +39,8 @@
 #define PLAYER_FLAGS_TORCH 1
 #define PLAYER_FLAGS_UNDERWATER 2
 
+// RT FLAGS
+
+#define RT_FLAG_LIGHT_CACHE_TAIL 1
+
 #endif

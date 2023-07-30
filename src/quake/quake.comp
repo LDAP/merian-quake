@@ -203,8 +203,12 @@ void main() {
                     mis_w = wo_p / (vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p()) + bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p());
                 }
 
-                // const vec3 incident = segment == max_path_length() - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
-                f = current_albedo * next_mat.emission * mis_w;
+                if ((rt_flags() & RT_FLAG_LIGHT_CACHE_TAIL) > 0) {
+                    const vec3 incident = segment == max_path_length() - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
+                    f = current_albedo * incident * mis_w;
+                } else {
+                    f = current_albedo * next_mat.emission * mis_w;
+                }
                 p *= wo_p;
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
