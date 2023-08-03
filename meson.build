@@ -6,6 +6,7 @@ project(
         'warning_level=3',
         'cpp_std=c++20',
         'b_ndebug=if-release',
+        'buildtype=release',
     ]
 )
 
