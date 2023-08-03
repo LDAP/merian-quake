@@ -120,13 +120,16 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
     return tex;
 }
 
-void init_quake(const char* base_dir) {
-    const char* argv[] = {"quakespasm", "-basedir", base_dir, "+skill", "2"};
-    const int argc = 5;
+void init_quake(const int quakespasm_argc, const char** quakespasm_argv) {
 
-    quake_data.params.basedir = base_dir; // does not work
-    quake_data.params.argc = argc;
-    quake_data.params.argv = (char**)argv;
+    std::vector<const char*> quakespasm_args = {"quakespasm"};
+    if (quakespasm_argc > 0) {
+        quakespasm_args.resize(1 + quakespasm_argc);
+        memcpy(&quakespasm_args[1], quakespasm_argv, quakespasm_argc * sizeof(quakespasm_argv));
+    }
+
+    quake_data.params.argc = quakespasm_args.size();
+    quake_data.params.argv = (char**)quakespasm_args.data();
     quake_data.params.errstate = 0;
     quake_data.params.memsize = 256 * 1024 * 1024; // qs default in 0.94.3
     quake_data.params.membase = malloc(quake_data.params.memsize);
@@ -710,7 +713,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                      const merian::ResourceAllocatorHandle& allocator,
                      const std::shared_ptr<merian::InputController> controller,
                      const uint32_t frames_in_flight,
-                     const char* base_dir)
+                     const int quakespasm_argc,
+                     const char** quakespasm_argv)
     : context(context), allocator(allocator), frames(frames_in_flight) {
 
     // QUAKE INIT
@@ -719,7 +723,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     }
     quake_data.node = this;
     host_parms = &quake_data.params;
-    init_quake(base_dir);
+    init_quake(quakespasm_argc, quakespasm_argv);
 
     // PIPELINE CREATION
     rt_shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);

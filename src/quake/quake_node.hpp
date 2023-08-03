@@ -138,7 +138,8 @@ class QuakeNode : public merian::Node {
               const merian::ResourceAllocatorHandle& allocator,
               const std::shared_ptr<merian::InputController> controller,
               const uint32_t ring_size,
-              const char* base_dir = "./res/quake");
+              const int quakespasm_argc = 0,
+              const char** quakespasm_argv = nullptr);
 
     ~QuakeNode();
 
