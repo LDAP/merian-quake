@@ -4,9 +4,9 @@
 
 /subprojects/*
 !/subprojects/*.wrap
+!/subprojects/projectfiles
 
 vgcore.*
 
-/res/*
 imgui.ini
 config.json

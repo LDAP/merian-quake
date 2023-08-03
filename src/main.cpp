@@ -38,9 +38,9 @@ struct FrameData {
 
 int main() {
     spdlog::set_level(spdlog::level::debug);
-    merian::FileLoader loader{{"/", "./", "./build", "./res", "./res/shaders"}};
+    merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
 
-    auto debugUtils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
+    auto debugUtils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
     auto extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();

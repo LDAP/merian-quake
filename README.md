@@ -1,18 +1,54 @@
-# Merian-Quake
+# Merian-Quake RT
 
-This is a raytraced version of quakespasm.
+This is a ray traced engine for [quakespasm](https://github.com/sezero/quakespasm).
 
 ## Usage
 
-Copy you maps into `res/quake` (the id1 folder), or specify a custom path.
-Copy a blue noise texture into `res/blue` or specify a custom path.
-Then compile and run:
+```bash
+merian-quake <quakespasm arguments>
+```
+
+You can specify the path to your quake folder using the `-basedir` argument if you do not want to use the default.
+
+
+## Building
+
+Supported OS:
+
+- Windows 11
+- Linux
+
+Build dependencies:
+
+- Vulkan SDK
+- Meson
+- A fairly recent C++ compiler
 
 ```bash
-meson setup build
+# Clone the repository with all submodules:
+git clone --recursive https://github.com/LDAP/merian-quake-rt
+cd merian-quake-rt
+
+# Compile
+meson setup build --prefix=path/to/installdir
 # or debug
-meson setup build --buildtype=debug
+meson setup build --prefix=path/to/installdir --buildtype=debug 
 
 meson compile -C build
+
+# Install
+meson install -C build
+```
+
+
+## Development
+
+```bash
+# Unix
+# Just run
+./build/merian-quake
+
+# Windows: (requires .dll paths set up correctly)
+meson devenv -C build
 ./build/merian-quake
 ```

@@ -10,6 +10,7 @@ project(
 )
 
 add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
+add_project_arguments('-DMERIAN_QUAKE_RESOURCES="@0@"'.format(join_paths(get_option('prefix'), 'res')), language : 'cpp')
 
 # Debug configuration
 if get_option('buildtype').startswith('debug')
@@ -23,10 +24,11 @@ endif
 # Dependencies
 fmt = dependency('fmt', version : ['>=9.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.11.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-vulkan = dependency('vulkan', version: ['>=1.3.0'])
+vulkan = dependency('vulkan-headers', version: ['>=1.3.0'], fallback : ['vulkan-headers', 'vulkan_headers_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'])
 merian = dependency('merian', fallback: ['merian', 'merian_dep'])
 quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'])
+glfw = dependency('glfw3', version: ['>=3.3.0'], fallback : ['glfw', 'glfw_dep'], default_options : ['install=true'])
 
 # Shaders
 glslc = find_program('glslangValidator')
@@ -51,7 +53,10 @@ exe = executable(
         quake,
         spdlog,
         vulkan,
+        glfw
     ],
     include_directories: inc_dirs,
     install : true,
 )
+
+install_subdir('res/blue_noise', install_dir : 'res')
