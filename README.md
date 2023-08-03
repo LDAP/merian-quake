@@ -30,9 +30,9 @@ git clone --recursive https://github.com/LDAP/merian-quake-rt
 cd merian-quake-rt
 
 # Compile
-meson setup build --prefix=path/to/installdir
+meson setup build [--prefix=path/to/installdir]
 # or debug
-meson setup build --prefix=path/to/installdir --buildtype=debug 
+meson setup build [--prefix=path/to/installdir] --buildtype=debug 
 
 meson compile -C build
 
@@ -46,9 +46,9 @@ meson install -C build
 ```bash
 # Unix
 # Just run
-./build/merian-quake
+./build/merian-quake [-basedir /path/to/quakedir]
 
 # Windows: (requires .dll paths set up correctly)
 meson devenv -C build
-./build/merian-quake
+./build/merian-quake [-basedir /path/to/quakedir]
 ```
