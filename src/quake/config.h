@@ -12,9 +12,6 @@
 // continue tracing if alpha of texture is smaller
 #define ALPHA_THRESHOLD .666 
 
-#define MAX_PATH_LENGHT 3
-
-
 // BINDINGS
 
 #define BINDING_VTX_BUF 0
