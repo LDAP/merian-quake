@@ -28,16 +28,12 @@ struct MCVertex {
     MCState states[STATES_PER_CELL];
 };
 
-#define LIGHT_CACHE_BUFFER_SIZE 100000
-#define LIGHT_CACHE_GRID_WIDTH 15.3
-#define LIGHT_CACHE_ENTRIES_PER_VERTEX 6
-
-struct LightCacheEntry {
-    ivec3 grid_idx;
-    vec4 irr_N;
-    //vec3 n;
-};
+#define LIGHT_CACHE_BUFFER_SIZE 40000000
 
 struct LightCacheVertex {
-    LightCacheEntry entries[LIGHT_CACHE_ENTRIES_PER_VERTEX];
+    ivec3 grid_idx;
+    uint level;
+    uint lock;
+    vec4 irr_N;
+    //vec3 n;
 };
