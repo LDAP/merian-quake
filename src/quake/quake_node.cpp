@@ -833,6 +833,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             if (shm->samplepos >= buffersize)
                 shm->samplepos = 0;
         });
+    audio_device->unpause_audio();
 }
 
 QuakeNode::~QuakeNode() {
