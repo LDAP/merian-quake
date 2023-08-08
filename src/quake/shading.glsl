@@ -106,7 +106,8 @@ void get_shading_material(const IntersectionInfo info,
     {
         // Load albedo
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
-        mat.albedo = texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st);
+        // Clamp to 1e-3 (nothing is really 100% black)
+        mat.albedo = max(texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st), vec4(vec3(1e-3), 1));
         const uint alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
             mat.albedo.a = decode_alpha(alpha);
