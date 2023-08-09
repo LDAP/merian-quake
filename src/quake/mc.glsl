@@ -1,9 +1,23 @@
+#define MC_MAX_GRID_WIDTH 25
+#define MC_MIN_GRID_WIDTH .1
+#define MC_MAX_LEVEL 4
+
 // Configure ML
-#define ML_MAX_N 1024
-#define ML_MIN_ALPHA 0.01
+#define ML_MAX_N 128
+#define ML_MIN_ALPHA .1
+
+ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+    float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 8);
+    return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
+}
+
+ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+    float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 8);
+    return grid_idx_closest(pos, grid_width);
+}
 
 MCState mc_state_new() {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0, ivec3(0)};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0.0};
     return r;
 }
 
@@ -28,37 +42,40 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
-MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
-    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-    const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
-    const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
-    const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
-    if (grid_idx == state.grid_idx) {
-        return state;
-    } else {
-        // const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-        // const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
-        // const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
-        // const MCState state = cells[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
-        // if (grid_idx == state.grid_idx) {
-        //     return state;
-        // } else {
-            return mc_state_new();
-        // }
-    }
-}
+// MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
+//     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+//     const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
+//     const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+//     const MCState state = mc_states[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+//     if (grid_idx == state.grid_idx) {
+//         return state;
+//     } else {
+//         // const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+//         // const uint buf_idx = hash_grid(grid_idx, MC_BUFFER_SIZE);
+//         // const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+//         // const MCState state = mc_states[buf_idx].states[uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)))];
+//         // if (grid_idx == state.grid_idx) {
+//         //     return state;
+//         // } else {
+//             return mc_state_new();
+//         // }
+//     }
+// }
 
 // return true if a valid state was found
 bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float score_sum = 0;
-    for (int i = 0; i < 5; i++) {
-        const MCState candidate = mc_state_load(pos, normal, rng_state);
-        const float candidate_score = candidate.sum_w;  // * smoothstep(0.8, 1.0, dot(candidate.normal, normal))
-        // why not best?
+    for (int level = 0; level <= MC_MAX_LEVEL; level++) {
+        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, normal, rng_state);
+        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+        MCVertex vtx = mc_states[buf_idx];
+
+        const float candidate_score = smoothstep(0., ML_MAX_N, vtx.state.N) * vtx.state.sum_w * float(grid_idx == vtx.grid_idx && level == vtx.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
+
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {
             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
-            mc_state = candidate;
+            mc_state = vtx.state;
         }
     }
 
@@ -82,12 +99,44 @@ void mc_state_add_sample(inout MCState mc_state,
 }
 
 void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
-    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
-    const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
-    const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
-    mc_state.grid_idx = grid_idx;
-    //mc_state.normal = normal;
-    cells[buf_idx].states[state_idx] = mc_state;
+    // const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
+    // const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
+    // const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
+    // mc_state.grid_idx = grid_idx;
+    // //mc_state.normal = normal;
+    // mc_states[buf_idx].states[state_idx] = mc_state;
+
+    for (int level = MC_MAX_LEVEL; level >= 0; level--) {
+        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, normal, rng_state);
+        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+
+        const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
+        if (old == params.frame)
+            // did not get lock
+            continue;
+
+        MCVertex vtx = mc_states[buf_idx];
+
+        if (old == 0) {
+            vtx.grid_idx = grid_idx;
+            vtx.level = level;
+            vtx.avg_frame = 0;
+        } else if (vtx.grid_idx == grid_idx && vtx.level == level) {
+            
+        } else if (XorShift32(rng_state) < level / vtx.level * .1) { // < level / vtx.level * .1
+            vtx.grid_idx = grid_idx;
+            vtx.level = level;
+            vtx.avg_frame = 0;
+        } else {
+            continue;
+        }
+
+        vtx.state = mc_state;
+        vtx.avg_frame = mix(vtx.avg_frame, params.frame, .5);
+
+        mc_states[buf_idx] = vtx;
+        return;   
+    }
 }
 
 bool mc_state_valid(const MCState mc_state) {

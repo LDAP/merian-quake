@@ -38,7 +38,7 @@ layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
 layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
 layout(set = 0, binding = 5, scalar) buffer buf_cells {
-    MCVertex cells[];
+    MCVertex mc_states[];
 };
 layout(set = 0, binding = 6, scalar) buffer buf_lightcache {
     LightCacheVertex light_cache[];

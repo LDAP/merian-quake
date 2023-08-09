@@ -10,9 +10,7 @@ using vec4 = glm::vec4;
 
 #endif
 
-#define STATES_PER_CELL 50
-#define MC_BUFFER_SIZE 200000
-#define MC_GRID_WIDTH 15.3
+#define MC_BUFFER_SIZE 40000000
 
 struct MCState {
     vec3 sum_tgt;
@@ -20,21 +18,27 @@ struct MCState {
     uint N;
     float sum_len;
     float f;
-    ivec3 grid_idx;
-    //vec3 normal;
 };
 
 struct MCVertex {
-    MCState states[STATES_PER_CELL];
+    ivec3 grid_idx;
+    uint level;
+
+    float avg_frame;
+    uint lock;
+
+    MCState state;
 };
 
 #define LIGHT_CACHE_BUFFER_SIZE 40000000
 
 struct LightCacheVertex {
     ivec3 grid_idx;
-    float avg_frame;
     uint level;
+
+    float avg_frame;
     uint lock;
+
     vec4 irr_N;
     //vec3 n;
 };

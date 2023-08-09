@@ -215,7 +215,7 @@ void main() {
                 {
                     if (!used_vmf) mc_state = mc_state_new();
 
-                    const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
+                    const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : vec3(0);// light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
                     const float mc_f = yuv_luminance(emm * bsdf_diffuse_eval(current_mat.albedo.rgb)) * dot(wo, current_mat.normal) * mis_w / wo_p;
                     // Using sum_w here instead of f fixes indirect lighting but slows down adaption.
                     // (Use the same as in load())
@@ -225,8 +225,6 @@ void main() {
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
                         mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state); // todo, only last?
                     }
-                    //imageStore(img_albedo, pixel, /*vec4(used_vmf && mc_f > 0));*/vec4(wo, 0));
-                    // imageStore(img_albedo, pixel, vec4(mc_state.N / ML_MAX_N));
 
                     light_cache_update(current_mat.pos, current_mat.normal, emm * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) * mis_w / wo_p, rng_state);
                 }
