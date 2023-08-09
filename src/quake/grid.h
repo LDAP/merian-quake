@@ -32,6 +32,7 @@ struct MCVertex {
 
 struct LightCacheVertex {
     ivec3 grid_idx;
+    float avg_frame;
     uint level;
     uint lock;
     vec4 irr_N;

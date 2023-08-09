@@ -7,7 +7,7 @@
 #define LIGHT_CACHE_MIN_ALPHA .1
 
 ivec3 grid_idx_for_level(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
-    float grid_width = cell_width_for_level_geometric(level, LIGHT_CACHE_MAX_LEVEL, LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH);
+    float grid_width = cell_width_for_level_poly(level, LIGHT_CACHE_MAX_LEVEL, LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH, 8);
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
@@ -17,6 +17,8 @@ vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
     // uint buf_idx = hash_grid_normal_level(grid_idx, normal, l, LIGHT_CACHE_BUFFER_SIZE);
     // return vec4(XorShift32(buf_idx), XorShift32(buf_idx), XorShift32(buf_idx), XorShift32(buf_idx));
 
+    vec4 irr_N = vec4(0);
+    float sum_w = 0;
     for (int level = 0; level <= LIGHT_CACHE_MAX_LEVEL; level++) {
         const ivec3 grid_idx = grid_idx_for_level(level, pos, normal, rng_state);
         const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
@@ -25,15 +27,21 @@ vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
             && level == vtx.level
             && !any(isinf(vtx.irr_N))       // make sure information is not damaged
             && !any(isnan(vtx.irr_N))
-            && vtx.lock > params.frame - 1  // make sure information is somewhat recent
-            && vtx.irr_N.a > 4              // make sure information is somewhat trustworthy
+            //&& vtx.avg_frame >= params.frame - 1 // make sure information is somewhat recent
+            //&& vtx.irr_N.a > 4              // make sure information is somewhat trustworthy
         ) {           
-            //return vec4(level / LIGHT_CACHE_MAX_LEVEL);
-            return vtx.irr_N;
+            float w = 1.;
+            w *= smoothstep(4, LIGHT_CACHE_MAX_N, vtx.irr_N.a);
+            w *= exp(vtx.avg_frame - params.frame);
+            const float a = 100;
+            w *= /*1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level);*/(pow(a, 1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level)) - 1) / (a - 1);
+
+            irr_N += w * vtx.irr_N;
+            sum_w += w;
         }
     }
 
-    return vec4(0);
+    return sum_w > 0 ? irr_N / sum_w : vec4(0);
 }
 
 void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout uint rng_state) {
@@ -89,6 +97,7 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
 
         vtx.irr_N.a = min(vtx.irr_N.a + 1, LIGHT_CACHE_MAX_N);
         vtx.irr_N.rgb = mix(vtx.irr_N.rgb, irr, max(1. / vtx.irr_N.a, LIGHT_CACHE_MIN_ALPHA));
+        vtx.avg_frame = mix(vtx.avg_frame, params.frame, .5);
 
         light_cache[buf_idx] = vtx;
 
