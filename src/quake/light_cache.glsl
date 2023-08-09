@@ -1,14 +1,19 @@
 
-#define LIGHT_CACHE_MAX_GRID_WIDTH 50
+#define LIGHT_CACHE_MAX_GRID_WIDTH 25
 #define LIGHT_CACHE_MIN_GRID_WIDTH .1
-#define LIGHT_CACHE_MAX_LEVEL 6
+#define LIGHT_CACHE_MAX_LEVEL 4
 
 #define LIGHT_CACHE_MAX_N 128
 #define LIGHT_CACHE_MIN_ALPHA .1
 
-ivec3 grid_idx_for_level(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+ivec3 grid_idx_for_level_interpolate(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float grid_width = cell_width_for_level_poly(level, LIGHT_CACHE_MAX_LEVEL, LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH, 8);
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
+}
+
+ivec3 grid_idx_for_level_closest(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+    float grid_width = cell_width_for_level_poly(level, LIGHT_CACHE_MAX_LEVEL, LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH, 8);
+    return grid_idx_closest(pos, grid_width);
 }
 
 vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
@@ -20,7 +25,7 @@ vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
     vec4 irr_N = vec4(0);
     float sum_w = 0;
     for (int level = 0; level <= LIGHT_CACHE_MAX_LEVEL; level++) {
-        const ivec3 grid_idx = grid_idx_for_level(level, pos, normal, rng_state);
+        const ivec3 grid_idx = grid_idx_for_level_interpolate(level, pos, normal, rng_state);
         const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
         LightCacheVertex vtx = light_cache[buf_idx];
         if (grid_idx == vtx.grid_idx        // detect conflict
@@ -70,8 +75,8 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
 
     // light_cache[buf_idx].entries[i] = entry;
 
-    for (int level = LIGHT_CACHE_MAX_LEVEL; level >= 0; level--) {
-        const ivec3 grid_idx = grid_idx_for_level(level, pos, normal, rng_state);
+    for (int level = int(round(XorShift32(rng_state) * LIGHT_CACHE_MAX_LEVEL)); level >= 0; level--) {
+        const ivec3 grid_idx = grid_idx_for_level_interpolate(level, pos, normal, rng_state);
         const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
 
         const uint old = atomicExchange(light_cache[buf_idx].lock, params.frame);
@@ -85,12 +90,14 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
             vtx.grid_idx = grid_idx;
             vtx.level = level;
             vtx.irr_N = vec4(0);
+            vtx.avg_frame = 0;
         } else if (vtx.grid_idx == grid_idx && vtx.level == level) {
             
-        } else if (XorShift32(rng_state) < .1) { // < level / vtx.level * .1
+        } else if (XorShift32(rng_state) < level / vtx.level * .1) { // < level / vtx.level * .1
             vtx.grid_idx = grid_idx;
             vtx.level = level;
             vtx.irr_N = vec4(0);
+            vtx.avg_frame = 0;
         } else {
             continue;
         }
