@@ -28,22 +28,17 @@ vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
         const ivec3 grid_idx = grid_idx_for_level_interpolate(level, pos, normal, rng_state);
         const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
         LightCacheVertex vtx = light_cache[buf_idx];
-        if (grid_idx == vtx.grid_idx        // detect conflict
-            && level == vtx.level
-            && !any(isinf(vtx.irr_N))       // make sure information is not damaged
-            && !any(isnan(vtx.irr_N))
-            //&& vtx.avg_frame >= params.frame - 1 // make sure information is somewhat recent
-            //&& vtx.irr_N.a > 4              // make sure information is somewhat trustworthy
-        ) {           
-            float w = 1.;
-            w *= smoothstep(4, LIGHT_CACHE_MAX_N, vtx.irr_N.a);
-            w *= exp(vtx.avg_frame - params.frame);
-            const float a = 100;
-            w *= /*1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level);*/(pow(a, 1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level)) - 1) / (a - 1);
+        
+        float w = 1.;
+        w *= grid_idx == vtx.grid_idx && level == vtx.level && !any(isinf(vtx.irr_N)) && !any(isnan(vtx.irr_N)) ? 1 : 0;
+        w *= smoothstep(4, LIGHT_CACHE_MAX_N, vtx.irr_N.a);
+        w *= exp(vtx.avg_frame - params.frame);
+        const float a = 100;
+        w *= /*1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level);*/(pow(a, 1. - smoothstep(0., LIGHT_CACHE_MAX_LEVEL + 1, level)) - 1) / (a - 1);
 
-            irr_N += w * vtx.irr_N;
-            sum_w += w;
-        }
+        irr_N += w * vtx.irr_N;
+        sum_w += w;
+        
     }
 
     return sum_w > 0 ? irr_N / sum_w : vec4(0);
