@@ -6,12 +6,12 @@
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA .1
 
-ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
     float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 2);
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
-ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, const vec3 normal, inout uint rng_state) {
+ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, inout uint rng_state) {
     float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 8);
     return grid_idx_closest(pos, grid_width);
 }
@@ -63,12 +63,12 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 // }
 
 // return true if a valid state was found
-bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
+bool mc_state_load_resample(out MCState mc_state, const vec3 pos, inout uint rng_state) {
     float score_sum = 0;
     for (int level = 0; level <= MC_MAX_LEVEL; level++) {
         //int level = clamp(int(round(XorShift32(rng_state) * MC_MAX_LEVEL)), 0, MC_MAX_LEVEL);
-        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, normal, rng_state);
-        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
+        const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
         MCVertex vtx = mc_states[buf_idx];
 
         const float candidate_score = vtx.state.sum_w * float(grid_idx == vtx.state.grid_idx && level == vtx.state.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
@@ -99,7 +99,7 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_len = max(mc_state.sum_len, 0);
 }
 
-void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
+void mc_state_save(MCState mc_state, const vec3 pos, inout uint rng_state) {
     // const ivec3 grid_idx = grid_idx_interpolate(pos, MC_GRID_WIDTH, XorShift32(rng_state));
     // const uint buf_idx = hash_grid_normal(grid_idx, normal, MC_BUFFER_SIZE);
     // const uint state_idx = uint(round(XorShift32(rng_state) * (STATES_PER_CELL - 1)));
@@ -109,7 +109,7 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
     
     // update state that was used for sampling
     {
-        const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
+        const uint buf_idx = hash_grid_level(mc_state.grid_idx, mc_state.level, MC_BUFFER_SIZE);
         // const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
         // if (old != params.frame)
             mc_states[buf_idx].state = mc_state;
@@ -120,8 +120,8 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
     float sum = 0;
     for (uint i = 0; i < 5; i++) {
         mc_state.level = int(round(XorShift32(rng_state) * MC_MAX_LEVEL));
-        mc_state.grid_idx = mc_grid_idx_for_level_interpolate(mc_state.level, pos, normal, rng_state);
-        const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
+        mc_state.grid_idx = mc_grid_idx_for_level_interpolate(mc_state.level, pos, rng_state);
+        const uint buf_idx = hash_grid_level(mc_state.grid_idx, mc_state.level, MC_BUFFER_SIZE);
         sum += mc_states[buf_idx].state.sum_w;
         //if (XorShift32(rng_state) < mc_state.sum_w / mc_states[buf_idx].state.sum_w) {
             // const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
@@ -136,7 +136,7 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
 
     // for (int level = MC_MAX_LEVEL; level >= 0; level--) {
     //     const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, normal, rng_state);
-    //     const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+    //     const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
 
     //     const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
     //     if (old == params.frame)
