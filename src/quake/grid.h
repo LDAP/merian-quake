@@ -17,13 +17,12 @@ struct MCState {
     float sum_w;
     uint N;
     float sum_len;
-    float f;
+
+    ivec3 grid_idx;
+    uint level;
 };
 
 struct MCVertex {
-    ivec3 grid_idx;
-    uint level;
-
     float avg_frame;
     uint lock;
 

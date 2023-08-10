@@ -197,6 +197,7 @@ void main() {
                 // EVALUATE BSDF
                 current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal);
 
+                // Multiple importance sampling
                 float mis_w = 1.0;
                 if (mc_valid) {
                     const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
@@ -221,7 +222,6 @@ void main() {
                     // (Use the same as in load())
                     if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / mc_state.sum_w) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
-                        mc_state.f = mc_f;
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
                         mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state); // todo, only last?
                     }
