@@ -65,13 +65,13 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 // return true if a valid state was found
 bool mc_state_load_resample(out MCState mc_state, const vec3 pos, inout uint rng_state) {
     float score_sum = 0;
-    for (int level = 0; level <= MC_MAX_LEVEL; level++) {
-        //int level = clamp(int(round(XorShift32(rng_state) * MC_MAX_LEVEL)), 0, MC_MAX_LEVEL);
+    for (int i = 0; i < 3; i++) {
+        int level = clamp(int(round(XorShift32(rng_state) * MC_MAX_LEVEL)), 0, MC_MAX_LEVEL);
         const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
         const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
         MCVertex vtx = mc_states[buf_idx];
 
-        const float candidate_score = vtx.state.sum_w * float(grid_idx == vtx.state.grid_idx && level == vtx.state.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
+        const float candidate_score = /*(1. - (level + 1) / (ML_MAX_N + 1)) * */ vtx.state.sum_w * float(grid_idx == vtx.state.grid_idx && level == vtx.state.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
 
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {
@@ -118,7 +118,7 @@ void mc_state_save(MCState mc_state, const vec3 pos, inout uint rng_state) {
 
     // resample to coarser level
     float sum = 0;
-    for (uint i = 0; i < 5; i++) {
+    for (uint i = 0; i < 1; i++) {
         mc_state.level = int(round(XorShift32(rng_state) * MC_MAX_LEVEL));
         mc_state.grid_idx = mc_grid_idx_for_level_interpolate(mc_state.level, pos, rng_state);
         const uint buf_idx = hash_grid_level(mc_state.grid_idx, mc_state.level, MC_BUFFER_SIZE);
