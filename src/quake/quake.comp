@@ -245,6 +245,14 @@ void main() {
 
     // show light cache
     //irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
+    
+    // MCState mc_state = mc_state_new();
+    // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
+    // irr_samples = vec4(vec3(mc_state.level / 4.), 1);
+
+    // MCState mc_state = mc_state_new();
+    // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
+    // irr_samples = vec4(vec3(mc_state.sum_w), 1);
 
     {
         // Store albedo and irradiance
