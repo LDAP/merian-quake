@@ -83,6 +83,7 @@ void main() {
     if (any(greaterThanEqual(pixel, resolution)))
         return;
 
+    // HEALTH and ARMOR bar
     if (pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
         // simple health + armor indicators
         float val = 0.0;
@@ -108,7 +109,7 @@ void main() {
     vec4 irr_samples = vec4(0); // store sample count in `a` for accum node
 
     ShadingMaterial first_mat;
-    const vec3 first_wi = get_camera_ray_dir(pixel, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
+    const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
     {
         // Find first surface
         IntersectionInfo info;
@@ -244,7 +245,7 @@ void main() {
     }
 
     // show light cache
-    //irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
+    // irr_samples = vec4(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
     
     // MCState mc_state = mc_state_new();
     // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
