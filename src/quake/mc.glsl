@@ -72,6 +72,7 @@ bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 nor
         MCVertex vtx = mc_states[buf_idx];
 
         const float candidate_score = /*(1. - (level + 1) / (ML_MAX_N + 1)) * */ vtx.state.sum_w * float(grid_idx == vtx.state.grid_idx && level == vtx.state.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
+        //candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - vtx.state.sum_w));
 
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {

@@ -17,8 +17,8 @@
 #include "layout.glsl"
 #include "envmap.glsl"
 #include "shading.glsl"
-#include "mc.glsl"
 #include "light_cache.glsl"
+#include "mc.glsl"
 
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
