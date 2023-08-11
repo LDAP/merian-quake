@@ -137,16 +137,10 @@ void main() {
         if (max_path_length() > 0) {
             irr_samples = vec4(first_mat.emission, 1);
 
-            // MCState mc_state = mc_state_new();
-            // mc_state_load_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
-
             // const float mc_f = yuv_luminance(first_mat.emission);
-
-            // if (XorShift32(rng_state) < mc_f / mc_state.sum_w) {
-            //     mc_state = mc_state_new();
-            //     mc_state_add_sample(mc_state, first_mat.pos, mc_f, first_mat.pos);
-            //     mc_state_save(mc_state, first_mat.pos, first_mat.normal, rng_state);
-            // }
+            // MCState mc_state = mc_state_new();
+            // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
+            // mc_state_save(mc_state, first_mat.pos, first_mat.normal, rng_state);
         }
     }
 
@@ -164,7 +158,7 @@ void main() {
                 // SAMPLE NEXT OUTGOING DIRECTION
                 vec3 wo;
                 MCState mc_state = mc_state_new();
-                bool mc_valid = mc_state_load_resample(mc_state, current_mat.pos, rng_state);
+                bool mc_valid = mc_state_load_resample(mc_state, current_mat.pos, current_mat.normal, rng_state);
                 bool used_vmf = false;
                 float wo_p;
                 if (XorShift32(rng_state) > bsdp_p() && mc_valid) {
@@ -223,7 +217,7 @@ void main() {
                     if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / mc_state.sum_w) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
-                        mc_state_save(mc_state, current_mat.pos, rng_state); // todo, only last?
+                        mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state); // todo, only last?
                     }
 
                     light_cache_update(current_mat.pos, current_mat.normal, emm * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) * mis_w / wo_p, rng_state);
