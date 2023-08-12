@@ -1,13 +1,13 @@
+# Reads a reference image from reference.hdr or uses
+# the mean of all images found in a folder "reference"
+#
+# Compares techniques found as subfolders in "techniques"
+
 from pathlib import Path
 
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
-
-# Reads a reference image from reference.hdr or uses
-# the mean of all images found in a folder "reference"
-#
-# Compares techniques found as subfolders in "techniques"
 
 def imread(path):
     return imageio.v2.imread(path, format="HDR-FI")
