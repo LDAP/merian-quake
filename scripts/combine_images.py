@@ -22,7 +22,7 @@ elif output.endswith(".png"):
     combined = np.clip(combined, 0, 1)
     combined = combined ** (1 / 2.2)
     combined *= 255
-    imageio.imwrite(output, np.rint(combined).Updatastype(np.uint8))
+    imageio.imwrite(output, np.rint(combined).astype(np.uint8))
 else:
     print("output format unknown.")
     exit(1)
