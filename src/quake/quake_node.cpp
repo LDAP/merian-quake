@@ -1106,8 +1106,9 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     if (stop_after_worldspawn >= 0 &&
-        frame - last_worldspawn_frame >= (uint64_t)stop_after_worldspawn) {
+        frame - last_worldspawn_frame == (uint64_t)stop_after_worldspawn) {
         update_gamestate = false;
+        run.request_rebuild();
     }
 
     if (!cur_frame.tlas || !cl.worldmodel) {
