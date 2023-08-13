@@ -10,10 +10,6 @@ project(
     ]
 )
 
-pymod = import('python')
-
-python = pymod.find_installation('python3')
-
 add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
 add_project_arguments('-DMERIAN_QUAKE_RESOURCES="@0@"'.format(join_paths(get_option('prefix'), 'res')), language : 'cpp')
 
