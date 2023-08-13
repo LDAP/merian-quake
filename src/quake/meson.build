@@ -18,12 +18,22 @@ included_files = files(
 )
 
 foreach s : shaders
+  glslc_args = ['-I' + merian_shaders, '-I' + project_source_root + '/src/quake' ,'--target-env', 'vulkan1.3']
+  compile_script = ['python', project_source_root + '/subprojects/merian/scripts/compile_shader.py']
+
+  # Header
   src_files += custom_target(
     s + '.spv.h',
-    input: s,
     output: s + '.spv.h',
-    # -x save binary output as text-based 32-bit hexadecimal numbers, allows #include as header
-    command: [glslc, '-V', '-I' + merian_shaders, '-I' + project_source_root + '/src/quake' ,'--target-env', 'vulkan1.3', '-x', '-o', '@OUTPUT@', '@INPUT@'],
+    command: compile_script + ['--header', s, '@OUTPUT@']
+  )
+
+  # Implementation
+  src_files += custom_target(
+    s + '.spv.c',
+    input: s,
+    output: s + '.spv.c',
+    command: compile_script + ['@INPUT@', '@OUTPUT@'] + glslc_args,
     depend_files: included_files
   )
 endforeach

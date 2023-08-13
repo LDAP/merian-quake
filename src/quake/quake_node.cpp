@@ -16,14 +16,8 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/utils/math.hpp"
-
-static const uint32_t spv[] = {
 #include "quake.comp.spv.h"
-};
-
-static const uint32_t clear_spv[] = {
 #include "clear.comp.spv.h"
-};
 
 struct QuakeData {
     // The first quake node sets this
@@ -726,8 +720,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     init_quake(quakespasm_argc, quakespasm_argv);
 
     // PIPELINE CREATION
-    rt_shader = std::make_shared<merian::ShaderModule>(context, sizeof(spv), spv);
-    clear_shader = std::make_shared<merian::ShaderModule>(context, sizeof(clear_spv), clear_spv);
+    rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(), merian_quake_comp_spv());
+    clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(), merian_clear_comp_spv());
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
