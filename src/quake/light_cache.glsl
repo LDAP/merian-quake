@@ -2,7 +2,7 @@
 #define LIGHT_CACHE_MIN_GRID_WIDTH .01
 #define LIGHT_CACHE_LEVELS 32.
 // Set the target for light cache resolution
-#define LIGHT_CACHE_TAN_ALPHA_HALF 0.005
+#define LIGHT_CACHE_TAN_ALPHA_HALF 0.002
 
 #define LIGHT_CACHE_MAX_N 128
 #define LIGHT_CACHE_MIN_ALPHA .01
