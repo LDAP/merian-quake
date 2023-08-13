@@ -1281,7 +1281,12 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     dynamic_ext.clear();
 
     std::thread particle_viewent([&]() {
-        add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+        if (playermodel == 1) {
+            add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+        } else if (playermodel == 2) {
+            add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+            add_geo(&cl_entities[cl.viewentity], dynamic_vtx, dynamic_idx, dynamic_ext);
+        }
         add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
     });
 
@@ -1460,6 +1465,7 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
             update_gamestate = true;
         }
     }
+    config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
     config.st_separate("Raytrace");
     int spp = pc.rt_config.spp_path_length & 0xf;

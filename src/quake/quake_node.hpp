@@ -316,4 +316,7 @@ class QuakeNode : public merian::Node {
     double mouse_oldy = 0;
     double mouse_x = 0;
     double mouse_y = 0;
+
+    // 0 None, 1 Gun, 2 Full
+    int playermodel = 1;
 };
