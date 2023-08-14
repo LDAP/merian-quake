@@ -80,5 +80,5 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
 
     light_cache[buf_idx] = vtx;
 
-    atomicExchange(light_cache[buf_idx].lock, 0);
+    light_cache[buf_idx].lock = 0;
 }
