@@ -32,11 +32,7 @@ struct MCVertex {
 #define LIGHT_CACHE_BUFFER_SIZE 4000000
 
 struct LightCacheVertex {
-    ivec3 grid_idx;
-    uint level;
-
+    uint hash; // grid_idx and level
     uint lock;
-
     vec4 irr_N;
-    //vec3 n;
 };

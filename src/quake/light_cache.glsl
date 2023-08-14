@@ -7,7 +7,6 @@
 #define LIGHT_CACHE_MAX_N 128
 #define LIGHT_CACHE_MIN_ALPHA .01
 
-
 uint lc_level_for_pos(const vec3 pos, inout uint rng_state) {
     const float target_grid_width = clamp(2 * LIGHT_CACHE_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH);
     const float level = LIGHT_CACHE_LEVELS * pow((target_grid_width - LIGHT_CACHE_MIN_GRID_WIDTH) / (LIGHT_CACHE_MAX_GRID_WIDTH - LIGHT_CACHE_MIN_GRID_WIDTH), 1 / 9.);
@@ -37,8 +36,7 @@ vec4 light_cache_get_level(const uint level, const vec3 pos, const vec3 normal, 
     const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
     const LightCacheVertex vtx = light_cache[buf_idx];
 
-    if (grid_idx == vtx.grid_idx
-        && level == vtx.level
+    if (vtx.hash == hash_level(grid_idx, level)
         && !any(isinf(vtx.irr_N))
         && !any(isnan(vtx.irr_N))) {
         return vtx.irr_N;
@@ -68,15 +66,13 @@ void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout
 
     LightCacheVertex vtx = light_cache[buf_idx];
 
-    if (grid_idx != vtx.grid_idx
-        || level != vtx.level
+    if (vtx.hash != hash_level(grid_idx, level)
         || any(isinf(vtx.irr_N))
         || any(isnan(vtx.irr_N))) {
 
         // attempt to get from coarser level
         vtx.irr_N = light_cache_get_level(level + 1, pos, normal, rng_state);
-        vtx.grid_idx = grid_idx;
-        vtx.level = level;
+        vtx.hash = hash_level(grid_idx, level);
     }
 
     vtx.irr_N.a = min(vtx.irr_N.a + 1, LIGHT_CACHE_MAX_N);
