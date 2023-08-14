@@ -10,7 +10,7 @@ using vec4 = glm::vec4;
 
 #endif
 
-#define MC_BUFFER_SIZE 40000000
+#define MC_BUFFER_SIZE 4000000
 
 struct MCState {
     vec3 sum_tgt;

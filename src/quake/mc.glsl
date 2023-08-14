@@ -1,19 +1,27 @@
-#define MC_MAX_GRID_WIDTH 25
+#define MC_MAX_GRID_WIDTH 100
 #define MC_MIN_GRID_WIDTH .1
-#define MC_MAX_LEVEL 4
+#define MC_LEVELS 5
+// Set the target for light cache resolution
+#define MC_TAN_ALPHA_HALF 0.005
 
 // Configure ML
-#define ML_MAX_N 1024
-#define ML_MIN_ALPHA .1
+#define ML_MAX_N 128
+#define ML_MIN_ALPHA .01
 
-ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
-    float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 2);
-    return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
+uint mc_level_for_pos(const vec3 pos, inout uint rng_state) {
+    const float target_grid_width = clamp(2 * MC_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH);
+    const float level = MC_LEVELS * pow((target_grid_width - MC_MIN_GRID_WIDTH) / (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH), 1 / 9.);
+    return uint(round(level));
 }
 
 ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, inout uint rng_state) {
-    float grid_width = cell_width_for_level_poly(level, MC_MAX_LEVEL, MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH, 8);
+    const float grid_width = pow(level / float(MC_LEVELS), 9.) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
     return grid_idx_closest(pos, grid_width);
+}
+
+ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
+    const float grid_width = pow(level / float(MC_LEVELS), 9.) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
+    return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
 MCState mc_state_new() {
@@ -65,8 +73,9 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 // return true if a valid state was found
 bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float score_sum = 0;
-    for (int i = 0; i < 3; i++) {
-        int level = clamp(int(round(XorShift32(rng_state) * MC_MAX_LEVEL)), 0, MC_MAX_LEVEL);
+    for (int i = 0; i < 5; i++) {
+        const float rand = XorShift32(rng_state);
+        uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
         const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
         const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
         MCVertex vtx = mc_states[buf_idx];
@@ -119,7 +128,8 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
 
     // update other levels
     for (uint i = 0; i < 1; i++) {
-        mc_state.level = int(round(XorShift32(rng_state) * MC_MAX_LEVEL));
+        const float rand = XorShift32(rng_state);
+        mc_state.level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
         mc_state.grid_idx = mc_grid_idx_for_level_interpolate(mc_state.level, pos, rng_state);
         const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
 
