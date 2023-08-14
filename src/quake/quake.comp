@@ -136,14 +136,13 @@ void main() {
             // Since irradiance is blurred set it to 1 and keep detail in albedo texture
             albedo = first_mat.emission;
         }
-
         imageStore(img_albedo, pixel, vec4(albedo, 1));
     }
 
     {
         // Evaluate direct light
         if (max_path_length() > 0) {
-            irr_samples = first_mat.emission;
+            irr_samples = first_mat.emission / (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1));
             float l = yuv_luminance(irr_samples);
             moments += vec2(l, l * l);
 
@@ -242,6 +241,7 @@ void main() {
                 current_mat = next_mat;
             }
 
+            // Albdeo demodulation
             const vec3 contrib = f / (p * (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1)));
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
                 irr_samples += contrib * (1.0 / spp());
