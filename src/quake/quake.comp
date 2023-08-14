@@ -106,7 +106,8 @@ void main() {
     }
 
     uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
-    vec4 irr_samples = vec4(0); // store sample count in `a` for accum node
+    vec2 moments = vec2(0);
+    vec3 irr_samples = vec3(0); // store sample count in `a` for accum node
 
     ShadingMaterial first_mat;
     const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
@@ -120,11 +121,6 @@ void main() {
     }
 
     {
-        // Store GBuffer
-        imageStore(img_gbuf, pixel, vec4(first_mat.normal, distance(params.cam_x.xyz, first_mat.pos)));
-    }
-
-    {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
         // Should compensate pixel filter..
@@ -132,10 +128,24 @@ void main() {
         imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 
+    vec3 albedo = first_mat.albedo.rgb;
+    {
+        // Store albedo and irradiance
+        if (any(greaterThan(first_mat.emission, vec3(0)))) {
+            // Required for albedo demodulation
+            // Since irradiance is blurred set it to 1 and keep detail in albedo texture
+            albedo = first_mat.emission;
+        }
+
+        imageStore(img_albedo, pixel, vec4(albedo, 1));
+    }
+
     {
         // Evaluate direct light
         if (max_path_length() > 0) {
-            irr_samples = vec4(first_mat.emission, 1);
+            irr_samples = first_mat.emission;
+            float l = yuv_luminance(irr_samples);
+            moments += vec2(l, l * l);
 
             // const float mc_f = yuv_luminance(first_mat.emission);
             // MCState mc_state = mc_state_new();
@@ -232,9 +242,12 @@ void main() {
                 current_mat = next_mat;
             }
 
-            const vec4 contrib = vec4((1.0 / spp()) * (f / p), 1);
-            if(!any(isinf(contrib)) && !any(isnan(contrib)))
-                irr_samples += contrib;
+            const vec3 contrib = f / (p * (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1)));
+            if(!any(isinf(contrib)) && !any(isnan(contrib))) {
+                irr_samples += contrib * (1.0 / spp());
+                float l = yuv_luminance(contrib);
+                moments += vec2(l, l * l) * (1.0 / spp());
+            }
         }
     }
 
@@ -250,19 +263,12 @@ void main() {
     // irr_samples = vec4(vec3(mc_state.sum_w), 1);
 
     {
-        // Store albedo and irradiance
-        vec3 albedo = first_mat.albedo.rgb;
-        if (any(greaterThan(first_mat.emission, vec3(0)))) {
-            // Required for albedo demodulation
-            // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-            albedo = first_mat.emission;
-        }
-        if (all(greaterThan(albedo, vec3(1e-7)))) {
-            irr_samples /= vec4(albedo, 1);
-        }
+        // Store irradiance
+        imageStore(img_irradiance, pixel, vec4(irr_samples, spp()));
 
-        imageStore(img_albedo, pixel, vec4(albedo, 1));
-        imageStore(img_irradiance, pixel, irr_samples);
+        // Store GBuffer
+        float l = yuv_luminance(irr_samples.rgb);
+        imageStore(img_gbuf, pixel, vec4(geo_encode_normal_float(first_mat.normal), distance(params.cam_x.xyz, first_mat.pos), moments));
     }
 
     // vec4 l = light_cache_get(first_mat.pos, first_mat.normal, rng_state);
