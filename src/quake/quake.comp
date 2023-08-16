@@ -129,18 +129,10 @@ void main() {
         imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 
-    // Required for albedo demodulation
-    // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-    vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-    {
-        // Store albedo
-        imageStore(img_albedo, pixel, vec4(albedo, 1));
-    }
-
     {
         // Evaluate direct light
         if (MAX_PATH_LENGTH > 0) {
-            irr_samples = first_mat.emission / (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1));
+            irr_samples = first_mat.emission;
             float l = yuv_luminance(irr_samples);
             moments += vec2(l, l * l);
 
@@ -240,7 +232,7 @@ void main() {
             }
 
             // Albdeo demodulation
-            const vec3 contrib = f / (p * (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1)));
+            const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
                 irr_samples += contrib * (1.0 / SPP);
                 float l = yuv_luminance(contrib);
@@ -253,14 +245,24 @@ void main() {
     // irr_samples = vec3(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
     
     // MCState mc_state = mc_state_new();
-    // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
-    // irr_samples = vec4(vec3(mc_state.level / 4.), 1);
+    // mc_state_load_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
+    // irr_samples = vec3(mc_state.level / float(MC_LEVELS));
 
     // MCState mc_state = mc_state_new();
-    // mc_state_load_resample(mc_state, first_mat.pos, rng_state);
-    // irr_samples = vec4(vec3(mc_state.sum_w), 1);
+    // mc_state_load_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
+    // irr_samples = vec3(mc_state.sum_w);
 
     {
+        // Required for albedo demodulation
+        // Since irradiance is blurred set it to 1 and keep detail in albedo texture
+        vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
+        imageStore(img_albedo, pixel, vec4(albedo, 1));
+        albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
+
+        irr_samples /= albedo;
+        float alb_l = yuv_luminance(albedo);
+        moments /= vec2(alb_l, alb_l * alb_l);
+
         // Store irradiance
         imageStore(img_irradiance, pixel, vec4(irr_samples, SPP));
 
