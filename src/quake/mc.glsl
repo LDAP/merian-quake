@@ -64,6 +64,7 @@ MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
 // return true if a valid state was found
 bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float score_sum = 0;
+    [[unroll]]
     for (int i = 0; i < 5; i++) {
         MCState state = mc_state_load(pos, normal, rng_state);
         const float candidate_score = state.sum_w;
@@ -107,6 +108,7 @@ void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout
     }
 
     // update other levels
+    [[unroll]]
     for (uint i = 0; i < 1; i++) {
         const float rand = XorShift32(rng_state);
         mc_state.level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
