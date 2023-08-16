@@ -12,7 +12,7 @@
 			"request": "launch",
 			"name": "Debug Merian",
 			"program": "${folder}/build/merian-quake",
-			"args": [],
+			"args": ["-basedir", "/home/lucas/repos/Semester_12/master_thesis/quake-basedir"],
 			"cwd": "${folder}",
 			"pre_debug_task": "Meson Compile"
 		},
