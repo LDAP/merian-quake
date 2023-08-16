@@ -50,23 +50,31 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
+MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const float rand = XorShift32(rng_state);
+    uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
+    const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
+    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+
+    MCState state = mc_states[buf_idx].state;
+    state.sum_w *= float(grid_idx == state.grid_idx && level == state.level);
+    return state;
+}
+
 // return true if a valid state was found
 bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     float score_sum = 0;
     for (int i = 0; i < 5; i++) {
-        const float rand = XorShift32(rng_state);
-        uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
-        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
-        MCVertex vtx = mc_states[buf_idx];
-
-        const float candidate_score = /*(1. - (level + 1) / (ML_MAX_N + 1)) * */ vtx.state.sum_w * float(grid_idx == vtx.state.grid_idx && level == vtx.state.level);  // * smoothstep(0.8, 1.0, dot(vtx.normal, normal))
-        //candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - vtx.state.sum_w));
+        MCState state = mc_state_load(pos, normal, rng_state);
+        const float candidate_score = state.sum_w;
+        // candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - state.sum_w));
+        // candidate_score *= (1. - (level + 1) / (ML_MAX_N + 1));
+        // candidate_score *= max(dot(state.normal, normal), 0.);
 
         score_sum += candidate_score;
         if (XorShift32(rng_state) < candidate_score / score_sum) {
             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
-            mc_state = vtx.state;
+            mc_state = state;
         }
     }
 
@@ -96,7 +104,6 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
         // const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
         // if (old != params.frame)
             mc_states[buf_idx].state = mc_state;
-            mc_states[buf_idx].avg_frame = mix(mc_states[buf_idx].avg_frame, params.frame, .5);
     }
 
     // update other levels
@@ -107,7 +114,6 @@ void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout ui
         const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
 
         mc_states[buf_idx].state = mc_state;
-        mc_states[buf_idx].avg_frame = mix(mc_states[buf_idx].avg_frame, params.frame, .5);
     }
 }
 

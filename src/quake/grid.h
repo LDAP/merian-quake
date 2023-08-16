@@ -23,9 +23,6 @@ struct MCState {
 };
 
 struct MCVertex {
-    float avg_frame;
-    uint lock;
-
     MCState state;
 };
 
