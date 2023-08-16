@@ -52,7 +52,7 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 
 MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
     const float rand = XorShift32(rng_state);
-    uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
+    const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
     const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
     const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
 
@@ -97,7 +97,7 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_len = max(mc_state.sum_len, 0);
 }
 
-void mc_state_save(MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
+void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     // update state that was used for sampling
     {
         const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);

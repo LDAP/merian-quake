@@ -46,12 +46,8 @@ vec4 light_cache_get_level(const uint level, const vec3 pos, const vec3 normal, 
 }
 
 vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
-    {
-        const uint level = lc_level_for_pos(pos, rng_state);
-        return light_cache_get_level(level, pos, normal, rng_state);
-    }
-
-    return vec4(0);
+    const uint level = lc_level_for_pos(pos, rng_state);
+    return light_cache_get_level(level, pos, normal, rng_state);
 }
 
 void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout uint rng_state) {
