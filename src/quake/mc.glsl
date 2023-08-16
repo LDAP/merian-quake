@@ -2,7 +2,7 @@
 #define MC_MIN_GRID_WIDTH .1
 #define MC_LEVELS 5
 // Set the target for light cache resolution
-#define MC_TAN_ALPHA_HALF 0.005
+#define MC_TAN_ALPHA_HALF 0.002
 
 // Configure ML
 #define ML_MAX_N 128
