@@ -6,6 +6,10 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
+layout (constant_id = 2) const int SPP = 1;
+layout (constant_id = 3) const int MAX_PATH_LENGTH = 3;
+layout (constant_id = 4) const int USE_LIGHT_CACHE_TAIL = 0;
+
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x;
     vec4 cam_w;
@@ -23,8 +27,6 @@ layout(push_constant) uniform PushConstant {
 } params;
 
 uint rt_flags()        { return params.rt_config & 0xff; }
-uint spp()             { return (params.rt_config >> 8)  & 0xf; }
-uint max_path_length() { return (params.rt_config >> 12)  & 0xf; }
 float bsdp_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
 float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 

@@ -23,9 +23,6 @@ extern "C" {
 
 class QuakeNode : public merian::Node {
   public:
-    // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
-    static constexpr uint32_t local_size_x = 8;
-    static constexpr uint32_t local_size_y = 8;
 
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
@@ -62,7 +59,7 @@ class QuakeNode : public merian::Node {
 
     struct RTConfig {
         unsigned char flags = 0;
-        unsigned char spp_path_length = 4 + (2 << 4);
+        unsigned char unused;
         unsigned char bsdp_p = static_cast<unsigned char>(0.1 * 255);
         unsigned char ml_prior = static_cast<unsigned char>(0.01 * 255);
     };
@@ -188,7 +185,7 @@ class QuakeNode : public merian::Node {
         pending_commands.push(command);
     }
 
-    void get_configuration(merian::Configuration& config) override;
+    void get_configuration(merian::Configuration& config, bool& needs_rebuild) override;
 
   private:
     // Attemps to reuse the supplied old_geo (by update, buffer reuse).
@@ -319,4 +316,12 @@ class QuakeNode : public merian::Node {
 
     // 0 None, 1 Gun, 2 Full
     int playermodel = 1;
+
+    // Spec constants
+    // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
+    static constexpr uint32_t local_size_x = 8;
+    static constexpr uint32_t local_size_y = 8;
+    int32_t spp = 1;
+    int32_t max_path_length = 3;
+    int32_t use_light_cache_tail = 0;
 };

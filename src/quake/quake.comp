@@ -141,7 +141,7 @@ void main() {
 
     {
         // Evaluate direct light
-        if (max_path_length() > 0) {
+        if (MAX_PATH_LENGTH > 0) {
             irr_samples = first_mat.emission / (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1));
             float l = yuv_luminance(irr_samples);
             moments += vec2(l, l * l);
@@ -156,14 +156,14 @@ void main() {
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
         if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
-        for (int s = 0; s < spp(); s++) {
+        for (int s = 0; s < SPP; s++) {
             vec3 wi = first_wi;
             ShadingMaterial current_mat = first_mat;
             vec3 current_albedo = vec3(1);
             vec3 f = vec3(0);
             float p = 1;
 
-            for (int segment = 1; segment < max_path_length(); segment++) {
+            for (int segment = 1; segment < MAX_PATH_LENGTH; segment++) {
                 // SAMPLE NEXT OUTGOING DIRECTION
                 vec3 wo;
                 MCState mc_state = mc_state_new();
@@ -207,8 +207,8 @@ void main() {
                     mis_w = wo_p / (vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p()) + bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p());
                 }
 
-                if ((rt_flags() & RT_FLAG_LIGHT_CACHE_TAIL) > 0) {
-                    const vec3 incident = segment == max_path_length() - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
+                if (USE_LIGHT_CACHE_TAIL != 0) {
+                    const vec3 incident = segment == MAX_PATH_LENGTH - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
                     f = current_albedo * incident * mis_w;
                 } else {
                     f = current_albedo * next_mat.emission * mis_w;
@@ -244,9 +244,9 @@ void main() {
             // Albdeo demodulation
             const vec3 contrib = f / (p * (all(greaterThan(albedo, vec3(1e-7))) ? albedo : vec3(1)));
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr_samples += contrib * (1.0 / spp());
+                irr_samples += contrib * (1.0 / SPP);
                 float l = yuv_luminance(contrib);
-                moments += vec2(l, l * l) * (1.0 / spp());
+                moments += vec2(l, l * l) * (1.0 / SPP);
             }
         }
     }
@@ -264,7 +264,7 @@ void main() {
 
     {
         // Store irradiance
-        imageStore(img_irradiance, pixel, vec4(irr_samples, spp()));
+        imageStore(img_irradiance, pixel, vec4(irr_samples, SPP));
 
         // Store GBuffer
         float l = yuv_luminance(irr_samples.rgb);

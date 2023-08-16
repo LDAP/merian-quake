@@ -38,6 +38,4 @@
 
 // RT FLAGS
 
-#define RT_FLAG_LIGHT_CACHE_TAIL 1
-
 #endif

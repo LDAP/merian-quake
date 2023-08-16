@@ -1,4 +1,5 @@
 #include "quake/quake_node.hpp"
+#include "clear.comp.spv.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "grid.h"
 #include "merian/utils/bitpacking.hpp"
@@ -17,7 +18,6 @@
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/utils/math.hpp"
 #include "quake.comp.spv.h"
-#include "clear.comp.spv.h"
 
 struct QuakeData {
     // The first quake node sets this
@@ -720,8 +720,10 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     init_quake(quakespasm_argc, quakespasm_argv);
 
     // PIPELINE CREATION
-    rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(), merian_quake_comp_spv());
-    clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(), merian_clear_comp_spv());
+    rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(),
+                                                       merian_quake_comp_spv());
+    clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(),
+                                                          merian_clear_comp_spv());
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -989,14 +991,15 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
         merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
                                            image_outputs, buffer_outputs, graph_desc_set_layout);
-    if (!pipe) {
+    {
         auto pipe_layout = merian::PipelineLayoutBuilder(context)
                                .add_descriptor_set_layout(graph_desc_set_layout)
                                .add_descriptor_set_layout(quake_desc_set_layout)
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
         auto spec_builder = merian::SpecializationInfoBuilder();
-        spec_builder.add_entry(local_size_x, local_size_y);
+        spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
+                               use_light_cache_tail);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1441,7 +1444,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
     }
 }
 
-void QuakeNode::get_configuration(merian::Configuration& config) {
+void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_rebuild) {
     config.st_separate("General");
     bool old_sound = sound;
     config.config_bool("sound", sound);
@@ -1462,22 +1465,24 @@ void QuakeNode::get_configuration(merian::Configuration& config) {
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
     config.st_separate("Raytrace");
-    int spp = pc.rt_config.spp_path_length & 0xf;
-    int path_lenght = (pc.rt_config.spp_path_length) >> 4 & 0xf;
+    const int32_t old_spp = spp;
+    const int32_t old_max_path_lenght = max_path_length;
+    const int32_t old_use_light_cache_tail = use_light_cache_tail;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
-    bool light_cache_tail = pc.rt_config.flags & RT_FLAG_LIGHT_CACHE_TAIL;
     config.config_int("spp", spp, 0, 15, "samples per pixel");
-    config.config_int("max path length", path_lenght, 0, 15, "maximum path length");
+    config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
     config.config_percent("BDSF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
-    config.config_bool("light cache tail", light_cache_tail, "use the light cache for the path tail");
-    pc.rt_config.spp_path_length = spp;
-    pc.rt_config.spp_path_length |= path_lenght << 4;
+    config.config_bool("light cache tail", use_light_cache_tail,
+                       "use the light cache for the path tail");
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
     pc.rt_config.flags = 0;
-    pc.rt_config.flags |= light_cache_tail ? RT_FLAG_LIGHT_CACHE_TAIL : 0;
+
+    if (old_spp != spp || old_max_path_lenght != max_path_length || old_use_light_cache_tail != use_light_cache_tail) {
+        needs_rebuild = true;
+    }
 
     config.st_separate("Reproducibility");
     config.config_int("stop and rebuild after worldspawn", stop_after_worldspawn,
