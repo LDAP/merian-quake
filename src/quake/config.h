@@ -36,6 +36,8 @@
 #define PLAYER_FLAGS_TORCH 1
 #define PLAYER_FLAGS_UNDERWATER 2
 
-// RT FLAGS
+// MC config
+#define MC_SAMPLES 5
+
 
 #endif

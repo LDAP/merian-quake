@@ -151,25 +151,52 @@ void main() {
             ShadingMaterial current_mat = first_mat;
             vec3 current_albedo = vec3(1);
             vec3 f = vec3(0);
-            float p = 1;
+            float p = 1.0;
 
             for (int segment = 1; segment < MAX_PATH_LENGTH; segment++) {
-                // SAMPLE NEXT OUTGOING DIRECTION
                 vec3 wo;
-                MCState mc_state = mc_state_new();
-                bool mc_valid = mc_state_load_resample(mc_state, current_mat.pos, current_mat.normal, rng_state);
-                bool used_vmf = false;
                 float wo_p;
-                if (XorShift32(rng_state) > bsdp_p() && mc_valid) {
-                    // VMF Sampling
-                    const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
-                    wo = vmf_sample(vmf.xyz, vmf.w, XorShift32Vec2(rng_state));
-                    wo_p = vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1.0 - bsdp_p());
-                    used_vmf = true;
-                } else {
-                    // BSDF Sampling
-                    wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                    wo_p = bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * (mc_valid ? bsdp_p() : 1.0);
+                MCState mc_state = mc_state_new();
+                // SAMPLE NEXT OUTGOING DIRECTION
+                {
+                    float scores[MC_SAMPLES];
+                    vec4 vmfs[MC_SAMPLES];
+
+                    float score_sum = 0;
+                    {
+                        [[unroll]]
+                        for (int i = 0; i < MC_SAMPLES; i++) {
+                            MCState state = mc_state_load(current_mat.pos, current_mat.normal, rng_state);
+                            scores[i] = state.sum_w;
+                            // candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - state.sum_w));
+                            // candidate_score *= (1. - (level + 1) / (ML_MAX_N + 1));
+                            // candidate_score *= max(dot(state.normal, normal), 0.);
+
+                            score_sum += scores[i];
+                            vmfs[i] = mc_state_get_vmf(state, current_mat.pos);
+                            if (XorShift32(rng_state) < scores[i] / score_sum) {
+                                // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
+                                mc_state = state;
+                                wo = vmf_sample(vmfs[i].xyz, vmfs[i].w, XorShift32Vec2(rng_state));
+                            }
+                        }
+                    }
+
+                    if (XorShift32(rng_state) > bsdp_p() && score_sum > 0) {
+                        // VMF Sampling
+                    } else {
+                        // BSDF Sampling
+                        wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
+                        mc_state = mc_state_new();
+                    }
+
+                    // Multiple importance sampling
+                    wo_p = bsdp_p() * bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
+                    for (int i = 0; i < MC_SAMPLES; i++) {
+                        wo_p += (1 - bsdp_p()) * (scores[i] > 0 ?
+                                                  scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum
+                                                  : bsdf_diffuse_pdf() * dot(wo, current_mat.normal));
+                    }
                 }
 
                 // ray is below geometric surface
@@ -190,27 +217,18 @@ void main() {
                 // EVALUATE BSDF
                 current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal);
 
-                // Multiple importance sampling
-                float mis_w = 1.0;
-                if (mc_valid) {
-                    const vec4 vmf = mc_state_get_vmf(mc_state, current_mat.pos);
-                    mis_w = wo_p / (vmf_pdf(vmf.w, dot(wo, vmf.xyz)) * (1 - bsdp_p()) + bsdf_diffuse_pdf() * dot(wo, current_mat.normal) * bsdp_p());
-                }
-
                 if (USE_LIGHT_CACHE_TAIL != 0) {
                     const vec3 incident = segment == MAX_PATH_LENGTH - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
-                    f = current_albedo * incident * mis_w;
+                    f = current_albedo * incident;
                 } else {
-                    f = current_albedo * next_mat.emission * mis_w;
+                    f = current_albedo * next_mat.emission;
                 }
                 p *= wo_p;
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    if (!used_vmf) mc_state = mc_state_new();
-
                     const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
-                    const float mc_f = yuv_luminance(emm * bsdf_diffuse_eval(current_mat.albedo.rgb)) * dot(wo, current_mat.normal) * mis_w / wo_p;
+                    const float mc_f = yuv_luminance(emm * bsdf_diffuse_eval(current_mat.albedo.rgb)) * dot(wo, current_mat.normal) / wo_p;
                     // Using sum_w here instead of f fixes indirect lighting but slows down adaption.
                     // (Use the same as in load())
                     if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / mc_state.sum_w) {
@@ -219,16 +237,18 @@ void main() {
                         mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state); // todo, only last?
                     }
 
-                    light_cache_update(current_mat.pos, current_mat.normal, emm * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) * mis_w / wo_p, rng_state);
+                    light_cache_update(current_mat.pos, current_mat.normal, emm * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) / wo_p, rng_state);
                 }
 
                 // PREPARE NEXT ITERATION
-                // we stop if we won't transport any more light or if we found emissive material
-                if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
+                {
+                    // we stop if we won't transport any more light or if we found emissive material
+                    if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                     break;
 
-                wi = wo;
-                current_mat = next_mat;
+                    wi = wo;
+                    current_mat = next_mat;
+                }
             }
 
             // Albdeo demodulation
