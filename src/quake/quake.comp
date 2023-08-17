@@ -155,8 +155,8 @@ void main() {
 
             for (int segment = 1; segment < MAX_PATH_LENGTH; segment++) {
                 vec3 wo;
-                float wo_p;
-                MCState mc_state = mc_state_new();
+                float wo_p = 0;
+                MCState mc_state;
                 // SAMPLE NEXT OUTGOING DIRECTION
                 {
                     float scores[MC_SAMPLES];
@@ -182,24 +182,19 @@ void main() {
                         }
                     }
 
-                    if (XorShift32(rng_state) > bsdp_p() && score_sum > 0) {
-                        // VMF Sampling
-                        // wo = set above
-                    } else {
+                    if (XorShift32(rng_state) < bsdf_p() || score_sum == 0) {
                         // BSDF Sampling
                         wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
                         mc_state = mc_state_new();
-                    }
+                    } // else {VMF Sampling // wo = set above }
 
                     // Multiple importance sampling
-                    wo_p = bsdp_p() * bsdf_diffuse_pdf() * dot(wo, current_mat.normal);
                     for (int i = 0; i < MC_SAMPLES; i++) {
-                        wo_p += (1 - bsdp_p()) * (scores[i] > 0 ?
-                                                  scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum
-                                                  : 0);
-                                                  // this is wrong:
-                                                  //: bsdf_diffuse_pdf() * dot(wo, current_mat.normal));
+                        // score_sum > 0 ? results in black artifacts
+                        wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum
+                                               : 0);
                     }
+                    wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_diffuse_pdf() * dot(wo, current_mat.normal) + (1 - bsdf_p()) * wo_p;
                 }
 
                 // ray is below geometric surface

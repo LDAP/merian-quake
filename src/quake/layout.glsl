@@ -27,7 +27,7 @@ layout(push_constant) uniform PushConstant {
 } params;
 
 uint rt_flags()        { return params.rt_config & 0xff; }
-float bsdp_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
+float bsdf_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
 float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 
 

@@ -5,7 +5,7 @@
 #define MC_TAN_ALPHA_HALF 0.002
 
 // Configure ML
-#define ML_MAX_N 128
+#define ML_MAX_N 1024
 #define ML_MIN_ALPHA .01
 
 uint mc_level_for_pos(const vec3 pos, inout uint rng_state) {
