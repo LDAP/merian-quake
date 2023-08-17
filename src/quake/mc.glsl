@@ -1,5 +1,6 @@
 #define MC_MAX_GRID_WIDTH 100
 #define MC_MIN_GRID_WIDTH .1
+#define MC_GRID_POWER 9.
 #define MC_LEVELS 5
 // Set the target for light cache resolution
 #define MC_TAN_ALPHA_HALF 0.002
@@ -10,17 +11,17 @@
 
 uint mc_level_for_pos(const vec3 pos, inout uint rng_state) {
     const float target_grid_width = clamp(2 * MC_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH);
-    const float level = MC_LEVELS * pow((target_grid_width - MC_MIN_GRID_WIDTH) / (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH), 1 / 9.);
+    const float level = MC_LEVELS * pow((target_grid_width - MC_MIN_GRID_WIDTH) / (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH), 1 / MC_GRID_POWER);
     return uint(round(level));
 }
 
 ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, inout uint rng_state) {
-    const float grid_width = pow(level / float(MC_LEVELS), 9.) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
+    const float grid_width = pow(level / float(MC_LEVELS), MC_GRID_POWER) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
     return grid_idx_closest(pos, grid_width);
 }
 
 ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
-    const float grid_width = pow(level / float(MC_LEVELS), 9.) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
+    const float grid_width = pow(level / float(MC_LEVELS), MC_GRID_POWER) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
