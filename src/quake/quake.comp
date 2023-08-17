@@ -168,9 +168,9 @@ void main() {
                         for (int i = 0; i < MC_SAMPLES; i++) {
                             MCState state = mc_state_load(current_mat.pos, current_mat.normal, rng_state);
                             scores[i] = state.sum_w;
-                            // candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - state.sum_w));
-                            // candidate_score *= (1. - (level + 1) / (ML_MAX_N + 1));
-                            // candidate_score *= max(dot(state.normal, normal), 0.);
+                            // scores[i] *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - state.sum_w));
+                            // scores[i] *= (1. - (level + 1) / (ML_MAX_N + 1));
+                            // scores[i] *= max(dot(state.normal, normal), 0.);
 
                             score_sum += scores[i];
                             vmfs[i] = mc_state_get_vmf(state, current_mat.pos);
@@ -184,6 +184,7 @@ void main() {
 
                     if (XorShift32(rng_state) > bsdp_p() && score_sum > 0) {
                         // VMF Sampling
+                        // wo = set above
                     } else {
                         // BSDF Sampling
                         wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
@@ -195,7 +196,9 @@ void main() {
                     for (int i = 0; i < MC_SAMPLES; i++) {
                         wo_p += (1 - bsdp_p()) * (scores[i] > 0 ?
                                                   scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum
-                                                  : bsdf_diffuse_pdf() * dot(wo, current_mat.normal));
+                                                  : 0);
+                                                  // this is wrong:
+                                                  //: bsdf_diffuse_pdf() * dot(wo, current_mat.normal));
                     }
                 }
 
