@@ -65,7 +65,8 @@ int main(const int argc, const char** argv) {
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
     auto black = std::make_shared<merian::ColorOutputNode>(vk::Format::eR16G16B16A16Sfloat,
                                                            vk::Extent3D{1920, 1080, 1});
-    auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size(), argc - 1, argv + 1);
+    auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size(),
+                                             argc - 1, argv + 1);
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
@@ -111,13 +112,6 @@ int main(const int argc, const char** argv) {
 
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-    // quake->queue_command("game SlayerTest");
-    // quake->queue_command("map st1m1");
-    quake->queue_command("game ad");
-    quake->queue_command("map ad_azad");
-    // quake->queue_command("map ad_tears");
-    //  quake->queue_command("map e1m6");
-    //  quake->queue_command("map e1m1");
     merian::GLFWImGui imgui(context, true);
     merian::Profiler::Report report;
     bool clear_profiler = false;

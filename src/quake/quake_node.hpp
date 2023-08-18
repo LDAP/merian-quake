@@ -273,6 +273,8 @@ class QuakeNode : public merian::Node {
     std::vector<FrameData> frames;
     uint64_t frame = 0;
 
+    std::array<char, 512> startup_commands_buffer = {0};
+
     FrameData& current_frame() {
         assert(frames.size());
         return frames[frame % frames.size()];

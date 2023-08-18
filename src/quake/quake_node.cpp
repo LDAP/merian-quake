@@ -1454,7 +1454,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         audio_device->pause_audio();
     config.st_no_space();
     config.config_bool("gamestate update", update_gamestate);
-    std::vector<char> cmd_buffer(128);
+    update_gamestate |= frame == 0;
+
+    std::array<char, 128> cmd_buffer = {0};
     if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true)) {
         queue_command(cmd_buffer.data());
         if (!update_gamestate) {
@@ -1462,6 +1464,16 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
             update_gamestate = true;
         }
     }
+    bool changed = config.config_text_multiline(
+        "startup commands", startup_commands_buffer.size(), startup_commands_buffer.data(), false,
+        "multiple commands separated by newline, lines starting with # are ignored");
+    if (changed && frame == 0) {
+        merian::split(startup_commands_buffer.data(), "\n", [&](const std::string& cmd) {
+            if (!cmd.starts_with("#"))
+                queue_command(cmd);
+        });
+    }
+
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
     config.st_separate("Raytrace");
@@ -1480,7 +1492,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
     pc.rt_config.flags = 0;
 
-    if (old_spp != spp || old_max_path_lenght != max_path_length || old_use_light_cache_tail != use_light_cache_tail) {
+    if (old_spp != spp || old_max_path_lenght != max_path_length ||
+        old_use_light_cache_tail != use_light_cache_tail) {
         needs_rebuild = true;
     }
 

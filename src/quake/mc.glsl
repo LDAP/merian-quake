@@ -93,10 +93,7 @@ void mc_state_add_sample(inout MCState mc_state,
 
     mc_state.sum_w   = mix(mc_state.sum_w,   w,          alpha);
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * target, alpha);
-    // is this the same?
-    mc_state.sum_len = mix(mc_state.sum_len, w * dot(normalize(target - pos), mc_state_dir(mc_state, pos)), alpha);
-
-    mc_state.sum_len = max(mc_state.sum_len, 0);
+    mc_state.sum_len = mix(mc_state.sum_len, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha);
 }
 
 void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
