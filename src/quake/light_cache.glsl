@@ -52,7 +52,7 @@ vec4 light_cache_get(const vec3 pos, const vec3 normal, inout uint rng_state) {
 
 void light_cache_update(const vec3 pos, const vec3 normal, const vec3 irr, inout uint rng_state) {
     const uint level = lc_level_for_pos(pos, rng_state);
-    const ivec3 grid_idx = lc_grid_idx_for_level_closest(level, pos, rng_state);
+    const ivec3 grid_idx = lc_grid_idx_for_level_interpolate(level, pos, rng_state);
     const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, LIGHT_CACHE_BUFFER_SIZE);
     
     const uint old = atomicExchange(light_cache[buf_idx].lock, params.frame);
