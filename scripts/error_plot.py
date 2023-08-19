@@ -30,8 +30,13 @@ def mae(img):
     return np.mean(np.abs(img - ref))
 
 for technique in sorted((prefix / "techniques").iterdir()):
+    if technique.name.startswith("_"):
+        continue
+
     errors = []
     for imgpath in sorted(technique.iterdir()):
+        if imgpath.suffix != ".hdr":
+            continue
         img = imread(imgpath)
         errors.append(rmse(img))
     plt.plot(errors, label=technique.name)
