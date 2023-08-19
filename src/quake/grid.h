@@ -11,7 +11,7 @@ using float16_t = uint16_t;
 
 #endif
 
-#define MC_BUFFER_SIZE 4000000
+#define MC_BUFFER_SIZE 8000000
 #define MC_EXCHANGE_BUFFER_SIZE 40000
 
 struct MCState {
