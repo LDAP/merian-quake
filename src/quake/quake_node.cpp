@@ -978,6 +978,14 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                                      LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
+            merian::NodeOutputDescriptorBuffer(
+                "markovchainexchange",
+                vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{{},
+                                     MC_EXCHANGE_BUFFER_SIZE * sizeof(MCExchangeVertex),
+                                     vk::BufferUsageFlagBits::eStorageBuffer},
+                true),
         },
     };
 }

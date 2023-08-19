@@ -39,11 +39,15 @@ layout(set = 0, binding = 1) uniform writeonly image2D img_irradiance;
 layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
 layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
-layout(set = 0, binding = 5, scalar) buffer buf_cells {
+
+layout(set = 0, binding = 5, scalar) buffer buf_mc_states {
     MCVertex mc_states[];
 };
-layout(set = 0, binding = 6, scalar) buffer buf_lightcache {
+layout(set = 0, binding = 6, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
+};
+layout(set = 0, binding = 7, scalar) buffer buf_mc_exchange {
+    MCExchangeVertex mc_exchange[];
 };
 
 // QUAKE 

@@ -12,6 +12,7 @@ using float16_t = uint16_t;
 #endif
 
 #define MC_BUFFER_SIZE 4000000
+#define MC_EXCHANGE_BUFFER_SIZE 40000
 
 struct MCState {
     vec3 sum_tgt;
@@ -24,6 +25,10 @@ struct MCState {
 };
 
 struct MCVertex {
+    MCState state;
+};
+
+struct MCExchangeVertex {
     MCState state;
 };
 
