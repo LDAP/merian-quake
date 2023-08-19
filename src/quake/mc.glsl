@@ -26,7 +26,7 @@ ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout 
 }
 
 MCState mc_state_new() {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, ivec3(0), 0};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0, 0};
     return r;
 }
 
@@ -58,7 +58,8 @@ MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
     const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
 
     MCState state = mc_states[buf_idx].state;
-    state.sum_w *= float(grid_idx == state.grid_idx && level == state.level);
+    state.sum_w *= float(hash_level(grid_idx, level) == state.hash);
+    state.buf_idx = buf_idx;
     return state;
 }
 
@@ -99,20 +100,17 @@ void mc_state_add_sample(inout MCState mc_state,
 void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
     // update state that was used for sampling
     {
-        const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
-        // const uint old = atomicExchange(mc_states[buf_idx].lock, params.frame);
-        // if (old != params.frame)
-            mc_states[buf_idx].state = mc_state;
+        mc_states[mc_state.buf_idx].state = mc_state;
     }
 
     // update other levels
     [[unroll]]
     for (uint i = 0; i < 1; i++) {
         const float rand = XorShift32(rng_state);
-        mc_state.level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
-        mc_state.grid_idx = mc_grid_idx_for_level_interpolate(mc_state.level, pos, rng_state);
-        const uint buf_idx = hash_grid_normal_level(mc_state.grid_idx, normal, mc_state.level, MC_BUFFER_SIZE);
-
+        const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
+        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
+        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+        mc_state.hash = hash_level(grid_idx, level);
         mc_states[buf_idx].state = mc_state;
     }
 }

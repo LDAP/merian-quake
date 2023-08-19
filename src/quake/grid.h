@@ -7,6 +7,7 @@ using uint = uint32_t;
 using vec3 = glm::vec3;
 using ivec3 = glm::ivec3;
 using vec4 = glm::vec4;
+using float16_t = uint16_t;
 
 #endif
 
@@ -18,8 +19,8 @@ struct MCState {
     uint N;
     float sum_len;
 
-    ivec3 grid_idx;
-    uint level;
+    uint buf_idx;
+    uint hash; // grid_idx and level
 };
 
 struct MCVertex {
