@@ -34,12 +34,15 @@ for technique in sorted((prefix / "techniques").iterdir()):
         continue
 
     errors = []
+    frames = []
     for imgpath in sorted(technique.iterdir()):
         if imgpath.suffix != ".hdr":
             continue
+        frame = int(imgpath.stem.split("_")[-2])
         img = imread(imgpath)
         errors.append(rmse(img))
-    plt.plot(errors, label=technique.name)
+        frames.append(frame + 1) # frames start with 0
+    plt.plot(frames, errors, label=technique.name)
 
 plt.xlabel("frames")
 plt.ylabel("RMSE")
