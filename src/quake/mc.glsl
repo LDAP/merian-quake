@@ -25,8 +25,11 @@ ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout 
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
-MCState mc_state_new() {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0, 0};
+MCState mc_state_new(const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const uint level = clamp(mc_level_for_pos(pos, rng_state), 0, MC_LEVELS - 1);
+    const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
+    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, buf_idx, hash_level(grid_idx, level)};
     return r;
 }
 

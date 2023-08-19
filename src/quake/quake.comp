@@ -185,7 +185,7 @@ void main() {
                     if (XorShift32(rng_state) < bsdf_p() || score_sum == 0) {
                         // BSDF Sampling
                         wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                        mc_state = mc_state_new();
+                        mc_state = mc_state_new(current_mat.pos, current_mat.normal, rng_state);
                     } // else {VMF Sampling // wo = set above }
 
                     // Multiple importance sampling
