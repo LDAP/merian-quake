@@ -163,7 +163,6 @@ void main() {
                     float scores[MC_SAMPLES];
                     vec4 vmfs[MC_SAMPLES];
 
-                    
                     {
                         [[unroll]]
                         for (int i = 0; i < MC_SAMPLES; i++) {
@@ -192,8 +191,7 @@ void main() {
                     // Multiple importance sampling
                     for (int i = 0; i < MC_SAMPLES; i++) {
                         // score_sum > 0 ? results in black artifacts
-                        wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum
-                                               : 0);
+                        wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
                     }
                     wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_diffuse_pdf() * dot(wo, current_mat.normal) + (1 - bsdf_p()) * wo_p;
                 }
@@ -215,9 +213,10 @@ void main() {
 
                 // EVALUATE BSDF
                 current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal);
+                const vec3 next_lc = light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
 
-                if (USE_LIGHT_CACHE_TAIL != 0) {
-                    const vec3 incident = segment == MAX_PATH_LENGTH - 1 && all(lessThan(next_mat.emission, vec3(1e-7))) ? light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb : next_mat.emission;
+                if (USE_LIGHT_CACHE_TAIL == 1) {
+                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc;
                     f = current_albedo * incident;
                 } else {
                     f = current_albedo * next_mat.emission;
@@ -226,17 +225,14 @@ void main() {
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 emm = any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
-                    const float mc_f = yuv_luminance(emm * bsdf_diffuse_eval(current_mat.albedo.rgb)) * dot(wo, current_mat.normal) / wo_p;
-                    // Using sum_w here instead of f fixes indirect lighting but slows down adaption.
-                    // (Use the same as in load())
+                    const vec3 incident = (any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) / wo_p;
+                    const float mc_f = yuv_luminance(incident);
                     if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
-                        mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state); // todo, only last?
+                        mc_state_save(mc_state, current_mat.pos, current_mat.normal, rng_state);
                     }
-
-                    light_cache_update(current_mat.pos, current_mat.normal, emm * bsdf_diffuse_eval(current_mat.albedo.rgb) * dot(wo, current_mat.normal) / wo_p, rng_state);
+                    light_cache_update(current_mat.pos, current_mat.normal, incident , rng_state);
                 }
 
                 // PREPARE NEXT ITERATION
