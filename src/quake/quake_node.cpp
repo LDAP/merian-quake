@@ -1106,6 +1106,9 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     if (worldspawn) {
+        key_dest = key_game;
+        m_state = m_none;
+
         sv_player = nullptr;
         worldspawn = false;
     }
