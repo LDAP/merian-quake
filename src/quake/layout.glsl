@@ -61,9 +61,9 @@ struct VertexExtraData {
     uint n1_brush;
     uint n2;
 
-    uint st_0;
-    uint st_1;
-    uint st_2;
+    f16vec2 st_0;
+    f16vec2 st_1;
+    f16vec2 st_2;
 };
 
 layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
