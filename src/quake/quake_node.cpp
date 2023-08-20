@@ -472,8 +472,7 @@ void add_geo_sprite(entity_t* ent,
     mspriteframe_t* frame;
     glm::vec3 s_up, s_right;
     float angle, sr, cr;
-    // XXX newer quakespasm has this: ENTSCALE_DECODE(ent->scale);
-    float scale = 1.0f;
+    float scale = ENTSCALE_DECODE(ent->scale);
 
     // pretty much from r_sprite:
     glm::vec3 vpn, vright, vup, r_origin;
@@ -491,8 +490,9 @@ void add_geo_sprite(entity_t* ent,
         v_up[0] = 0;
         v_up[1] = 0;
         v_up[2] = 1;
+        v_right = glm::normalize(glm::cross(vpn, v_up));
         s_up = v_up;
-        s_right = vright;
+        s_right = v_right;
         break;
     case SPR_FACING_UPRIGHT: // faces camera origin, up is towards the heavens
         VectorSubtract(ent->origin, r_origin, v_forward);
