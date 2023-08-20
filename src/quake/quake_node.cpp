@@ -1037,6 +1037,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     // ZERO markov chain and light cache
     cmd.fillBuffer(*buffer_outputs[0][0], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][1], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*buffer_outputs[0][2], 0, VK_WHOLE_SIZE, 0);
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
