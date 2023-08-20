@@ -41,7 +41,7 @@ bool confirm_intersection(const IntersectionInfo info) {
         // }
 
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
-        return textureGather(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st, 3).r >= ALPHA_THRESHOLD;
+        return textureGather(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 3).r >= ALPHA_THRESHOLD;
     }
 }
 

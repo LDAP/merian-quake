@@ -6,8 +6,8 @@ vec3 envmap(in vec3 w) {
         // classic quake sky
         const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
         const vec2 t = params.cl_time * vec2(0.12, 0.06);
-        const vec4 bck = texture(img_tex[nonuniformEXT(params.sky_rt_bk & 0xffff)], st + 0.1 * t);
-        const vec4 fnt = texture(img_tex[nonuniformEXT(params.sky_rt_bk >> 16   )], st + t);
+        const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.1 * t);
+        const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         return 50 * tex;
     } else {
@@ -35,7 +35,8 @@ vec3 envmap(in vec3 w) {
             case 4: { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5*vec2(-w.y,  w.x) / abs(w.z); break; } // up
             case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z); break; } // dn
         }
-        emcol += texture(img_tex[nonuniformEXT(side)], st).rgb;
+        if (side < MAX_GLTEXTURES)
+            emcol += texture(img_tex[nonuniformEXT(side)], st).rgb;
         return emcol;
     }
 }

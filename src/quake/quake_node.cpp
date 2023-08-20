@@ -321,19 +321,13 @@ void add_geo_alias(entity_t* ent,
     for (int i = 0; i < hdr->numindexes / 3; i++) {
         const int sk = CLAMP(0, ent->skinnum, hdr->numskins - 1), fm = ((int)(cl.time * 10)) & 3;
         const uint16_t texnum_alpha = make_texnum_alpha(hdr->gltextures[sk][fm]);
-        const uint16_t fb_texnum =
-            hdr->fbtextures[sk][fm]
-                ? std::min(hdr->fbtextures[sk][fm]->texnum, (uint32_t)MAX_GLTEXTURES - 1)
-                : 0;
+        const uint16_t fb_texnum = hdr->fbtextures[sk][fm] ? hdr->fbtextures[sk][fm]->texnum : 0;
 
         uint32_t n0, n1, n2;
         if (hdr->nmtextures[sk][fm]) {
             // this discards the vertex normals
-            n0 = merian::pack_uint32(
-                hdr->gstextures[sk][fm]
-                    ? std::min(hdr->gstextures[sk][fm]->texnum, (uint32_t)MAX_GLTEXTURES - 1)
-                    : 0,
-                std::min(hdr->nmtextures[sk][fm]->texnum, (uint32_t)MAX_GLTEXTURES - 1));
+            n0 = merian::pack_uint32(hdr->gstextures[sk][fm] ? hdr->gstextures[sk][fm]->texnum : 0,
+                                     hdr->nmtextures[sk][fm]->texnum);
             n1 = 0xffffffff; // mark as brush model -> to use normal map
             n2 = 0;
         } else {
@@ -417,9 +411,8 @@ void add_geo_brush(entity_t* ent,
                 QuakeNode::VertexExtraData extra{
                     .texnum_alpha = 0,
                     .texnum_fb_flags = 0,
-                    .n0_gloss_norm = merian::pack_uint32(
-                        t->gloss ? std::min(t->gloss->texnum, (uint32_t)MAX_GLTEXTURES - 1) : 0,
-                        t->norm ? std::min(t->norm->texnum, (uint32_t)MAX_GLTEXTURES - 1) : 0),
+                    .n0_gloss_norm = merian::pack_uint32(t->gloss ? t->gloss->texnum : 0,
+                                                         t->norm ? t->norm->texnum : 0),
                     .n1_brush = 0xffffffff,
                     .n2 = 0,
                 };
@@ -432,9 +425,7 @@ void add_geo_brush(entity_t* ent,
                     extra.s_2 = merian::float_to_half_aprox(p->verts[k - 0][3]);
                     extra.t_2 = merian::float_to_half_aprox(p->verts[k - 0][4]);
                     extra.texnum_alpha = make_texnum_alpha(t->gltexture, ent, surf);
-                    extra.texnum_fb_flags = t->fullbright ? std::min(t->fullbright->texnum,
-                                                                     (uint32_t)MAX_GLTEXTURES - 1)
-                                                          : 0;
+                    extra.texnum_fb_flags = t->fullbright ? t->fullbright->texnum : 0;
 
                     if (surf->flags & SURF_DRAWLAVA)
                         flags = MAT_FLAGS_LAVA;
@@ -588,14 +579,14 @@ void add_geo_sprite(entity_t* ent,
             texnum = make_texnum_alpha(frame->gltexture);
         }
 
-        ext.emplace_back(std::min(texnum, (uint16_t)(MAX_GLTEXTURES - 1)),
-                         std::min(texnum, (uint16_t)(MAX_GLTEXTURES - 1)), // sprite allways emits
+        ext.emplace_back(texnum,
+                         texnum, // sprite allways emits
                          n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
                          merian::float_to_half_aprox(0));
-        ext.emplace_back(std::min(texnum, (uint16_t)(MAX_GLTEXTURES - 1)),
-                         std::min(texnum, (uint16_t)(MAX_GLTEXTURES - 1)), // sprite allways emits
+        ext.emplace_back(texnum,
+                         texnum, // sprite allways emits
                          n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
                          merian::float_to_half_aprox(1), merian::float_to_half_aprox(1),
                          merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),

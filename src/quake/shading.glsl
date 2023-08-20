@@ -30,7 +30,7 @@ vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const 
     if (flags == MAT_FLAGS_WATERFALL)
         return albedo;
 
-    if (texnum_fb > 0) {
+    if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
         vec3 emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
         const float sum = emission.x + emission.y + emission.z;
         if (sum > 0) {
@@ -107,7 +107,7 @@ void get_shading_material(const IntersectionInfo info,
         // Load albedo
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
         // Clamp to 1e-3 (nothing is really 100% black)
-        mat.albedo = max(texture(img_tex[nonuniformEXT(extra_data.texnum_alpha & 0xfff)], st), vec4(vec3(1e-3), 1));
+        mat.albedo = max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1));
         const uint alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
             mat.albedo.a = decode_alpha(alpha);
@@ -127,12 +127,12 @@ void get_shading_material(const IntersectionInfo info,
         const uint texnum_gloss = extra_data.n0_gloss_norm & 0xffff;
         const uint texnum_normal = extra_data.n0_gloss_norm >> 16;
         
-        if (texnum_normal > 0) {
+        if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
             // overwrite geo normal with normal map normal
             const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
             mat.normal = apply_normalmap(verts[0], verts[1], verts[2], st_0, st_1, st_2, mat.normal, tangent_normal);
         }
-        if (texnum_gloss > 0) {
+        if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
             mat.gloss = texture(img_tex[nonuniformEXT(texnum_gloss)], st).r;
         }
     } else {
