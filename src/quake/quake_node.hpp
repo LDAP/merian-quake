@@ -236,8 +236,8 @@ class QuakeNode : public merian::Node {
     // ----------------------------------------------------
     // Params
 
-    uint32_t width = 1920;
-    uint32_t height = 1080;
+    static constexpr uint32_t width = 1920;
+    static constexpr uint32_t height = 1080;
 
     PushConstant pc;
 
@@ -318,6 +318,9 @@ class QuakeNode : public merian::Node {
 
     // 0 None, 1 Gun, 2 Full
     int playermodel = 1;
+
+    float fov = glm::radians(90.);
+    float fov_tan_alpha_half = glm::tan(fov / 2);
 
     // Spec constants
     // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4

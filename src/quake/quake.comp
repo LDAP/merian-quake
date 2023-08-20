@@ -112,7 +112,7 @@ void main() {
     vec3 irr_samples = vec3(0); // store sample count in `a` for accum node
 
     ShadingMaterial first_mat;
-    const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, radians(90));
+    const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
     {
         // Find first surface
         IntersectionInfo info;
@@ -126,7 +126,7 @@ void main() {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
         // Should compensate pixel filter..
-        const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, radians(90));
+        const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 

@@ -39,6 +39,8 @@ static QuakeData quake_data;
 // from r_alias.c
 extern float r_avertexnormals[162][3];
 extern particle_t* active_particles;
+extern cvar_t scr_fov, cl_gun_fovscale;
+
 extern cvar_t cl_maxpitch; // johnfitz -- variable pitch clamping
 extern cvar_t cl_minpitch; // johnfitz -- variable pitch clamping
 }
@@ -272,6 +274,12 @@ void add_geo_alias(entity_t* ent,
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
     R_SetupEntityTransform(ent, &lerpdata);
+
+    // makes gun fov independent
+    glm::vec3 fovscale(1.);
+    if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
+        fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
+
     // angles: pitch yaw roll. axes: right fwd up
     lerpdata.angles[0] *= -1;
     glm::mat3 mat_model;
@@ -288,8 +296,8 @@ void add_geo_alias(entity_t* ent,
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
         // get model pos
         for (int k = 0; k < 3; k++) {
-            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] + hdr->scale_origin[k];
-            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] + hdr->scale_origin[k];
+            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] * fovscale[k] + hdr->scale_origin[k] * fovscale[k];
+            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] * fovscale[k] + hdr->scale_origin[k] * fovscale[k];
         }
         // convert to world space
 
@@ -1007,6 +1015,12 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
                           const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
+
+    // Quake sets fov assuming a 4x3 screen :D
+    vid.width = width;
+    vid.height = height;
+    fov_tan_alpha_half = glm::tan(glm::radians(r_refdef.fov_x) / 2);
+
     // GRAPH DESC SETS
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
         merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
@@ -1019,7 +1033,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                .build_pipeline_layout();
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
-                               use_light_cache_tail);
+                               use_light_cache_tail, fov_tan_alpha_half);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
