@@ -24,8 +24,9 @@
 // Checks flags and alpha to determine if the intersection should be confirmed.
 bool confirm_intersection(const IntersectionInfo info) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
-    const uint alpha = extra_data.texnum_alpha >> 12;
-    if ((extra_data.texnum_fb_flags >> 12) != MAT_FLAGS_NONE) {
+    const uint16_t alpha = extra_data.texnum_alpha >> 12;
+    const uint16_t flags = extra_data.texnum_fb_flags >> 12;
+    if (flags != MAT_FLAGS_NONE && flags != MAT_FLAGS_SPRITE) {
         // treat sky, lava, slime,... not transparent for now
         return true;
     } else if (alpha != 0) { // 0 means use texture

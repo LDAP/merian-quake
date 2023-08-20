@@ -459,20 +459,24 @@ void add_geo_sprite(entity_t* ent,
                     std::vector<QuakeNode::VertexExtraData>& ext) {
     assert(m->type == mod_sprite);
 
-    vec3_t point, v_forward, v_right, v_up;
+    glm::vec3 v_forward, v_right, v_up;
     msprite_t* psprite;
     mspriteframe_t* frame;
-    float *s_up, *s_right;
+    glm::vec3 s_up, s_right;
     float angle, sr, cr;
     // XXX newer quakespasm has this: ENTSCALE_DECODE(ent->scale);
     float scale = 1.0f;
 
-    vec3_t vpn, vright, vup, r_origin;
+    // pretty much from r_sprite:
+    glm::vec3 vpn, vright, vup, r_origin;
     VectorCopy(r_refdef.vieworg, r_origin);
-    AngleVectors(r_refdef.viewangles, vpn, vright, vup);
+    AngleVectors(r_refdef.viewangles, &vpn.x, &vright.x, &vup.x);
 
     frame = R_GetSpriteFrame(ent);
     psprite = (msprite_t*)ent->model->cache.data;
+
+    if (!frame->gltexture)
+        return;
 
     switch (psprite->type) {
     case SPR_VP_PARALLEL_UPRIGHT: // faces view plane, up is towards the heavens
@@ -485,7 +489,7 @@ void add_geo_sprite(entity_t* ent,
     case SPR_FACING_UPRIGHT: // faces camera origin, up is towards the heavens
         VectorSubtract(ent->origin, r_origin, v_forward);
         v_forward[2] = 0;
-        VectorNormalizeFast(v_forward);
+        VectorNormalizeFast(&v_forward.x);
         v_right[0] = v_forward[1];
         v_right[1] = -v_forward[0];
         v_right[2] = 0;
@@ -500,7 +504,7 @@ void add_geo_sprite(entity_t* ent,
         s_right = vright;
         break;
     case SPR_ORIENTED: // pitch yaw roll are independent of camera
-        AngleVectors(ent->angles, v_forward, v_right, v_up);
+        AngleVectors(ent->angles, &v_forward.x, &v_right.x, &v_up.x);
         s_up = v_up;
         s_right = v_right;
         break;
@@ -521,76 +525,93 @@ void add_geo_sprite(entity_t* ent,
         return;
     }
 
+    s_up = glm::normalize(s_up);
+    s_right = glm::normalize(s_right);
+
+    // Dirty hack to fix alignment of sprites when only a few pixels are lit.
+    // Since quakespasm normally uses a single fan they do not have this problem
+    const float off = strstr(frame->gltexture->name, "dotmed")
+                          ? 1.5
+                          : (strstr(frame->gltexture->name, "dotsml") ? 1.0 : 0);
+    const float s_off = frame->gltexture->width % 2 == 0 ? -off / frame->gltexture->width : 0;
+    const float t_off = frame->gltexture->height % 2 == 0 ? -off / frame->gltexture->height : 0;
+
     // add three quads
     for (int k = 0; k < 3; k++) {
-        float vert[4][3];
+        glm::vec3 v0, v1, v2, v3;
 
-        vec3_t front;
-        CrossProduct(s_up, s_right, front);
-        VectorMA(ent->origin, frame->down * scale, k == 1 ? front : s_up, point);
-        VectorMA(point, frame->left * scale, k == 2 ? front : s_right, point);
-        for (int l = 0; l < 3; l++)
-            vert[0][l] = point[l];
+        // clang-format off
+        switch (k) {
+        case 0: {
+            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * s_up + frame->left * s_right);
+            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * s_up + frame->left * s_right);
+            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * s_up + frame->right * s_right);
+            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * s_up + frame->right * s_right);
+            break;
+        }
+        case 1: {
+            glm::vec3 front = glm::cross(s_up, s_right);
+            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->left * s_right);
+            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->left * s_right);
+            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->right * s_right);
+            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->right * s_right);
+            break;
+        }
+        case 2: {
+            glm::vec3 front = glm::cross(s_up, s_right);
+            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->left * front);
+            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->left * front);
+            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->right * front);
+            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->right * front);
+            break;
+        }
 
-        VectorMA(ent->origin, frame->up * scale, k == 1 ? front : s_up, point);
-        VectorMA(point, frame->left * scale, k == 2 ? front : s_right, point);
-        for (int l = 0; l < 3; l++)
-            vert[1][l] = point[l];
+        default:
+            assert(0);
+        }
+        // clang-format on
 
-        VectorMA(ent->origin, frame->up * scale, k == 1 ? front : s_up, point);
-        VectorMA(point, frame->right * scale, k == 2 ? front : s_right, point);
-        for (int l = 0; l < 3; l++)
-            vert[2][l] = point[l];
-
-        VectorMA(ent->origin, frame->down * scale, k == 1 ? front : s_up, point);
-        VectorMA(point, frame->right * scale, k == 2 ? front : s_right, point);
-        for (int l = 0; l < 3; l++)
-            vert[3][l] = point[l];
-
-        // add vertices
+        // add vertices - triangle fan
         uint32_t vtx_cnt = vtx.size() / 3;
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[0][l]);
+            vtx.emplace_back(v0[l]);
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[1][l]);
+            vtx.emplace_back(v1[l]);
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[2][l]);
+            vtx.emplace_back(v2[l]);
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[3][l]);
+            vtx.emplace_back(v3[l]);
 
-        // add index
-        idx.emplace_back(vtx_cnt);
-        idx.emplace_back(vtx_cnt + 2 - 1);
+        // add index - tiangle fan
+        idx.emplace_back(vtx_cnt + 0);
+        idx.emplace_back(vtx_cnt + 1);
         idx.emplace_back(vtx_cnt + 2);
 
-        idx.emplace_back(vtx_cnt);
-        idx.emplace_back(vtx_cnt + 3 - 1);
+        idx.emplace_back(vtx_cnt + 0);
+        idx.emplace_back(vtx_cnt + 2);
         idx.emplace_back(vtx_cnt + 3);
 
         // add extra data
-        float n[3],
-            e0[] = {vert[2][0] - vert[0][0], vert[2][1] - vert[0][1], vert[2][2] - vert[0][2]},
-            e1[] = {vert[1][0] - vert[0][0], vert[1][1] - vert[0][1], vert[1][2] - vert[0][2]};
-        CrossProduct(e0, e1, n);
-        uint32_t n_enc = merian::encode_normal(n);
+        glm::vec3 e0(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
+        glm::vec3 e1(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
+        uint32_t n_enc = merian::encode_normal(glm::normalize(glm::cross(e0, e1)));
 
-        uint16_t texnum = 0;
-        if (frame->gltexture) {
-            texnum = make_texnum_alpha(frame->gltexture);
-        }
+        uint16_t texnum = make_texnum_alpha(frame->gltexture);
 
+        // clang-format off
         ext.emplace_back(texnum,
-                         texnum, // sprite allways emits
-                         n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
-                         merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
-                         merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                         merian::float_to_half_aprox(0));
+                         MAT_FLAGS_SPRITE << 12, // sprite allways emits
+                         n_enc, n_enc, n_enc,
+                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(frame->tmax + t_off),
+                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(0 + t_off),
+                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(0 + t_off));
         ext.emplace_back(texnum,
-                         texnum, // sprite allways emits
-                         n_enc, n_enc, n_enc, merian::float_to_half_aprox(0),
-                         merian::float_to_half_aprox(1), merian::float_to_half_aprox(1),
-                         merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                         merian::float_to_half_aprox(1));
+                         MAT_FLAGS_SPRITE << 12, // sprite allways emits
+                         n_enc, n_enc, n_enc,
+                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(frame->tmax + t_off),
+                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(0 + t_off),
+                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(frame->tmax + t_off));
+        // clang-format on
 
     } // end three axes
 }
@@ -1367,7 +1388,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
                             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                                 vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate));
         cur_frame.dynamic_geometries.back().instance_flags =
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
+            vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise |
+            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
     } else {
         cur_frame.dynamic_geometries.clear();
     }

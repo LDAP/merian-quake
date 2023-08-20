@@ -21,26 +21,30 @@ void warp(inout vec2 st) {
 }
 
 vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const uint flags) {
+    vec3 emission;
+
     if (flags == MAT_FLAGS_LAVA)
         return 20.0 * albedo;
-    if (flags == MAT_FLAGS_SLIME)
+    else if (flags == MAT_FLAGS_SLIME)
         return 0.5 * albedo;
-    if (flags == MAT_FLAGS_TELE)
+    else if (flags == MAT_FLAGS_TELE)
         return 5.0 * albedo;
-    if (flags == MAT_FLAGS_WATERFALL)
+    else if (flags == MAT_FLAGS_WATERFALL)
         return albedo;
-
-    if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
-        vec3 emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
-        const float sum = emission.x + emission.y + emission.z;
-        if (sum > 0) {
-            emission /= sum;
-            emission *= 10.0 * (exp2(3.5 * sum) - 1.0);
-        }
-        return emission;
+    else if (flags == MAT_FLAGS_SPRITE)
+        emission = albedo;
+    else if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
+        emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
+    } else {
+        return vec3(0);
     }
 
-    return vec3(0.);
+    const float sum = emission.x + emission.y + emission.z;
+    if (sum > 0) {
+        emission /= sum;
+        emission *= 10.0 * (exp2(3.5 * sum) - 1.0);
+    }
+    return emission;
 }
 
 void get_verts_pos_geonormal(out mat3 verts,
