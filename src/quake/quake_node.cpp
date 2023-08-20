@@ -38,7 +38,11 @@ extern "C" {
 static QuakeData quake_data;
 // from r_alias.c
 extern float r_avertexnormals[162][3];
+// from r_part.c
 extern particle_t* active_particles;
+extern gltexture_t *particletexture;
+extern float texturescalefactor;
+
 extern cvar_t cl_maxpitch; // johnfitz -- variable pitch clamping
 extern cvar_t cl_minpitch; // johnfitz -- variable pitch clamping
 }
@@ -183,14 +187,23 @@ void add_particles(std::vector<float>& vtx,
                    const uint32_t texnum_explosion) {
     merian::XORShift32 xrand{1337};
 
-    static const float voff[4][3] = {
-        {0.0, 1.0, 0.0},
-        {-0.5, -0.5, -0.87},
-        {-0.5, -0.5, 0.87},
-        {1.0, -0.5, 0.0},
-    };
+    vec3_t vpn, vright, vup, r_origin, up, right, p_up, p_right;
+    VectorCopy(r_refdef.vieworg, r_origin);
+    AngleVectors(r_refdef.viewangles, vpn, vright, vup);
+    VectorScale(vup, 1.5, up);
+    VectorScale(vright, 1.5, right);
 
     for (particle_t* p = active_particles; p; p = p->next) {
+        // from r_part.c
+        float scale = (p->org[0] - r_origin[0]) * vpn[0] + (p->org[1] - r_origin[1]) * vpn[1] +
+                      (p->org[2] - r_origin[2]) * vpn[2];
+        if (scale < 20)
+            scale = 1 + 0.08;
+        else
+            scale = 1 + scale * 0.004;
+        scale *= texturescalefactor;
+
+
         uint8_t* c = (uint8_t*)&d_8to24table[(int)p->color]; // that would be the colour. pick
                                                              // texture based on this:
         // smoke is r=g=b
@@ -199,46 +212,28 @@ void add_particles(std::vector<float>& vtx,
         const uint16_t tex_col = c[1] == 0 && c[2] == 0 ? texnum_blood : texnum_explosion;
         const uint16_t tex_lum = c[1] == 0 && c[2] == 0 ? 0 : texnum_explosion;
 
-        float vert[4][3];
-        for (int l = 0; l < 3; l++) {
-            float off = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
-            for (int k = 0; k < 4; k++)
-                vert[k][l] =
-                    p->org[l] + off + 2 * voff[k][l] + (xrand.get() - 0.5) + (xrand.get() - 0.5);
-        }
-
         const uint32_t vtx_cnt = vtx.size() / 3;
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[0][l]);
+            vtx.emplace_back(p->org[l]);
+
+        VectorMA (p->org, scale, up, p_up);
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[1][l]);
+            vtx.emplace_back(p_up[l]);
+
+        VectorMA (p->org, scale, right, p_right);
         for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[2][l]);
-        for (int l = 0; l < 3; l++)
-            vtx.emplace_back(vert[3][l]);
+            vtx.emplace_back(p_right[l]);
 
         idx.emplace_back(vtx_cnt);
         idx.emplace_back(vtx_cnt + 1);
         idx.emplace_back(vtx_cnt + 2);
 
-        idx.emplace_back(vtx_cnt);
-        idx.emplace_back(vtx_cnt + 2);
-        idx.emplace_back(vtx_cnt + 3);
+        assert(particletexture);
+        ext.emplace_back(tex_col, tex_lum, 0, 0, 0, merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                         merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(1));
 
-        idx.emplace_back(vtx_cnt);
-        idx.emplace_back(vtx_cnt + 3);
-        idx.emplace_back(vtx_cnt + 1);
-
-        idx.emplace_back(vtx_cnt + 1);
-        idx.emplace_back(vtx_cnt + 2);
-        idx.emplace_back(vtx_cnt + 3);
-
-        for (int k = 0; k < 4; k++) {
-            ext.emplace_back(tex_col, tex_lum, 0, 0, 0, merian::float_to_half_aprox(0),
-                             merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
-                             merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                             merian::float_to_half_aprox(0));
-        }
     }
 }
 
