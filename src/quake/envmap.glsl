@@ -1,7 +1,7 @@
 #include "common/von_mises_fisher.glsl"
 #include "common/cubemap.glsl"
 
-vec3 envmap(in vec3 w) {
+vec3 envmap(const vec3 w) {
     if((params.sky_lf_ft & 0xffff) == 0xffff) {
         // classic quake sky
         const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
@@ -9,7 +9,7 @@ vec3 envmap(in vec3 w) {
         const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.1 * t);
         const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
-        return 50 * tex;
+        return 10.0 * (exp2(3.5 * tex) - 1.0);
     } else {
         // Add a custom sun using vmf lobe
         // vec3 sundir = normalize(vec3(1, 1, 1)); // this where the moon is in ad_azad

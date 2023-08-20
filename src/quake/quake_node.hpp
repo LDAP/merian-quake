@@ -244,7 +244,6 @@ class QuakeNode : public merian::Node {
     // Store some textures for custom patches
     uint32_t texnum_blood = 0;
     uint32_t texnum_explosion = 0;
-    std::array<uint16_t, 6> texnum_skybox;
 
     // ----------------------------------------------------
     // Per-frame data and updates

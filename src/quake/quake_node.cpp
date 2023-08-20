@@ -296,8 +296,10 @@ void add_geo_alias(entity_t* ent,
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
         // get model pos
         for (int k = 0; k < 3; k++) {
-            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] * fovscale[k] + hdr->scale_origin[k] * fovscale[k];
-            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] * fovscale[k] + hdr->scale_origin[k] * fovscale[k];
+            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] * fovscale[k] +
+                           hdr->scale_origin[k] * fovscale[k];
+            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] * fovscale[k] +
+                           hdr->scale_origin[k] * fovscale[k];
         }
         // convert to world space
 
@@ -761,7 +763,6 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     }
 
     binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
-    texnum_skybox.fill(0);
 
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController& controller, int key, int scancode, merian::InputController::KeyStatus action, int){
@@ -883,32 +884,6 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // HACK: for sparks and for emissive rocket particle trails
     if (!strcmp(glt->name, "progs/s_exp_big.spr:frame10"))
         texnum_explosion = glt->texnum;
-
-    // classic quake sky
-    if (merian::ends_with(glt->name, "_front")) {
-        texnum_skybox[1] = glt->texnum;
-        texnum_skybox[2] = static_cast<uint16_t>(-1u);
-    }
-    if (merian::ends_with(glt->name, "_back")) {
-        texnum_skybox[0] = glt->texnum;
-        texnum_skybox[2] = static_cast<uint16_t>(-1u);
-    }
-
-    // full featured cube map/arcane dimensions
-    if (merian::starts_with(glt->name, "gfx/env/")) {
-        if (merian::ends_with(glt->name, "_rt"))
-            texnum_skybox[0] = glt->texnum;
-        if (merian::ends_with(glt->name, "_bk"))
-            texnum_skybox[1] = glt->texnum;
-        if (merian::ends_with(glt->name, "_lf"))
-            texnum_skybox[2] = glt->texnum;
-        if (merian::ends_with(glt->name, "_ft"))
-            texnum_skybox[3] = glt->texnum;
-        if (merian::ends_with(glt->name, "_up"))
-            texnum_skybox[4] = glt->texnum;
-        if (merian::ends_with(glt->name, "_dn"))
-            texnum_skybox[5] = glt->texnum;
-    }
 
     // ALLOCATE ----------------------------
 
@@ -1170,7 +1145,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     } else {
         pc.player = {0, 0, 0, 0};
     }
-    pc.sky = texnum_skybox;
     pc.cl_time = cl.time;
     pc.prev_cam_x = pc.cam_x;
     pc.prev_cam_w = pc.cam_w;
@@ -1181,6 +1155,16 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     // float fog_density = Fog_GetDensity();
     // fog_density *= fog_density;
     // pc.fog = glm::vec4(*merian::as_vec3(Fog_GetColor()), fog_density);
+    pc.sky.fill(0);
+    if (skybox_name[0]) {
+        for (int i = 0; i < 6; i++)
+            pc.sky[i] = skybox_textures[i]->texnum;
+    } else {
+        pc.sky[0] = solidskytexture->texnum;
+        pc.sky[1] = alphaskytexture->texnum;
+        pc.sky[2] = static_cast<uint16_t>(-1u);
+    }
+
 
     // BIND PIPELINE
     {
