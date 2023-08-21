@@ -93,20 +93,14 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         mat.emission = 10.0 * (exp2(3.5 * tex) - 1.0);
     } else {
-        // Add a custom sun using vmf lobe
-        // vec3 sundir = normalize(vec3(1, 1, 1)); // this where the moon is in ad_azad
-        // vec3 sundir = normalize(vec3(1, -1, 1)); // this comes in more nicely through the windows for debugging
-        vec3 sundir = normalize(vec3(1, -1, 1)); // ad_tears
+        const vec3 sundir = normalize(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z));
+        const vec3 suncolor = vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
         
-        const float k0 = 4.0, k1 = 30.0, k2 = 4.0, k3 = 3000.0;
         mat.emission = vec3(0.0);
-        mat.emission += vec3(0.50, 0.50, 0.50) * /*(k0+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k0);
-        mat.emission += vec3(1.00, 0.70, 0.30) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k1);
-        mat.emission += 30.0*vec3(1.1, 1.0, 0.9)*vmf_pdf(k3, dot(sundir, w));
-        mat.emission += vec3(0.20, 0.08, 0.02) * /*(k2+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0-w.z), k2);
+        mat.emission += 0.5 * suncolor * pow(0.5 * (1.0 + dot(sundir, w)), 4.0);
+        mat.emission += 5. * suncolor * vmf_pdf(3000.0, dot(sundir, w));
         
         // Evaluate cubemap
-        // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
         uint side = 0;
         vec2 st;
         switch(cubemap_side(w)) {

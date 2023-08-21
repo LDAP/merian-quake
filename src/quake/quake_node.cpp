@@ -329,7 +329,8 @@ void add_geo_alias(entity_t* ent,
 
     // add extra data for each primitive
     for (int i = 0; i < hdr->numindexes / 3; i++) {
-        const int sk = CLAMP(0, ent->skinnum, hdr->numskins - 1), fm = ((int)(cl.time * 10)) & 3;
+        const int sk = glm::clamp(ent->skinnum, 0, hdr->numskins - 1),
+                  fm = ((int)(cl.time * 10)) & 3;
         const uint16_t texnum_alpha = make_texnum_alpha(hdr->gltextures[sk][fm]);
         const uint16_t fb_texnum = hdr->fbtextures[sk][fm] ? hdr->fbtextures[sk][fm]->texnum : 0;
 
@@ -932,6 +933,79 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
 
 // -------------------------------------------------------------------------------------------
 
+void QuakeNode::parse_worldspawn() {
+    std::map<std::string, std::string> worldspawn_props;
+    char key[128], value[4096];
+    const char* data;
+
+    data = COM_Parse(cl.worldmodel->entities);
+    if (!data)
+        return; // error
+    if (com_token[0] != '{')
+        return; // error
+    while (1) {
+        data = COM_Parse(data);
+        if (!data)
+            return; // error
+        if (com_token[0] == '}')
+            break; // end of worldspawn
+        if (com_token[0] == '_')
+            q_strlcpy(key, com_token + 1, sizeof(key));
+        else
+            q_strlcpy(key, com_token, sizeof(key));
+        while (key[0] && key[strlen(key) - 1] == ' ') // remove trailing spaces
+            key[strlen(key) - 1] = 0;
+        data = COM_Parse(data);
+        if (!data)
+            return; // error
+        q_strlcpy(value, com_token, sizeof(value));
+
+        SPDLOG_DEBUG("{} {}", key, value);
+        worldspawn_props[key] = value;
+    }
+
+    sun_col = glm::vec3(0);
+    for (const std::string& k : {"sunlight", "sunlight2", "sunlight3"}) {
+        if (worldspawn_props.contains(k)) {
+            glm::vec3 col(0);
+
+            if (worldspawn_props.contains(k + "_color")) {
+                sscanf(worldspawn_props[k + "_color"].c_str(), "%f %f %f", &col.r, &col.g, &col.b);
+            } else {
+                col = glm::vec3(1);
+            }
+
+            float intensity = std::stoi(worldspawn_props[k]);
+            col *= intensity;
+            col /= 4000.;
+
+            if (merian::yuv_luminance(col) > merian::yuv_luminance(sun_col)) {
+                sun_col = col;
+            }
+        }
+    }
+
+    if (worldspawn_props.contains("sun_mangle")) {
+        float angles[3];
+        sscanf(worldspawn_props["sun_mangle"].c_str(), "%f %f %f", &angles[1], &angles[0],
+               &angles[2]);
+        // This seems wrong.. But works on ad_azad
+        float right[3], up[3];
+        angles[1] -= 180;
+        AngleVectors(angles, &sun_dir.x, right, up);
+    } else {
+        sun_dir = glm::vec3(1, 1, 1);
+    }
+
+    // Some patches for maps
+    if (worldspawn_props.contains("sky") && worldspawn_props["sky"] == "stormydays_") {
+        // ad_tears
+        sun_dir = glm::vec3(1, -1, 1);
+        sun_col = glm::vec3(1.1, 1.0, 0.9);
+        sun_col *= 6.0;
+    }
+}
+
 std::tuple<std::vector<merian::NodeInputDescriptorImage>,
            std::vector<merian::NodeInputDescriptorBuffer>>
 QuakeNode::describe_inputs() {
@@ -1008,7 +1082,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                .build_pipeline_layout();
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
-                               use_light_cache_tail, fov_tan_alpha_half);
+                               use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
+                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1016,9 +1091,11 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     }
 
     // DUMMY IMAGE as placeholder
-    uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
-    binding_dummy_image = make_rgb8_texture(
-        cmd, allocator, {missing_rgba, missing_rgba, missing_rgba, missing_rgba}, 2, 2);
+    if (!binding_dummy_image) {
+        uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
+        binding_dummy_image = make_rgb8_texture(
+            cmd, allocator, {missing_rgba, missing_rgba, missing_rgba, missing_rgba}, 2, 2);
+    }
 
     // MAKE SURE ALL DESCRIPTORS ARE SET
     for (auto& frame : frames) {
@@ -1111,8 +1188,13 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         key_dest = key_game;
         m_state = m_none;
 
+        parse_worldspawn();
+
         sv_player = nullptr;
         worldspawn = false;
+
+        // some spec constants change
+        run.request_rebuild();
     }
 
     if (stop_after_worldspawn >= 0 &&
@@ -1164,7 +1246,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.sky[1] = alphaskytexture->texnum;
         pc.sky[2] = static_cast<uint16_t>(-1u);
     }
-
 
     // BIND PIPELINE
     {
@@ -1525,4 +1606,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                       "Can be used for reference renders. -1 to disable");
     config.config_float("force timediff (ms)", force_timediff,
                         "For reference renders and video outputs.");
+
+    std::string debug_text = "";
+    debug_text += fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
+                              r_refdef.viewangles[1], r_refdef.viewangles[2]);
+    config.output_text(debug_text);
 }

@@ -10,6 +10,12 @@ layout (constant_id = 2) const int SPP = 1;
 layout (constant_id = 3) const int MAX_PATH_LENGTH = 3;
 layout (constant_id = 4) const int USE_LIGHT_CACHE_TAIL = 0;
 layout (constant_id = 5) const float FOV_TAN_ALPHA_HALF = 0;
+layout (constant_id = 6) const float SUN_W_X = 0;
+layout (constant_id = 7) const float SUN_W_Y = 0;
+layout (constant_id = 8) const float SUN_W_Z = 0;
+layout (constant_id = 9) const float SUN_COLOR_R = 0;
+layout (constant_id = 10) const float SUN_COLOR_G = 0;
+layout (constant_id = 11) const float SUN_COLOR_B = 0;
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x;

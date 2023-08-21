@@ -208,6 +208,8 @@ class QuakeNode : public merian::Node {
     // processes the pending uploads and updates the current descriptor set
     void update_textures(const vk::CommandBuffer& cmd);
 
+    void parse_worldspawn();
+
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
@@ -320,6 +322,8 @@ class QuakeNode : public merian::Node {
 
     float fov = glm::radians(90.);
     float fov_tan_alpha_half = glm::tan(fov / 2);
+    glm::vec3 sun_dir{0};
+    glm::vec3 sun_col{0};
 
     // Spec constants
     // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
