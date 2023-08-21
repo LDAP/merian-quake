@@ -2,8 +2,8 @@
 #include "common/cubemap.glsl"
 
 struct ShadingMaterial {
-    vec4 albedo;
-    vec3 emission;
+    vec4 color;
+    bool emissive;
     vec3 normal; // normalized
     vec3 geo_normal;
     vec3 pos;
@@ -91,7 +91,7 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
         const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.1 * t);
         const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
-        mat.emission = 10.0 * (exp2(3.5 * tex) - 1.0);
+        mat.color = vec4(10.0 * (exp2(3.5 * tex) - 1.0), 1);
     } else {
         // Add a custom sun using vmf lobe
         // vec3 sundir = normalize(vec3(1, 1, 1)); // this where the moon is in ad_azad
@@ -99,11 +99,11 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
         vec3 sundir = normalize(vec3(1, -1, 1)); // ad_tears
         
         const float k0 = 4.0, k1 = 30.0, k2 = 4.0, k3 = 3000.0;
-        mat.emission = vec3(0.0);
-        mat.emission += vec3(0.50, 0.50, 0.50) * /*(k0+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k0);
-        mat.emission += vec3(1.00, 0.70, 0.30) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k1);
-        mat.emission += 30.0*vec3(1.1, 1.0, 0.9)*vmf_pdf(k3, dot(sundir, w));
-        mat.emission += vec3(0.20, 0.08, 0.02) * /*(k2+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0-w.z), k2);
+        mat.color = vec4(0.0);
+        mat.color.rgb += vec3(0.50, 0.50, 0.50) * /*(k0+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k0);
+        mat.color.rgb += vec3(1.00, 0.70, 0.30) * /*(k1+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0+dot(sundir, w)), k1);
+        mat.color.rgb += 30.0*vec3(1.1, 1.0, 0.9)*vmf_pdf(k3, dot(sundir, w));
+        mat.color.rgb += vec3(0.20, 0.08, 0.02) * /*(k2+1.0)/(2.0*M_PI)*/ pow(0.5*(1.0-w.z), k2);
         
         // Evaluate cubemap
         // cubemap: gfx/env/*{rt,bk,lf,ft,up,dn}
@@ -118,10 +118,10 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
             case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z); break; } // dn
         }
         if (side < MAX_GLTEXTURES)
-            mat.emission += texture(img_tex[nonuniformEXT(side)], st).rgb;
+            mat.color.rgb += texture(img_tex[nonuniformEXT(side)], st).rgb;
     }
 
-    mat.albedo = vec4(0, 0, 0, 1);
+    mat.emissive = true;
     mat.normal = -w;
     mat.geo_normal = -w;
     mat.pos = pos + T_MAX * w;
@@ -134,7 +134,6 @@ void get_shading_material(const IntersectionInfo info,
                           out ShadingMaterial mat) {
     const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
     const uint16_t flags = extra_data.texnum_fb_flags >> 12;
-
     if (flags == MAT_FLAGS_SKY) {
         get_sky(ray_origin, ray_dir, mat);
         return;
@@ -152,15 +151,17 @@ void get_shading_material(const IntersectionInfo info,
         // Load albedo
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
         // Clamp to 1e-3 (nothing is really 100% black)
-        mat.albedo = max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1));
+        mat.color = max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1));
         const uint16_t alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
-            mat.albedo.a = decode_alpha(alpha);
+            mat.color.a = decode_alpha(alpha);
     }
     {
         // Load emission
         // const uint texnum_fb = extra_data.texnum_fb_flags & 0xfff;
-        mat.emission = get_emission(extra_data.texnum_fb_flags & 0xfff, st, mat.albedo.rgb, flags);
+        vec3 emission = get_emission(extra_data.texnum_fb_flags & 0xfff, st, mat.color.rgb, flags);
+        mat.emissive = any(greaterThan(emission, vec3(0)));
+        mat.color.rgb = mat.emissive ? emission : mat.color.rgb;
     }
 
     mat3 verts;

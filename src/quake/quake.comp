@@ -133,8 +133,8 @@ void main() {
 
     {
         // Evaluate direct light
-        if (MAX_PATH_LENGTH > 0) {
-            irr_samples = first_mat.emission;
+        if (MAX_PATH_LENGTH > 0 && first_mat.emissive) {
+            irr_samples = first_mat.color.rgb;
             float l = yuv_luminance(irr_samples);
             moments += vec2(l, l * l);
 
@@ -147,7 +147,7 @@ void main() {
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
+        if (any(greaterThanEqual(first_mat.color.rgb, vec3(1e-7))) && !first_mat.emissive)
         for (int s = 0; s < SPP; s++) {
             vec3 wi = first_wi;
             ShadingMaterial current_mat = first_mat;
@@ -218,20 +218,21 @@ void main() {
                 }
 
                 // EVALUATE BSDF
-                current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn;
+                // cannot be emissive, else we already would have added a contribution and quit the loop
+                current_albedo *= bsdf_diffuse_eval(current_mat.color.rgb) * wodotn;
                 const vec3 next_lc = light_cache_get(next_mat.pos, next_mat.normal, rng_state).rgb;
 
                 if (USE_LIGHT_CACHE_TAIL == 1) {
-                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc;
+                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || next_mat.emissive ? next_mat.color.rgb : next_lc;
                     f = current_albedo * incident;
                 } else {
-                    f = current_albedo * next_mat.emission;
+                    f = current_albedo * next_mat.color.rgb * float(next_mat.emissive);
                 }
                 p *= wo_p;
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 incident = (any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
+                    const vec3 incident = (next_mat.emissive ? next_mat.color.rgb : next_lc) * bsdf_diffuse_eval(current_mat.color.rgb) * wodotn / wo_p;
                     const float mc_f = yuv_luminance(incident);
                     if (!isinf(mc_f) && XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
                         // add if we found light and we are better or the random god wants us to add our worse value to the state. 
@@ -276,7 +277,7 @@ void main() {
     {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-        vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
+        vec3 albedo = first_mat.color.rgb;
         imageStore(img_albedo, pixel, vec4(albedo, 1));
         albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 
