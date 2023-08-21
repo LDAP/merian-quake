@@ -28,7 +28,7 @@ ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout 
 MCState mc_state_new(const vec3 pos, const vec3 normal, inout uint rng_state) {
     const uint level = clamp(mc_level_for_pos(pos, rng_state), 0, MC_LEVELS - 1);
     const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
     MCState r = {vec3(0.0), 0.0, 0, 0.0, buf_idx, hash_level(grid_idx, level)};
     return r;
 }
@@ -58,7 +58,7 @@ MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
     const float rand = XorShift32(rng_state);
     const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
     const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
 
     MCState state = mc_states[buf_idx].state;
     state.sum_w *= float(hash_level(grid_idx, level) == state.hash);
@@ -112,7 +112,7 @@ void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout
         const float rand = XorShift32(rng_state);
         const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
         const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-        const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_BUFFER_SIZE);
+        const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
         mc_state.hash = hash_level(grid_idx, level);
         mc_states[buf_idx].state = mc_state;
     }
