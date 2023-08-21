@@ -16,7 +16,6 @@
 
 #include "config.h"
 #include "layout.glsl"
-#include "envmap.glsl"
 #include "shading.glsl"
 #include "light_cache.glsl"
 #include "mc.glsl"
@@ -117,9 +116,11 @@ void main() {
         // Find first surface
         IntersectionInfo info;
         trace_ray(params.cam_x.xyz, first_wi, info);
-        if (info.t <= 0)
-            return; // should not happen in Quake but it does :o
-        get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
+        if (info.t > 0) {
+            get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
+        } else {
+            get_sky(params.cam_x.xyz, first_wi, first_mat);
+        }
     }
 
     {
@@ -209,9 +210,11 @@ void main() {
                     IntersectionInfo info;
                     // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
                     trace_ray(current_mat.pos - wi * 1e-3, wo, info);
-                    if (info.t <= 0)
-                        break;  // should not happen in Quake but it does :o
-                    get_shading_material(info, current_mat.pos, wo, next_mat);
+                    if (info.t > 0) {
+                        get_shading_material(info, current_mat.pos, wo, next_mat);
+                    } else {
+                        get_sky(current_mat.pos, wo, next_mat);
+                    }
                 }
 
                 // EVALUATE BSDF

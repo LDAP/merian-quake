@@ -6,7 +6,6 @@ included_files = files(
     'quake_water.glsl',
     'config.h',
     'layout.glsl',
-    'envmap.glsl',
     'grid.h',
     'shading.glsl',
     'mc.glsl',
