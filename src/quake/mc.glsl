@@ -1,13 +1,13 @@
 // ADAPTIVE GRID (sclaes with distance to camera)
-#define MC_ADAPTIVE_GRID_MAX_WIDTH 50
+#define MC_ADAPTIVE_GRID_MAX_WIDTH 100
 #define MC_ADAPTIVE_GRID_MIN_WIDTH .1
-#define MC_ADAPTIVE_GRID_POWER 2.
-#define MC_ADAPTIVE_GRID_LEVELS 16
+#define MC_ADAPTIVE_GRID_POWER 4.
+#define MC_ADAPTIVE_GRID_LEVELS 10
 // Set the target for light cache resolution
-#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.003
+#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.002
 
 // STATIC GRID (does not scale, for state exchange)
-#define MC_STATIC_GRID_WIDTH 25
+#define MC_STATIC_GRID_WIDTH 25.3
 
 // Configure ML
 #define ML_MAX_N 1024
@@ -33,7 +33,8 @@ ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 po
 }
 
 MCState mc_adaptive_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
-    const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
+    const float rand = XorShift32(rng_state);
+    const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos, rng_state);
     const uint buf_idx = hash_grid_level(grid_idx, level, MC_ADAPTIVE_BUFFER_SIZE);
 

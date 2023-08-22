@@ -12,9 +12,8 @@ using float16_t = uint16_t;
 #endif
 
 #define MC_ADAPTIVE_BUFFER_SIZE 4000000
-// Should hold roughly whole quake map at 25 cell width
-#define MC_STATIC_BUFFER_SIZE 1000000
-#define MC_STATIC_VERTEX_STATE_COUNT 5
+#define MC_STATIC_BUFFER_SIZE 200000
+#define MC_STATIC_VERTEX_STATE_COUNT 25
 
 struct MCState {
     vec3 sum_tgt;
