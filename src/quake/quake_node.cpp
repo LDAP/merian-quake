@@ -966,7 +966,7 @@ void QuakeNode::parse_worldspawn() {
     }
 
     sun_col = glm::vec3(0);
-    for (const std::string& k : {"sunlight", "sunlight2", "sunlight3"}) {
+    for (const std::string k : {"sunlight", "sunlight2", "sunlight3"}) {
         if (worldspawn_props.contains(k)) {
             glm::vec3 col(0);
 
