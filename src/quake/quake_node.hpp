@@ -332,4 +332,6 @@ class QuakeNode : public merian::Node {
     int32_t spp = 1;
     int32_t max_path_length = 3;
     int32_t use_light_cache_tail = 0;
+
+    bool dump_mc = false;
 };

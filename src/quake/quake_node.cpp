@@ -1,5 +1,6 @@
 #include "quake/quake_node.hpp"
 #include "clear.comp.spv.h"
+#include "ext/json.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "grid.h"
 #include "merian/utils/bitpacking.hpp"
@@ -1258,6 +1259,33 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
 
+    if (dump_mc) {
+        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCVertex), (std::size_t)MC_BUFFER_SIZE);
+        const MCVertex* buf = static_cast<const MCVertex*>(
+            allocator->getStaging()->cmdFromBuffer(cmd, *buffer_outputs[0], 0, sizeof(MCVertex) * count));
+        run.add_submit_callback([buf](const merian::QueueHandle& queue) { 
+            queue->wait_idle();
+            nlohmann::json j;
+
+            for (const MCVertex* v = buf; v < buf + count; v++) {
+                nlohmann::json o;
+                o["N"] = v->state.N;
+                o["buf_idx"] = v->state.buf_idx;
+                o["hash"] = v->state.hash;
+                o["sum_len"] = v->state.sum_len;
+                o["sum_w"] = v->state.sum_w;
+                o["sum_tgt"] = fmt::format("{} {} {}", v->state.sum_tgt.x, v->state.sum_tgt.y, v->state.sum_tgt.z);
+
+                j.emplace_back(o);
+            }
+
+            std::ofstream file("mc_dump.json");
+            file << std::setw(4) << j << std::endl;
+        });
+
+        dump_mc = false;
+    }
+
     frame++;
 }
 
@@ -1607,8 +1635,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("force timediff (ms)", force_timediff,
                         "For reference renders and video outputs.");
 
+    config.st_separate("Debug");
     std::string debug_text = "";
     debug_text += fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                               r_refdef.viewangles[1], r_refdef.viewangles[2]);
     config.output_text(debug_text);
+    dump_mc = config.config_bool("Download 128MB MC states", "Dumps the states as json into mc_dump.json");
 }
