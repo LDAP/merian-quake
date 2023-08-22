@@ -1,35 +1,85 @@
-#define MC_MAX_GRID_WIDTH 100
-#define MC_MIN_GRID_WIDTH .1
-#define MC_GRID_POWER 9.
-#define MC_LEVELS 5
+// ADAPTIVE GRID (sclaes with distance to camera)
+#define MC_ADAPTIVE_GRID_MAX_WIDTH 50
+#define MC_ADAPTIVE_GRID_MIN_WIDTH .1
+#define MC_ADAPTIVE_GRID_POWER 2.
+#define MC_ADAPTIVE_GRID_LEVELS 16
 // Set the target for light cache resolution
-#define MC_TAN_ALPHA_HALF 0.002
+#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.003
+
+// STATIC GRID (does not scale, for state exchange)
+#define MC_STATIC_GRID_WIDTH 25
 
 // Configure ML
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA .01
 
-uint mc_level_for_pos(const vec3 pos, inout uint rng_state) {
-    const float target_grid_width = clamp(2 * MC_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), MC_MIN_GRID_WIDTH, MC_MAX_GRID_WIDTH);
-    const float level = MC_LEVELS * pow((target_grid_width - MC_MIN_GRID_WIDTH) / (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH), 1 / MC_GRID_POWER);
+
+// ADAPTIVE GRID
+
+uint mc_adaptive_level_for_pos(const vec3 pos, inout uint rng_state) {
+    const float target_grid_width = clamp(2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), MC_ADAPTIVE_GRID_MIN_WIDTH, MC_ADAPTIVE_GRID_MAX_WIDTH);
+    const float level = MC_ADAPTIVE_GRID_LEVELS * pow((target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH) / (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH), 1 / MC_ADAPTIVE_GRID_POWER);
     return uint(round(level));
 }
 
-ivec3 mc_grid_idx_for_level_closest(const uint level, const vec3 pos, inout uint rng_state) {
-    const float grid_width = pow(level / float(MC_LEVELS), MC_GRID_POWER) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
+ivec3 mc_adpative_grid_idx_for_level_closest(const uint level, const vec3 pos, inout uint rng_state) {
+    const float grid_width = pow(level / float(MC_ADAPTIVE_GRID_LEVELS), MC_ADAPTIVE_GRID_POWER) * (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH) + MC_ADAPTIVE_GRID_MIN_WIDTH;
     return grid_idx_closest(pos, grid_width);
 }
 
-ivec3 mc_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
-    const float grid_width = pow(level / float(MC_LEVELS), MC_GRID_POWER) * (MC_MAX_GRID_WIDTH - MC_MIN_GRID_WIDTH) + MC_MIN_GRID_WIDTH;
+ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 pos, inout uint rng_state) {
+    const float grid_width = pow(level / float(MC_ADAPTIVE_GRID_LEVELS), MC_ADAPTIVE_GRID_POWER) * (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH) + MC_ADAPTIVE_GRID_MIN_WIDTH;
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
+MCState mc_adaptive_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
+    const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos, rng_state);
+    const uint buf_idx = hash_grid_level(grid_idx, level, MC_ADAPTIVE_BUFFER_SIZE);
+
+    MCState state = mc_states_adaptive[buf_idx].state;
+    state.sum_w *= float(hash2_grid_level(grid_idx, level) == state.hash);
+    return state;
+}
+
+void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const float rand = XorShift32(rng_state);
+    const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
+    const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos, rng_state);
+    const uint buf_idx = hash_grid_level(grid_idx, level, MC_ADAPTIVE_BUFFER_SIZE);
+
+    mc_state.hash = hash2_grid_level(grid_idx, level);
+    mc_states_adaptive[buf_idx].state = mc_state;
+}
+
+
+// STATIC GRID
+
+MCState mc_static_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
+    const uint buf_idx = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE);
+    const uint state_idx = uint(XorShift32(rng_state) * MC_STATIC_VERTEX_STATE_COUNT);
+    
+    MCState state = mc_states_static[buf_idx].states[state_idx];
+    state.sum_w *= float(hash2_grid(grid_idx) == state.hash);
+
+    return state;
+}
+
+void mc_static_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
+    const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
+    const uint buf_idx = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE);
+    const uint state_idx = uint(XorShift32(rng_state) * MC_STATIC_VERTEX_STATE_COUNT);
+
+    mc_state.hash = hash2_grid(grid_idx);
+    mc_states_static[buf_idx].states[state_idx] = mc_state;
+}
+
+
+// GENERAL
+
 MCState mc_state_new(const vec3 pos, const vec3 normal, inout uint rng_state) {
-    const uint level = clamp(mc_level_for_pos(pos, rng_state), 0, MC_LEVELS - 1);
-    const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, buf_idx, hash_level(grid_idx, level)};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0};
     return r;
 }
 
@@ -54,39 +104,6 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
-MCState mc_state_load(const vec3 pos, const vec3 normal, inout uint rng_state) {
-    const float rand = XorShift32(rng_state);
-    const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
-    const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
-
-    MCState state = mc_states[buf_idx].state;
-    state.sum_w *= float(hash_level(grid_idx, level) == state.hash);
-    state.buf_idx = buf_idx;
-    return state;
-}
-
-// return true if a valid state was found
-bool mc_state_load_resample(out MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
-    float score_sum = 0;
-    [[unroll]]
-    for (int i = 0; i < 5; i++) {
-        MCState state = mc_state_load(pos, normal, rng_state);
-        const float candidate_score = state.sum_w;
-        // candidate_score *= exp(- abs(yuv_luminance(light_cache_get(pos, normal, rng_state).rgb) - state.sum_w));
-        // candidate_score *= (1. - (level + 1) / (ML_MAX_N + 1));
-        // candidate_score *= max(dot(state.normal, normal), 0.);
-
-        score_sum += candidate_score;
-        if (XorShift32(rng_state) < candidate_score / score_sum) {
-            // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
-            mc_state = state;
-        }
-    }
-
-    return score_sum > 0.0;
-}
-
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
@@ -98,24 +115,6 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.sum_w   = mix(mc_state.sum_w,   w,          alpha);
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * target, alpha);
     mc_state.sum_len = mix(mc_state.sum_len, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha);
-}
-
-void mc_state_save(in MCState mc_state, const vec3 pos, const vec3 normal, inout uint rng_state) {
-    // update state that was used for sampling
-    {
-        mc_states[mc_state.buf_idx].state = mc_state;
-    }
-
-    // update other levels
-    [[unroll]]
-    for (uint i = 0; i < 1; i++) {
-        const float rand = XorShift32(rng_state);
-        const uint level = clamp(mc_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_LEVELS - 1);
-        const ivec3 grid_idx = mc_grid_idx_for_level_interpolate(level, pos, rng_state);
-        const uint buf_idx = hash_grid_level(grid_idx, level, MC_BUFFER_SIZE);
-        mc_state.hash = hash_level(grid_idx, level);
-        mc_states[buf_idx].state = mc_state;
-    }
 }
 
 bool mc_state_valid(const MCState mc_state) {

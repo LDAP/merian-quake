@@ -1039,7 +1039,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{
-                    {}, MC_BUFFER_SIZE * sizeof(MCVertex), vk::BufferUsageFlagBits::eStorageBuffer},
+                    {}, MC_ADAPTIVE_BUFFER_SIZE * sizeof(MCAdaptiveVertex), vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
             merian::NodeOutputDescriptorBuffer(
                 "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
@@ -1053,7 +1053,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     MC_EXCHANGE_BUFFER_SIZE * sizeof(MCExchangeVertex),
+                                     MC_STATIC_BUFFER_SIZE * sizeof(MCStaticVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },
@@ -1260,17 +1260,16 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     if (dump_mc) {
-        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCVertex), (std::size_t)MC_BUFFER_SIZE);
-        const MCVertex* buf = static_cast<const MCVertex*>(
-            allocator->getStaging()->cmdFromBuffer(cmd, *buffer_outputs[0], 0, sizeof(MCVertex) * count));
+        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCAdaptiveVertex), (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
+        const MCAdaptiveVertex* buf = static_cast<const MCAdaptiveVertex*>(
+            allocator->getStaging()->cmdFromBuffer(cmd, *buffer_outputs[0], 0, sizeof(MCAdaptiveVertex) * count));
         run.add_submit_callback([buf](const merian::QueueHandle& queue) { 
             queue->wait_idle();
             nlohmann::json j;
 
-            for (const MCVertex* v = buf; v < buf + count; v++) {
+            for (const MCAdaptiveVertex* v = buf; v < buf + count; v++) {
                 nlohmann::json o;
                 o["N"] = v->state.N;
-                o["buf_idx"] = v->state.buf_idx;
                 o["hash"] = v->state.hash;
                 o["sum_len"] = v->state.sum_len;
                 o["sum_w"] = v->state.sum_w;

@@ -48,13 +48,13 @@ layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
 layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
 
 layout(set = 0, binding = 5, scalar) buffer buf_mc_states {
-    MCVertex mc_states[];
+    MCAdaptiveVertex mc_states_adaptive[];
 };
 layout(set = 0, binding = 6, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
 layout(set = 0, binding = 7, scalar) buffer buf_mc_exchange {
-    MCExchangeVertex mc_exchange[];
+    MCStaticVertex mc_states_static[];
 };
 
 // QUAKE 

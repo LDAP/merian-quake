@@ -11,8 +11,10 @@ using float16_t = uint16_t;
 
 #endif
 
-#define MC_BUFFER_SIZE 8000000
-#define MC_EXCHANGE_BUFFER_SIZE 40000
+#define MC_ADAPTIVE_BUFFER_SIZE 4000000
+// Should hold roughly whole quake map at 25 cell width
+#define MC_STATIC_BUFFER_SIZE 1000000
+#define MC_STATIC_VERTEX_STATE_COUNT 5
 
 struct MCState {
     vec3 sum_tgt;
@@ -20,16 +22,15 @@ struct MCState {
     uint N;
     float sum_len;
 
-    uint buf_idx;
     uint hash; // grid_idx and level
 };
 
-struct MCVertex {
+struct MCAdaptiveVertex {
     MCState state;
 };
 
-struct MCExchangeVertex {
-    MCState state;
+struct MCStaticVertex {
+    MCState states[MC_STATIC_VERTEX_STATE_COUNT];
 };
 
 #define LIGHT_CACHE_BUFFER_SIZE 4000000

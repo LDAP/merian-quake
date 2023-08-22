@@ -37,7 +37,8 @@
 #define PLAYER_FLAGS_UNDERWATER 2
 
 // MC config
-#define MC_SAMPLES 5
+#define MC_ADAPTIVE_GRID_SAMPLES 3
+#define MC_STATIC_GRID_SAMPLES 2
 
 
 #endif
