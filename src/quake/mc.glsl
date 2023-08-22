@@ -4,7 +4,7 @@
 #define MC_ADAPTIVE_GRID_POWER 4.
 #define MC_ADAPTIVE_GRID_LEVELS 10
 // Set the target for light cache resolution
-#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.002
+#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.003
 
 // STATIC GRID (does not scale, for state exchange)
 #define MC_STATIC_GRID_WIDTH 25.3
@@ -36,7 +36,7 @@ MCState mc_adaptive_load(const vec3 pos, const vec3 normal, inout uint rng_state
     const float rand = XorShift32(rng_state);
     const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_level(grid_idx, level, MC_ADAPTIVE_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
 
     MCState state = mc_states_adaptive[buf_idx].state;
     state.sum_w *= float(hash2_grid_level(grid_idx, level) == state.hash);
@@ -47,7 +47,7 @@ void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal, in
     const float rand = XorShift32(rng_state);
     const uint level = clamp(mc_adaptive_level_for_pos(pos, rng_state) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos, rng_state);
-    const uint buf_idx = hash_grid_level(grid_idx, level, MC_ADAPTIVE_BUFFER_SIZE);
+    const uint buf_idx = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
 
     mc_state.hash = hash2_grid_level(grid_idx, level);
     mc_states_adaptive[buf_idx].state = mc_state;

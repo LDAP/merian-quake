@@ -174,7 +174,7 @@ void main() {
                         [[unroll]]
                         for (int i = 0; i < MC_ADAPTIVE_GRID_SAMPLES; i++) {
                             MCState state = mc_adaptive_load(current_mat.pos, current_mat.normal, rng_state);
-                            scores_adaptive[i] = state.sum_w * float(dot(current_mat.normal, mc_state_dir(state, current_mat.pos)) > 0.);
+                            scores_adaptive[i] = state.sum_w;
 
                             score_sum += scores_adaptive[i];
                             vmfs_adaptive[i] = mc_state_get_vmf(state, current_mat.pos);
@@ -211,10 +211,12 @@ void main() {
 
 
                     // Multiple importance sampling
+                    [[unroll]]
                     for (int i = 0; i < MC_ADAPTIVE_GRID_SAMPLES; i++) {
                         // score_sum > 0 ? results in black artifacts
                         wo_p += (scores_adaptive[i] > 0 ? scores_adaptive[i] * (vmf_pdf(vmfs_adaptive[i].w, dot(wo, vmfs_adaptive[i].xyz))) / score_sum : 0);
                     }
+                    [[unroll]]
                     for (int i = 0; i < MC_STATIC_GRID_SAMPLES; i++) {
                         // score_sum > 0 ? results in black artifacts
                         wo_p += (scores_static[i] > 0 ? scores_static[i] * (vmf_pdf(vmfs_static[i].w, dot(wo, vmfs_static[i].xyz))) / score_sum : 0);
