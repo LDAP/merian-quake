@@ -81,11 +81,9 @@ void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
 void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
-    if (any(greaterThanEqual(pixel, resolution)))
-        return;
 
     // HEALTH and ARMOR bar
-    if (pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
+    if (all(lessThan(pixel, resolution)) && pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
         // simple health + armor indicators
         float val = 0.0;
         vec3 col;
@@ -123,7 +121,7 @@ void main() {
         }
     }
 
-    {
+    if (all(lessThan(pixel, resolution))) {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
         // Should compensate pixel filter..
@@ -280,7 +278,7 @@ void main() {
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
     // irr_samples = vec3(mc_state.sum_w);
 
-    {
+    if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
         vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
