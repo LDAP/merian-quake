@@ -171,9 +171,9 @@ void main() {
                         for (int i = 0; i < MC_SAMPLES; i++) {
                             MCState state;
                             if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB)
-                                state = mc_adaptive_load(current_mat.pos, current_mat.normal, rng_state);
+                                mc_adaptive_load(state, current_mat.pos, current_mat.normal, rng_state);
                             else
-                                state = mc_static_load(current_mat.pos, current_mat.normal, rng_state);
+                                mc_static_load(state, current_mat.pos, current_mat.normal, rng_state);
 
                             scores[i] = state.sum_w;
                             score_sum += scores[i];
