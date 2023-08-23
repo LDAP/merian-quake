@@ -200,7 +200,7 @@ void main() {
                         // score_sum > 0 ? results in black artifacts
                         wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
                     }
-                    wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_diffuse_pdf() * wodotn + (1 - bsdf_p()) * wo_p;
+                    wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_diffuse_pdf(wodotn) + (1 - bsdf_p()) * wo_p;
 
                 }
 
