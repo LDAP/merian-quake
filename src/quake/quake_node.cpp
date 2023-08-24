@@ -1034,11 +1034,13 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
             merian::NodeOutputDescriptorImage::compute_write(
                 "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
-                "gbuffer", vk::Format::eR32G32B32A32Sfloat, width, height),
-            merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16B16A16Sfloat,
-                                                             width, height),
+                "gbuffer", vk::Format::eR32G32B32A32Uint, width, height),
+            merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16Sfloat, width,
+                                                             height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "debug", vk::Format::eR16G16B16A16Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write("moments", vk::Format::eR32G32Sfloat,
+                                                             width, height),
         },
         {
             merian::NodeOutputDescriptorBuffer(
@@ -1227,8 +1229,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     pc.frame = frame - last_worldspawn_frame;
     if (sv_player) {
         // Demos do not have a player set
-        pc.player.health = sv_player->v.health;
-        pc.player.armor = sv_player->v.armorvalue;
         pc.player.flags = 0;
         pc.player.flags |= sv_player->v.weapon == 1 ? PLAYER_FLAGS_TORCH : 0; // shotgun has torch
         pc.player.flags |= sv_player->v.waterlevel >= 3 ? PLAYER_FLAGS_UNDERWATER : 0;

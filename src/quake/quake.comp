@@ -21,64 +21,7 @@
 #include "shading.glsl"
 #include "light_cache.glsl"
 #include "mc.glsl"
-
-// Checks flags and alpha to determine if the intersection should be confirmed.
-bool confirm_intersection(const IntersectionInfo info) {
-    const VertexExtraData extra_data =  buf_ext[nonuniformEXT(info.instance_id)].v[info.primitive_index];
-    const uint16_t alpha = extra_data.texnum_alpha >> 12;
-    const uint16_t flags = extra_data.texnum_fb_flags >> 12;
-    if (flags != MAT_FLAGS_NONE && flags != MAT_FLAGS_SPRITE) {
-        // treat sky, lava, slime,... not transparent for now
-        return true;
-    } else if (alpha != 0) { // 0 means use texture
-        return decode_alpha(alpha) >= ALPHA_THRESHOLD;
-    } else {
-        const vec2 st = extra_data.st_0 * info.barycentrics.x
-                      + extra_data.st_1 * info.barycentrics.y
-                      + extra_data.st_2 * info.barycentrics.z;
-
-        // We covered the flags above, this surface cannot warp
-        // if (flags > 0 && flags < 6) {
-        //     warp(st);
-        // }
-
-        // const uint texnum = extra_data.texnum_alpha & 0xfff;
-        return textureGather(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 3).r >= ALPHA_THRESHOLD;
-    }
-}
-
-// Sets t < 0 if nothing was hit
-void trace_ray(const vec3 x0, const vec3 dir, out IntersectionInfo info) {
-    rayQueryEXT ray_query;
-    rayQueryInitializeEXT(ray_query,
-                          tlas,
-                          gl_RayFlagsCullBackFacingTrianglesEXT,    // Ray flags, None means: If not set in the instance the triangle
-                                                                    // may not be opaque. This is a major performance hit
-                                                                    // since we need to load the texture to determine if we want to trace
-                                                                    // further.
-                                                                    // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
-                          0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
-                          x0,
-                          0,                     // Minimum t-value (we set it here to 0 and pull back the ray)
-                                                 // such that the ray cannot escape in corners.
-                          dir,
-                          T_MAX);                // Maximum t-value
-
-    while(rayQueryProceedEXT(ray_query)) {
-        // We are only interessted in triangles. "false" means candidates too, not only commited
-        if (rayQueryGetIntersectionTypeEXT(ray_query, false) != gl_RayQueryCandidateIntersectionTriangleEXT)
-            continue;
-
-        get_intersection_info_uncommited(ray_query, info);
-        if (confirm_intersection(info))
-            rayQueryConfirmIntersectionEXT(ray_query);
-    }
-
-    if(rayQueryGetIntersectionTypeEXT(ray_query, true) == gl_RayQueryCommittedIntersectionTriangleEXT)
-        get_intersection_info_commited(ray_query, info);
-    else
-        info.t = -1;
-}
+#include "raytrace.glsl"
 
 void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
@@ -102,7 +45,7 @@ void main() {
     }
 
     float normalized_variance;
-    uint SPP;
+    const uint SPP = MAX_SPP;
     {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
@@ -112,20 +55,20 @@ void main() {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
         }
 
-        if (ADAPTIVE_SAMPLING == 1) {
-            const ivec2 iold = ivec2(round(old_pixel));
-            const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
-            const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
-            const float new_z = distance(params.cam_x.xyz, first_mat.pos);
-            const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_mat.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
+        // if (ADAPTIVE_SAMPLING == 1) {
+        //     const ivec2 iold = ivec2(round(old_pixel));
+        //     const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
+        //     const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
+        //     const float new_z = distance(params.cam_x.xyz, first_mat.pos);
+        //     const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_mat.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
             
-            const float mean = mean_variance[0];
-            const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
-            normalized_variance = subgroupMax(var) / mean;
-            SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
-        } else {
-            SPP = MAX_SPP;
-        }
+        //     const float mean = mean_variance[0];
+        //     const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
+        //     normalized_variance = subgroupMax(var) / mean;
+        //     SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
+        // } else {
+        //     SPP = MAX_SPP;
+        // }
     }
 
     {
@@ -281,28 +224,6 @@ void main() {
     // MCState mc_state = mc_state_new();
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
     // irr_samples = vec3(mc_state.sum_w);
-    
-    // HEALTH and ARMOR bar
-    if (all(lessThan(pixel, resolution)) && pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
-        // simple health + armor indicators
-        float val = 0.0;
-        vec3 col;
-        if (pixel.y > imageSize(img_irradiance).y * 0.98) {
-            val = (params.player >> 8) & 0xff;
-            col = vec3(1e7, 0, 0);
-        } else {
-            val = (params.player >> 16) & 0xff;
-            col = vec3(0, 0, 1e7);
-        }
-        float off = (pixel.x / float(imageSize(img_irradiance).x) - 0.8)/0.1;
-        if (off * 100 < val) {
-            imageStore(img_irradiance, pixel, vec4(1));
-            imageStore(img_gbuf, pixel, vec4(0));
-            imageStore(img_albedo, pixel, vec4(col, 1));
-            imageStore(img_mv, pixel, vec4(0));
-            return;
-        }
-    }
 
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
@@ -312,15 +233,15 @@ void main() {
         albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 
         irr_samples /= albedo;
-        float alb_l = yuv_luminance(albedo);
+        const float alb_l = yuv_luminance(albedo);
         moments /= vec2(alb_l, alb_l * alb_l);
 
         // Store irradiance
-        imageStore(img_irradiance, pixel, vec4(irr_samples, SPP));
+        imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
 
         // Store GBuffer
-        float l = yuv_luminance(irr_samples.rgb);
-        imageStore(img_gbuf, pixel, vec4(geo_encode_normal_float(first_mat.normal), distance(params.cam_x.xyz, first_mat.pos), moments));
+        imageStore(img_gbuf, pixel, uvec4(geo_encode_normal(first_mat.normal), floatBitsToUint(distance(params.cam_x.xyz, first_mat.pos)), 0, 0));
+        imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 
     // vec4 l = light_cache_get(first_mat.pos, first_mat.normal, rng_state);

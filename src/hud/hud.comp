@@ -1,0 +1,45 @@
+#version 460
+#extension GL_GOOGLE_include_directive              : enable
+
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D img_in;
+layout(set = 0, binding = 1) uniform writeonly image2D img_out;
+
+layout(push_constant) uniform PushConstant { 
+    float armor;
+    float health;
+} pc;
+
+void main() {
+    const ivec2 pixel = ivec2(gl_GlobalInvocationID);
+    const ivec2 resolution = ivec2(imageSize(img_out));
+
+    if (any(greaterThanEqual(pixel, imageSize(img_out))))
+        return;
+
+    vec3 color = texelFetch(img_in, pixel, 0).rgb;
+
+    if (pixel.y > imageSize(img_out).y * 0.96 && pixel.x > imageSize(img_out).x * 0.8) {
+        // simple health + armor indicators
+        float val = 0.0;
+        vec3 col;
+        if (pixel.y > imageSize(img_out).y * 0.98) {
+            val = pc.health;
+            col = vec3(1, 0, 0);
+        } else {
+            val = pc.armor;
+            col = vec3(0, 1, 1);
+        }
+        const float off = (pixel.x / float(imageSize(img_out).x) - 0.8) / 0.1;
+        if (off * 100 < val) {
+            color = mix(color, col, 0.5);
+        }
+    }
+
+    if (distance(pixel, imageSize(img_out) / vec2(2)) < .004 * imageSize(img_out).x) {
+        color = any(lessThan(abs(vec2(pixel) - imageSize(img_out).rg / vec2(2)), vec2(2))) ? vec3(.1, .1, .1) : color;
+    }
+
+    imageStore(img_out, pixel, vec4(color, 1));
+}

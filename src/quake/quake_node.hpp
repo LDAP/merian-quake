@@ -52,9 +52,9 @@ class QuakeNode : public merian::Node {
     struct PlayerData {
         // see PLAYER_* in config.h
         unsigned char flags;
-        unsigned char health;
-        unsigned char armor;
-        unsigned char padding;
+        unsigned char padding0;
+        unsigned char padding1;
+        unsigned char padding2;
     };
 
     struct RTConfig {

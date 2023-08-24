@@ -1,17 +1,7 @@
 shaders = [
-    'quake.comp',
-    'clear.comp',
-    'gbuf.comp',
+    'hud.comp',
 ]
 included_files = files(
-    'quake_water.glsl',
-    'config.h',
-    'layout.glsl',
-    'grid.h',
-    'shading.glsl',
-    'mc.glsl',
-    'light_cache.glsl',
-    'raytrace.glsl'
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',
@@ -39,4 +29,4 @@ foreach s : shaders
   )
 endforeach
 
-src_files += files('quake_node.cpp')
+src_files += files('hud.cpp')

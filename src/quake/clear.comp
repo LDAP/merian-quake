@@ -19,6 +19,6 @@ main() {
 
   imageStore(img_irradiance, ipos, vec4(0));
   imageStore(img_albedo, ipos, vec4(0));
-  imageStore(img_gbuf, ipos, vec4(0));
+  imageStore(img_gbuf, ipos, uvec4(0));
   imageStore(img_mv, ipos, vec4(0));
 }
