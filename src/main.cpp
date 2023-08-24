@@ -114,7 +114,7 @@ int main(const int argc, const char** argv) {
 
     graph.connect_image(tonemap, output, 0, 0);
     //  debug output
-    //graph.connect_image(quake, output, 4, 0);
+    // graph.connect_image(quake, output, 4, 0);
 
     graph.connect_image(svgf, image_writer, 0, 0);
 
@@ -125,8 +125,8 @@ int main(const int argc, const char** argv) {
     merian::GLFWImGui imgui(context, true);
     merian::Profiler::Report report;
     bool clear_profiler = false;
-    merian::Stopwatch sw;
-
+    merian::Stopwatch report_intervall;
+    merian::Stopwatch frametime;
     auto load = merian::JSONLoadConfiguration("config.json");
     graph.get_configuration(load);
 
@@ -137,10 +137,10 @@ int main(const int argc, const char** argv) {
             frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
         } else {
             frame_data.user_data.profiler->collect();
-            if (sw.millis() > 100) {
+            if (report_intervall.millis() > 100) {
                 report = frame_data.user_data.profiler->get_report();
                 clear_profiler = true;
-                sw.reset();
+                report_intervall.reset();
             } else {
                 clear_profiler = false;
             }
@@ -158,7 +158,11 @@ int main(const int argc, const char** argv) {
         if (output->current_aquire_result().has_value()) {
             imgui.new_frame(cmd, *window, output->current_aquire_result().value());
 
-            ImGui::Begin("Quake Debug");
+            const double frametime_ms = frametime.millis();
+            frametime.reset();
+            ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
+                                     frametime_ms, 1000 / frametime_ms)
+                             .c_str());
 
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
