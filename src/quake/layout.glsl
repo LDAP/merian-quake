@@ -6,7 +6,7 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-layout (constant_id = 2) const int SPP = 1;
+layout (constant_id = 2) const int MAX_SPP = 4;
 layout (constant_id = 3) const int MAX_PATH_LENGTH = 3;
 layout (constant_id = 4) const int USE_LIGHT_CACHE_TAIL = 0;
 layout (constant_id = 5) const float FOV_TAN_ALPHA_HALF = 0;
@@ -16,6 +16,7 @@ layout (constant_id = 8) const float SUN_W_Z = 0;
 layout (constant_id = 9) const float SUN_COLOR_R = 0;
 layout (constant_id = 10) const float SUN_COLOR_G = 0;
 layout (constant_id = 11) const float SUN_COLOR_B = 0;
+layout (constant_id = 12) const int ADAPTIVE_SAMPLING = 0;
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x;
@@ -38,22 +39,31 @@ float bsdf_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
 float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 
 
-// GRAPH IN/OUTs
-
+// GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
+layout(set = 0, binding = 1) uniform sampler2D img_prev_filtered;
+layout(set = 0, binding = 2) uniform sampler2D img_prev_gbuf;
 
-layout(set = 0, binding = 1) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 2) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 3) uniform writeonly image2D img_gbuf;
-layout(set = 0, binding = 4) uniform writeonly image2D img_mv;
+// GRAPH buffer in
+layout(set = 0, binding = 3, scalar) buffer buf_filtered_image {
+    float mean_variance[];
+};
 
-layout(set = 0, binding = 5, scalar) buffer buf_mc_states {
+// GRAPH image out
+layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
+layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
+layout(set = 0, binding = 6) uniform writeonly image2D img_gbuf;
+layout(set = 0, binding = 7) uniform writeonly image2D img_mv;
+layout(set = 0, binding = 8) uniform writeonly image2D img_debug;
+
+// GRAPH buffer out
+layout(set = 0, binding = 9, scalar) buffer buf_mc_states {
     MCAdaptiveVertex mc_states_adaptive[];
 };
-layout(set = 0, binding = 6, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 10, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 7, scalar) buffer buf_mc_exchange {
+layout(set = 0, binding = 11, scalar) buffer buf_mc_exchange {
     MCStaticVertex mc_states_static[];
 };
 

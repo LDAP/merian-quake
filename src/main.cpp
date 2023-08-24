@@ -7,6 +7,7 @@
 #include "merian-nodes/exposure/exposure.hpp"
 #include "merian-nodes/image/image.hpp"
 #include "merian-nodes/image_write/image_write.hpp"
+#include "merian-nodes/median_approx/median.hpp"
 #include "merian-nodes/shadertoy_spheres/spheres.hpp"
 #include "merian-nodes/svgf/svgf.hpp"
 #include "merian-nodes/taa/taa.hpp"
@@ -72,6 +73,7 @@ int main(const int argc, const char** argv) {
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
     auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
+    auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
 
     graph.add_node("output", output);
     graph.add_node("black_color", black);
@@ -82,6 +84,7 @@ int main(const int argc, const char** argv) {
     graph.add_node("tonemap", tonemap);
     graph.add_node("image writer", image_writer);
     graph.add_node("exposure", exposure);
+    graph.add_node("median variance", median);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -92,6 +95,11 @@ int main(const int argc, const char** argv) {
     graph.connect_image(quake, accum, 2, 4);
     graph.connect_image(quake, accum, 3, 5); // mv
 
+    graph.connect_image(quake, quake, 2, 2); // gbuf
+
+    graph.connect_image(svgf, quake, 0, 1); // prev final image (with variance)
+    graph.connect_buffer(median, quake, 0, 0);
+
     graph.connect_image(svgf, svgf, 0, 0);  // feedback
     graph.connect_image(accum, svgf, 0, 1); // irr
     graph.connect_image(accum, svgf, 1, 2); // moments
@@ -100,11 +108,13 @@ int main(const int argc, const char** argv) {
     graph.connect_image(quake, svgf, 1, 5); // albedo
     graph.connect_image(quake, svgf, 3, 6); // mv
     graph.connect_image(svgf, exposure, 0, 0);
+    graph.connect_image(svgf, median, 0, 0);
 
     graph.connect_image(exposure, tonemap, 0, 0);
 
     graph.connect_image(tonemap, output, 0, 0);
-    // graph.connect_image(quake, output, 1, 0);
+    //  debug output
+    //graph.connect_image(quake, output, 4, 0);
 
     graph.connect_image(svgf, image_writer, 0, 0);
 

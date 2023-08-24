@@ -1013,8 +1013,12 @@ QuakeNode::describe_inputs() {
     return {
         {
             merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
+            merian::NodeInputDescriptorImage::compute_read("prev_filtered", 1),
+            merian::NodeInputDescriptorImage::compute_read("prev_gbuf", 1),
         },
-        {},
+        {
+            merian::NodeInputDescriptorBuffer::compute_read("mean_filtered", 1),
+        },
     };
 }
 
@@ -1033,13 +1037,16 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "gbuffer", vk::Format::eR32G32B32A32Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16B16A16Sfloat,
                                                              width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "debug", vk::Format::eR16G16B16A16Sfloat, width, height),
         },
         {
             merian::NodeOutputDescriptorBuffer(
                 "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
-                vk::BufferCreateInfo{
-                    {}, MC_ADAPTIVE_BUFFER_SIZE * sizeof(MCAdaptiveVertex), vk::BufferUsageFlagBits::eStorageBuffer},
+                vk::BufferCreateInfo{{},
+                                     MC_ADAPTIVE_BUFFER_SIZE * sizeof(MCAdaptiveVertex),
+                                     vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
             merian::NodeOutputDescriptorBuffer(
                 "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
@@ -1084,7 +1091,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
-                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b);
+                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1260,10 +1267,12 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     if (dump_mc) {
-        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCAdaptiveVertex), (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
-        const MCAdaptiveVertex* buf = static_cast<const MCAdaptiveVertex*>(
-            allocator->getStaging()->cmdFromBuffer(cmd, *buffer_outputs[0], 0, sizeof(MCAdaptiveVertex) * count));
-        run.add_submit_callback([buf](const merian::QueueHandle& queue) { 
+        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCAdaptiveVertex),
+                                           (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
+        const MCAdaptiveVertex* buf =
+            static_cast<const MCAdaptiveVertex*>(allocator->getStaging()->cmdFromBuffer(
+                cmd, *buffer_outputs[0], 0, sizeof(MCAdaptiveVertex) * count));
+        run.add_submit_callback([buf](const merian::QueueHandle& queue) {
             queue->wait_idle();
             nlohmann::json j;
 
@@ -1273,7 +1282,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                 o["hash"] = v->state.hash;
                 o["sum_len"] = v->state.sum_len;
                 o["sum_w"] = v->state.sum_w;
-                o["sum_tgt"] = fmt::format("{} {} {}", v->state.sum_tgt.x, v->state.sum_tgt.y, v->state.sum_tgt.z);
+                o["sum_tgt"] = fmt::format("{} {} {}", v->state.sum_tgt.x, v->state.sum_tgt.y,
+                                           v->state.sum_tgt.z);
 
                 j.emplace_back(o);
             }
@@ -1611,9 +1621,11 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_spp = spp;
     const int32_t old_max_path_lenght = max_path_length;
     const int32_t old_use_light_cache_tail = use_light_cache_tail;
+    const int32_t old_adaptive_sampling = adaptive_sampling;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
     config.config_int("spp", spp, 0, 15, "samples per pixel");
+    config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
     config.config_percent("BDSF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
@@ -1624,7 +1636,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     pc.rt_config.flags = 0;
 
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
-        old_use_light_cache_tail != use_light_cache_tail) {
+        old_use_light_cache_tail != use_light_cache_tail ||
+        old_adaptive_sampling != adaptive_sampling) {
         needs_rebuild = true;
     }
 
@@ -1639,5 +1652,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     debug_text += fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                               r_refdef.viewangles[1], r_refdef.viewangles[2]);
     config.output_text(debug_text);
-    dump_mc = config.config_bool("Download 128MB MC states", "Dumps the states as json into mc_dump.json");
+    dump_mc = config.config_bool("Download 128MB MC states",
+                                 "Dumps the states as json into mc_dump.json");
 }

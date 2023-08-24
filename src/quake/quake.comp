@@ -5,6 +5,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types  : enable
 #extension GL_EXT_nonuniform_qualifier              : enable
 #extension GL_EXT_control_flow_attributes           : enable
+#extension GL_KHR_shader_subgroup_ballot            : enable
+#extension GL_KHR_shader_subgroup_arithmetic        : enable
 
 #include "common/camera.glsl"
 #include "common/random.glsl"
@@ -82,28 +84,6 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
 
-    // HEALTH and ARMOR bar
-    if (all(lessThan(pixel, resolution)) && pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
-        // simple health + armor indicators
-        float val = 0.0;
-        vec3 col;
-        if (pixel.y > imageSize(img_irradiance).y * 0.98) {
-            val = (params.player >> 8) & 0xff;
-            col = vec3(1e7, 0, 0);
-        } else {
-            val = (params.player >> 16) & 0xff;
-            col = vec3(0, 0, 1e7);
-        }
-        float off = (pixel.x / float(imageSize(img_irradiance).x) - 0.8)/0.1;
-        if (off * 100 < val) {
-            imageStore(img_irradiance, pixel, vec4(1));
-            imageStore(img_gbuf, pixel, vec4(0));
-            imageStore(img_albedo, pixel, vec4(col, 1));
-            imageStore(img_mv, pixel, vec4(0));
-            return;
-        }
-    }
-
     uint rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
     vec2 moments = vec2(0);
     vec3 irr_samples = vec3(0); // store sample count in `a` for accum node
@@ -121,12 +101,31 @@ void main() {
         }
     }
 
-    if (all(lessThan(pixel, resolution))) {
+    float normalized_variance;
+    uint SPP;
+    {
         // Store motion vector
         const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
         // Should compensate pixel filter..
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
+        if (all(lessThan(pixel, resolution))) {
+            imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
+        }
+
+        if (ADAPTIVE_SAMPLING == 1) {
+            const ivec2 iold = ivec2(round(old_pixel));
+            const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
+            const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
+            const float new_z = distance(params.cam_x.xyz, first_mat.pos);
+            const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_mat.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
+            
+            const float mean = mean_variance[0];
+            const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
+            normalized_variance = subgroupMax(var) / mean;
+            SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
+        } else {
+            SPP = MAX_SPP;
+        }
     }
 
     {
@@ -267,6 +266,11 @@ void main() {
         }
     }
 
+    // irr_samples = filtered;
+    // if (all(lessThan(pixel, resolution))) {
+    //     imageStore(img_debug, pixel, vec4(SPP) / MAX_SPP);
+    // }
+
     // show light cache
     // irr_samples = vec3(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
     
@@ -277,6 +281,28 @@ void main() {
     // MCState mc_state = mc_state_new();
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
     // irr_samples = vec3(mc_state.sum_w);
+    
+    // HEALTH and ARMOR bar
+    if (all(lessThan(pixel, resolution)) && pixel.y > imageSize(img_irradiance).y * 0.96 && pixel.x > imageSize(img_irradiance).x*0.8) {
+        // simple health + armor indicators
+        float val = 0.0;
+        vec3 col;
+        if (pixel.y > imageSize(img_irradiance).y * 0.98) {
+            val = (params.player >> 8) & 0xff;
+            col = vec3(1e7, 0, 0);
+        } else {
+            val = (params.player >> 16) & 0xff;
+            col = vec3(0, 0, 1e7);
+        }
+        float off = (pixel.x / float(imageSize(img_irradiance).x) - 0.8)/0.1;
+        if (off * 100 < val) {
+            imageStore(img_irradiance, pixel, vec4(1));
+            imageStore(img_gbuf, pixel, vec4(0));
+            imageStore(img_albedo, pixel, vec4(col, 1));
+            imageStore(img_mv, pixel, vec4(0));
+            return;
+        }
+    }
 
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
