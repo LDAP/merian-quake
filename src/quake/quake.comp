@@ -48,7 +48,6 @@ void main() {
         }
     }
 
-    float normalized_variance;
     const uint SPP = MAX_SPP;
     {
         // Store motion vector
@@ -68,7 +67,7 @@ void main() {
             
         //     const float mean = mean_variance[0];
         //     const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
-        //     normalized_variance = subgroupMax(var) / mean;
+        //     float normalized_variance = subgroupMax(var) / mean;
         //     SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
         // } else {
         //     SPP = MAX_SPP;
