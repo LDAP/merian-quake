@@ -9,9 +9,7 @@ bool confirm_intersection(const IntersectionInfo info) {
     } else if (alpha != 0) { // 0 means use texture
         return decode_alpha(alpha) >= ALPHA_THRESHOLD;
     } else {
-        const vec2 st = extra_data.st_0 * info.barycentrics.x
-                      + extra_data.st_1 * info.barycentrics.y
-                      + extra_data.st_2 * info.barycentrics.z;
+        const vec2 st = extra_data.st * info.barycentrics;
 
         // We covered the flags above, this surface cannot warp
         // if (flags > 0 && flags < 6) {

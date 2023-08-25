@@ -62,27 +62,6 @@ void get_verts_pos_geonormal(out mat3 verts,
     geo_normal = f16vec3(normalize(cross(verts[2] - verts[0], verts[1] - verts[0])));
 }
 
-vec3 apply_normalmap(const vec3 v0,
-                     const vec3 v1,
-                     const vec3 v2,
-                     const f16vec2 st0,
-                     const f16vec2 st1,
-                     const f16vec2 st2,
-                     const vec3 geo_normal,
-                     const vec3 tangent_normal) {
-    vec3 du = v2 - v0, dv = v1 - v0;
-    const f16vec2 duv1 = st2 - st0, duv2 = st1 - st0;
-    const float16_t det = duv1.x * duv2.y - duv2.x * duv1.y;
-    if(abs(det) > 1e-8) {
-      const vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
-      dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
-      du = du2;
-    }
-    vec3 n = normalize(mat3(du, dv, geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
-    // if (dot(geo_normal, n) <= 0) n -= geo_normal * dot(geo_normal, n);
-    return n;
-}
-
 void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
     vec3 emm = vec3(0);
     if((params.sky_lf_ft & 0xffff) == 0xffff) {
@@ -135,9 +114,7 @@ void get_shading_material(const IntersectionInfo info,
         return;
     }
 
-    vec2 st = extra_data.st_0 * info.barycentrics.x
-            + extra_data.st_1 * info.barycentrics.y
-            + extra_data.st_2 * info.barycentrics.z;
+    vec2 st = extra_data.st * info.barycentrics;
 
     if (flags > 0 && flags < 5) {
         warp(st);
@@ -170,7 +147,17 @@ void get_shading_material(const IntersectionInfo info,
         if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
             // overwrite geo normal with normal map normal
             const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
-            mat.normal = apply_normalmap(verts[0], verts[1], verts[2], extra_data.st_0, extra_data.st_1, extra_data.st_2, mat.normal, tangent_normal);
+
+            vec3 du = verts[2] - verts[0], dv = verts[1] - verts[0];
+            const f16vec2 duv1 = extra_data.st[2] - extra_data.st[0], duv2 = extra_data.st[1] - extra_data.st[0];
+            const float16_t det = duv1.x * duv2.y - duv2.x * duv1.y;
+            if(abs(det) > 1e-8) {
+              const vec3 du2 =  normalize(( duv2.y * du - duv1.y * dv) / det);
+              dv = -normalize((-duv2.x * du + duv1.x * dv) / det);
+              du = du2;
+            }
+
+            mat.normal = normalize(mat3(du, dv, mat.geo_normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
         }
         if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
             mat.gloss = float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r);
