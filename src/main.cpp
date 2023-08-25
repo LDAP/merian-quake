@@ -42,7 +42,7 @@ int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::debug);
     merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
 
-    auto debugUtils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    auto debugUtils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
     auto extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();

@@ -210,6 +210,8 @@ class QuakeNode : public merian::Node {
 
     void parse_worldspawn();
 
+    void compact_static_blas(const vk::CommandBuffer& async_cmd);
+
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
@@ -268,7 +270,12 @@ class QuakeNode : public merian::Node {
         // Can be nullptr if there is not geometry
         merian::AccelerationStructureHandle tlas{nullptr};
         uint32_t last_instances_size{};
+
+        vk::Semaphore semaphore{VK_NULL_HANDLE};
+        std::shared_ptr<merian::CommandPool> async_pool;
     };
+
+    merian::QueueHandle async_queue;
 
     // Access using frame % frames.size()
     std::vector<FrameData> frames;
@@ -303,6 +310,9 @@ class QuakeNode : public merian::Node {
 
     std::queue<std::string> pending_commands;
     bool worldspawn = false;
+
+    int compaction_state = 2; // 0 waits for compaction, 1: waits for results, 2: done
+    vk::QueryPool as_size_query_pool;
 
     double old_time = 0;
     bool update_gamestate = true;

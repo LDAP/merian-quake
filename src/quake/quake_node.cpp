@@ -759,10 +759,14 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             .add_binding_acceleration_structure()
             .build_layout(context);
     quake_pool = std::make_shared<merian::DescriptorPool>(quake_desc_set_layout, frames_in_flight);
+
+    async_queue = context->get_queue_C();
     for (auto& frame : frames) {
         frame.quake_sets = std::make_shared<merian::DescriptorSet>(quake_pool);
         frame.blas_builder = std::make_unique<merian::BLASBuilder>(context, allocator);
         frame.tlas_builder = std::make_unique<merian::TLASBuilder>(context, allocator);
+        frame.semaphore = context->device.createSemaphore(vk::SemaphoreCreateInfo{});
+        frame.async_pool = std::make_shared<merian::CommandPool>(async_queue);
     }
 
     binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
@@ -854,10 +858,19 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                 shm->samplepos = 0;
         });
     audio_device->unpause_audio();
+
+    vk::QueryPoolCreateInfo qpci{{}, vk::QueryType::eAccelerationStructureCompactedSizeKHR, 4};
+    as_size_query_pool = context->device.createQueryPool(qpci);
 }
 
 QuakeNode::~QuakeNode() {
     deinit_quake();
+
+    for (auto& frame : frames) {
+        context->device.destroySemaphore(frame.semaphore);
+    }
+
+    context->device.destroyQueryPool(as_size_query_pool);
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1175,22 +1188,33 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
 
     // UPDATE GEOMETRY
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
+        // MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
+        cur_frame.async_pool->reset();
+        auto async_cmd = cur_frame.async_pool->create_and_begin();
+
         if (worldspawn) {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
-            update_static_geo(cmd, true);
+            // MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), async_cmd, "upload static");
+            update_static_geo(async_cmd, true);
+            compaction_state = 0;
             last_worldspawn_frame = frame;
         } else {
-            update_static_geo(cmd, false);
+            update_static_geo(async_cmd, false);
         }
         {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload dynamic");
-            update_dynamic_geo(cmd);
+            // MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), async_cmd, "upload dynamic");
+            update_dynamic_geo(async_cmd);
         }
         {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "build acceleration structures");
-            update_as(cmd, run.get_profiler());
+            // MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), async_cmd, "build acceleration
+            // structures");
+            update_as(async_cmd, run.get_profiler());
         }
+
+        compact_static_blas(async_cmd);
+
+        cur_frame.async_pool->end_all();
+        async_queue->submit(cur_frame.async_pool, {}, {cur_frame.semaphore});
+        run.add_wait_semaphore(cur_frame.semaphore, vk::PipelineStageFlagBits::eComputeShader);
     }
 
     // UPDATE TEXTURES
@@ -1303,6 +1327,75 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     frame++;
 }
 
+void QuakeNode::compact_static_blas(const vk::CommandBuffer& async_cmd) {
+    switch (compaction_state) {
+    case 0: {
+        if (current_static_geo.empty()) {
+            compaction_state = 2;
+            return;
+        }
+
+        async_cmd.resetQueryPool(as_size_query_pool, 0,
+                                 static_cast<uint32_t>(current_static_geo.size()));
+        std::vector<vk::AccelerationStructureKHR> acc_structures(current_static_geo.size());
+        std::transform(current_static_geo.begin(), current_static_geo.end(), acc_structures.begin(),
+                       [&](auto& as) { return as.blas->get_acceleration_structure(); });
+        async_cmd.writeAccelerationStructuresPropertiesKHR(
+            acc_structures, vk::QueryType::eAccelerationStructureCompactedSizeKHR,
+            as_size_query_pool, 0);
+        compaction_state = 1;
+        break;
+    }
+    case 1: {
+        std::vector<vk::DeviceSize> compact_sizes(static_cast<uint32_t>(current_static_geo.size()));
+        vk::Result result = context->device.getQueryPoolResults(
+            as_size_query_pool, 0, (uint32_t)compact_sizes.size(),
+            compact_sizes.size() * sizeof(vk::DeviceSize), compact_sizes.data(),
+            sizeof(VkDeviceSize), vk::QueryResultFlagBits::eWait);
+
+        if (result == vk::Result::eNotReady)
+            return;
+        check_result(result, "could not get query pool results");
+
+        for (uint32_t i = 0; i < current_static_geo.size(); i++) {
+            auto size_info = current_static_geo[i].blas->get_size_info();
+            size_info.accelerationStructureSize = compact_sizes[i];
+
+            // Creating a compact version of the AS
+            current_static_geo[i].blas = allocator->createAccelerationStructure(
+                vk::AccelerationStructureTypeKHR::eBottomLevel, size_info);
+
+            // at this point the current static blases are also in the cur_frame structure
+            FrameData& cur_frame = current_frame();
+
+            // Copy the original BLAS to a compact version
+            vk::CopyAccelerationStructureInfoKHR copy_info{
+                *cur_frame.static_geometries[i].blas, *current_static_geo[i].blas,
+                vk::CopyAccelerationStructureModeKHR::eCompact};
+            async_cmd.copyAccelerationStructureKHR(copy_info);
+        }
+
+        vk::MemoryBarrier2 copy_tlas_barrier{
+            vk::PipelineStageFlagBits2::eAccelerationStructureCopyKHR,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                vk::AccessFlagBits2::eAccelerationStructureWriteKHR};
+        vk::DependencyInfo dep_copy_tlas{{}, copy_tlas_barrier};
+        async_cmd.pipelineBarrier2(dep_copy_tlas);
+
+        SPDLOG_DEBUG("compacted static BLASs");
+        compaction_state = 2;
+        break;
+    }
+    case 2: {
+        // done
+        break;
+    }
+    }
+}
+
 void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
     // Make sure the current_textures is valid for the current frame
     for (auto texnum : pending_uploads) {
@@ -1393,7 +1486,9 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 1);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext,
+                                                            cur_frame.blas_builder, old_geo, true,
+                                                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise
             | vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
         }
@@ -1406,7 +1501,9 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 2);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext,
+                                                            cur_frame.blas_builder, old_geo, true,
+                                                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
         SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
@@ -1519,7 +1616,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
 void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHandle profiler) {
     FrameData& cur_frame = current_frame();
     {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "blas");
+        // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "blas");
         cur_frame.blas_builder->get_cmds(cmd);
     }
 
@@ -1584,7 +1681,7 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
     update.update(context);
 
     {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "tlas");
+        // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "tlas");
         cur_frame.tlas_builder->get_cmds(cmd);
         cur_frame.tlas_builder->cmd_barrier(cmd, vk::PipelineStageFlagBits::eComputeShader);
     }
