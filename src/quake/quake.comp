@@ -49,30 +49,6 @@ void main() {
     }
 
     const uint SPP = MAX_SPP;
-    {
-        // Store motion vector
-        const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
-        // Should compensate pixel filter..
-        const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        if (all(lessThan(pixel, resolution))) {
-            imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-        }
-
-        // if (ADAPTIVE_SAMPLING == 1) {
-        //     const ivec2 iold = ivec2(round(old_pixel));
-        //     const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
-        //     const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
-        //     const float new_z = distance(params.cam_x.xyz, first_mat.pos);
-        //     const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_mat.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
-            
-        //     const float mean = mean_variance[0];
-        //     const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
-        //     float normalized_variance = subgroupMax(var) / mean;
-        //     SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
-        // } else {
-        //     SPP = MAX_SPP;
-        // }
-    }
 
     {
         // Evaluate direct light
@@ -231,7 +207,6 @@ void main() {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
         vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-        imageStore(img_albedo, pixel, vec4(albedo, 1));
         albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 
         irr_samples /= albedo;
@@ -240,11 +215,6 @@ void main() {
 
         // Store irradiance
         imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
-
-        // Store GBuffer
-        gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
-        gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
-
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 

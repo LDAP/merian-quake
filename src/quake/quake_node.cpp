@@ -1,6 +1,7 @@
 #include "quake/quake_node.hpp"
 #include "clear.comp.spv.h"
 #include "ext/json.hpp"
+#include "gbuf.comp.spv.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "grid.h"
 #include "merian-nodes/common/gbuffer.glsl.h"
@@ -749,6 +750,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                                                        merian_quake_comp_spv());
     clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(),
                                                           merian_clear_comp_spv());
+    gbuf_shader = std::make_shared<merian::ShaderModule>(context, merian_gbuf_comp_spv_size(),
+                                                         merian_gbuf_comp_spv());
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -1103,6 +1106,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
                                                                spec_builder.build());
+        gbuf_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, gbuf_shader,
+                                                              spec_builder.build());
     }
 
     // DUMMY IMAGE as placeholder
@@ -1260,9 +1265,20 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.sky[2] = static_cast<uint16_t>(-1u);
     }
 
-    // BIND PIPELINE
+    // GBUFFER
     {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "GBuffer");
+        gbuf_pipe->bind(cmd);
+        gbuf_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        gbuf_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
+        gbuf_pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+    }
+
+    // RAYTRACE
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "Raytrace");
         pipe->bind(cmd);
         pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);

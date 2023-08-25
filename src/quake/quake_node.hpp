@@ -218,6 +218,8 @@ class QuakeNode : public merian::Node {
 
     merian::ShaderModuleHandle rt_shader;
     merian::ShaderModuleHandle clear_shader;
+    merian::ShaderModuleHandle gbuf_shader;
+
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
     merian::DescriptorPoolHandle graph_pool;
     std::vector<merian::DescriptorSetHandle> graph_sets;
@@ -234,6 +236,7 @@ class QuakeNode : public merian::Node {
 
     merian::PipelineHandle pipe;
     merian::PipelineHandle clear_pipe;
+    merian::PipelineHandle gbuf_pipe;
 
     // ----------------------------------------------------
     // Params

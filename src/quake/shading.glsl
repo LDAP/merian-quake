@@ -1,5 +1,7 @@
 #include "common/von_mises_fisher.glsl"
 #include "common/cubemap.glsl"
+#include "common/raytrace.glsl"
+#include "common/normal_encode.glsl"
 
 struct ShadingMaterial {
     vec4 albedo;
