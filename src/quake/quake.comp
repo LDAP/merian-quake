@@ -240,7 +240,9 @@ void main() {
         imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
 
         // Store GBuffer
-        imageStore(img_gbuf, pixel, uvec4(geo_encode_normal(first_mat.normal), floatBitsToUint(distance(params.cam_x.xyz, first_mat.pos)), 0, 0));
+        gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
+        gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
+
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 

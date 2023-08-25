@@ -1,15 +1,4 @@
-#ifdef __cplusplus
-
-#include "glm/glm.hpp"
-#include <cstdint>
-
-using uint = uint32_t;
-using vec3 = glm::vec3;
-using ivec3 = glm::ivec3;
-using vec4 = glm::vec4;
-using float16_t = uint16_t;
-
-#endif
+#include "merian-nodes/common/types.glsl.h"
 
 #define MC_ADAPTIVE_BUFFER_SIZE 4000000
 #define MC_STATIC_BUFFER_SIZE 200000

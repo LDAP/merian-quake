@@ -3,6 +3,7 @@
 #include "ext/json.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "grid.h"
+#include "merian-nodes/common/gbuffer.glsl.h"
 #include "merian/utils/bitpacking.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/glm.hpp"
@@ -1014,10 +1015,10 @@ QuakeNode::describe_inputs() {
         {
             merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
             merian::NodeInputDescriptorImage::compute_read("prev_filtered", 1),
-            merian::NodeInputDescriptorImage::compute_read("prev_gbuf", 1),
         },
         {
             merian::NodeInputDescriptorBuffer::compute_read("mean_filtered", 1),
+            merian::NodeInputDescriptorBuffer::compute_read("prev_gbuf", 1),
         },
     };
 }
@@ -1033,8 +1034,6 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "irradiance", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
-            merian::NodeOutputDescriptorImage::compute_write(
-                "gbuffer", vk::Format::eR32G32B32A32Uint, width, height),
             merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16Sfloat, width,
                                                              height),
             merian::NodeOutputDescriptorImage::compute_write(
@@ -1065,6 +1064,12 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                                      MC_STATIC_BUFFER_SIZE * sizeof(MCStaticVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
+            merian::NodeOutputDescriptorBuffer(
+                "gbuffer", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{{},
+                                     width * height * sizeof(merian::GBuffer),
+                                     vk::BufferUsageFlagBits::eStorageBuffer}),
         },
     };
 }

@@ -1,5 +1,6 @@
 #include "config.h"
 #include "grid.h"
+#include "merian-nodes/common/gbuffer.glsl.h"
 
 #extension GL_EXT_scalar_block_layout       : require
 #extension GL_EXT_shader_16bit_storage      : enable
@@ -42,30 +43,34 @@ float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
 // GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
 layout(set = 0, binding = 1) uniform sampler2D img_prev_filtered;
-layout(set = 0, binding = 2) uniform usampler2D img_prev_gbuf;
 
 // GRAPH buffer in
-layout(set = 0, binding = 3, scalar) buffer buf_filtered_image {
+layout(set = 0, binding = 2, scalar) buffer buf_filtered_image {
     float mean_variance[];
+};
+layout(set = 0, binding = 3, scalar) buffer buf_prev_gbuf {
+    GBuffer prev_gbuffer[];
 };
 
 // GRAPH image out
 layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
 layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly uimage2D img_gbuf;
-layout(set = 0, binding = 7) uniform writeonly image2D img_mv;
-layout(set = 0, binding = 8) uniform writeonly image2D img_debug;
-layout(set = 0, binding = 9) uniform writeonly image2D img_moments;
+layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
+layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
+layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
 
 // GRAPH buffer out
-layout(set = 0, binding = 10, scalar) buffer buf_mc_states {
+layout(set = 0, binding = 9, scalar) buffer buf_mc_states {
     MCAdaptiveVertex mc_states_adaptive[];
 };
-layout(set = 0, binding = 11, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 10, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 12, scalar) buffer buf_mc_exchange {
+layout(set = 0, binding = 11, scalar) buffer buf_mc_exchange {
     MCStaticVertex mc_states_static[];
+};
+layout(set = 0, binding = 12, scalar) buffer buf_gbuf {
+    GBuffer gbuffer[];
 };
 
 // QUAKE 

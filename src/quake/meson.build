@@ -19,7 +19,7 @@ included_files = files(
 )
 
 foreach s : shaders
-  glslc_args = ['-I' + merian_shaders, '-I' + project_source_root + '/src/quake' ,'--target-env', 'vulkan1.3']
+  glslc_args = ['-I' + merian_shaders, '-I' + project_source_root + '/src/quake', '-I' + merian_include,'--target-env', 'vulkan1.3']
   compile_script = [project_source_root + '/subprojects/merian/scripts/compile_shader.py']
 
   # Header

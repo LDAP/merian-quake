@@ -41,6 +41,7 @@ inc_dirs = [
 
 project_source_root = meson.project_source_root()
 merian_shaders = project_source_root + '/subprojects/merian/src/merian-nodes'
+merian_include = project_source_root + '/subprojects/merian/src'
 
 subdir('src')
 
