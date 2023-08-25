@@ -33,7 +33,7 @@ QuakeHud::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connect
     extent = connected_image_outputs[0].create_info.extent;
     return {
         {
-            NodeOutputDescriptorImage::compute_write("output", vk::Format::eR8G8B8A8Snorm, extent),
+            NodeOutputDescriptorImage::compute_write("output", vk::Format::eR16G16B16A16Sfloat, extent),
         },
         {},
     };

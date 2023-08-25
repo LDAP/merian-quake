@@ -71,7 +71,7 @@ int main(const int argc, const char** argv) {
                                              argc - 1, argv + 1);
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
-    auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc, vk::Format::eR8G8B8A8Snorm);
+    auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
     auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
     auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
