@@ -138,7 +138,7 @@ void get_shading_material(const IntersectionInfo info,
             + extra_data.st_1 * info.barycentrics.y
             + extra_data.st_2 * info.barycentrics.z;
 
-    if (flags > 0 && flags < 6) {
+    if (flags > 0 && flags < 5) {
         warp(st);
     }
 
