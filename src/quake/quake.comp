@@ -56,6 +56,13 @@ void main() {
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
+
+            const vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
+            imageStore(img_albedo, pixel, vec4(albedo, 1));
+
+            // Store GBuffer
+            gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
+            gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
         }
 
         // if (ADAPTIVE_SAMPLING == 1) {
@@ -232,20 +239,13 @@ void main() {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
         vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-        imageStore(img_albedo, pixel, vec4(albedo, 1));
         albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 
         irr_samples /= albedo;
         const float alb_l = yuv_luminance(albedo);
         moments /= vec2(alb_l, alb_l * alb_l);
 
-        // Store irradiance
         imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
-
-        // Store GBuffer
-        gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
-        gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
-
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 
