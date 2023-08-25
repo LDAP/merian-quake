@@ -11,9 +11,7 @@ struct ShadingMaterial {
 };
 
 // assert(alpha != 0)
-float decode_alpha(const uint alpha) {
-    return float(alpha - 1) / 14.;
-}
+#define decode_alpha(enc_alpha) (float16_t(alpha - 1) / 14.hf)
 
 // Get warped texture coordinate
 void warp(inout vec2 st) {
@@ -127,7 +125,7 @@ void get_shading_material(const IntersectionInfo info,
         mat.albedo = f16vec4(max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1)));
         const uint16_t alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
-            mat.albedo.a = float16_t(decode_alpha(alpha));
+            mat.albedo.a = decode_alpha(alpha);
     }
     {
         // Load emission
