@@ -1,6 +1,20 @@
 #ifndef _QUAKE_CONFIG_H_
 #define _QUAKE_CONFIG_H_
 
+#include "merian-nodes/common/types.glsl.h"
+
+struct ShadingMaterial {
+    f16vec4 albedo;
+    f16vec3 emission;
+    vec3 normal;
+    f16vec3 geo_normal;
+    vec3 pos;
+    float16_t gloss;
+};
+
+#define shading_material_index(ipos) (ipos.x + ipos.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x)
+
+
 // same as in gl_texmgr.c
 #define MAX_GLTEXTURES 4096
 #define MAX_GEOMETRIES 16

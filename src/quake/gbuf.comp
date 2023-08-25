@@ -43,7 +43,7 @@ void main() {
         gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
         gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
 
-        vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
+        vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
         imageStore(img_albedo, pixel, vec4(albedo, 1));
 
         // if (ADAPTIVE_SAMPLING == 1) {
@@ -62,4 +62,5 @@ void main() {
         // }
     }
 
+    first_mats[shading_material_index(pixel)] = first_mat;
 }

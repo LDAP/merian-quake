@@ -1031,6 +1031,9 @@ std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
 QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
                             const std::vector<merian::NodeOutputDescriptorBuffer>&) {
 
+    uint32_t group_count_x = (width + local_size_x - 1) / local_size_x;
+    uint32_t group_count_y = (height + local_size_y - 1) / local_size_y;
+
     return {
         {
             merian::NodeOutputDescriptorImage::compute_write(
@@ -1072,6 +1075,13 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
                                      width * height * sizeof(merian::GBuffer),
+                                     vk::BufferUsageFlagBits::eStorageBuffer}),
+            merian::NodeOutputDescriptorBuffer(
+                "first_mats", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{{},
+                                     (group_count_x * group_count_y * local_size_x * local_size_y) *
+                                         sizeof(ShadingMaterial),
                                      vk::BufferUsageFlagBits::eStorageBuffer}),
         },
     };
@@ -1274,6 +1284,14 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         gbuf_pipe->push_constant(cmd, pc);
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
+
+        auto bar = buffer_outputs[4]->buffer_barrier(vk::AccessFlagBits::eShaderWrite,
+                                                     vk::AccessFlagBits::eShaderRead);
+        auto bar1 =
+            image_outputs[1]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                      vk::AccessFlagBits::eShaderRead);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, bar1);
     }
 
     // RAYTRACE

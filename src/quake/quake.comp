@@ -33,43 +33,39 @@ void main() {
 
     rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
     moments = vec2(0);
-    irr_samples = vec3(0); // store sample count in `a` for accum node
-
-    ShadingMaterial first_mat;
-    {
-        const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        // Find first surface
-        IntersectionInfo info;
-        trace_ray(params.cam_x.xyz, first_wi, info);
-        if (info.t > 0) {
-            get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
-        } else {
-            get_sky(params.cam_x.xyz, first_wi, first_mat);
-        }
-    }
+    irr_samples = vec3(0);
 
     const uint SPP = MAX_SPP;
 
-    {
-        // Evaluate direct light
-        if (MAX_PATH_LENGTH > 0) {
-            irr_samples = first_mat.emission;
-            float l = yuv_luminance(irr_samples);
-            moments += vec2(l, l * l);
+    // {
+    //     // Evaluate direct light
+    //     if (MAX_PATH_LENGTH > 0) {
+    //         irr_samples = first_mat.emission;
+    //         float l = yuv_luminance(irr_samples);
+    //         moments += vec2(l, l * l);
 
-            // const float mc_f = yuv_luminance(first_mat.emission);
-            // MCState mc_state = mc_state_new();
-            // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
-            // mc_state_save_adaptive(mc_state, first_mat.pos, first_mat.normal, rng_state);
-        }
-    }
+    //         // const float mc_f = yuv_luminance(first_mat.emission);
+    //         // MCState mc_state = mc_state_new();
+    //         // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
+    //         // mc_state_save_adaptive(mc_state, first_mat.pos, first_mat.normal, rng_state);
+    //     }
+    // }
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
+        //if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
         for (int s = 0; s < SPP; s++) {
-            vec3 wi = normalize(first_mat.pos - params.cam_x.xyz);
-            ShadingMaterial current_mat = first_mat;
+            ShadingMaterial current_mat = first_mats[shading_material_index(pixel)];
+            vec3 wi = normalize(current_mat.pos - params.cam_x.xyz);
+
+            if (s == 0) {
+                irr_samples += current_mat.emission;
+            }
+
+            if (all(lessThan(current_mat.albedo.rgb, f16vec3(1e-7))) || any(greaterThanEqual(current_mat.emission, f16vec3(1e-7)))) {
+                break;
+            }
+
             vec3 current_albedo = vec3(1);
             vec3 f = vec3(0);
             float p = 1.0;
@@ -123,7 +119,7 @@ void main() {
                 }
 
                 // ray is below geometric surface
-                if (dot(wo, current_mat.geo_normal) <= 1e-6 || wodotn <= 1e-3)
+                if (dot(f16vec3(wo), current_mat.geo_normal) <= 1e-6 || wodotn <= 1e-3)
                     break;
 
                 // TRACE RAY TO NEXT SURFACE
@@ -144,7 +140,7 @@ void main() {
                 const vec3 next_lc = light_cache_get(next_mat.pos, next_mat.normal).rgb;
 
                 if (USE_LIGHT_CACHE_TAIL == 1) {
-                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc;
+                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc;
                     f = current_albedo * incident;
                 } else {
                     f = current_albedo * next_mat.emission;
@@ -153,7 +149,7 @@ void main() {
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 incident = (any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
+                    const vec3 incident = (any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
                     const float mc_f = yuv_luminance(incident);
                     if (!isinf(mc_f)) {
                         light_cache_update(current_mat.pos, current_mat.normal, incident);
@@ -170,7 +166,7 @@ void main() {
                 {
                     // we stop if we won't transport any more light or if we found emissive material
                     if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
-                    break;
+                        break;
 
                     wi = wo;
                     current_mat = next_mat;
@@ -206,8 +202,8 @@ void main() {
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-        vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-        albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
+        f16vec3 albedo = f16vec3(imageLoad(img_albedo, pixel).rgb);
+        albedo = all(greaterThan(albedo.rgb, f16vec3(1e-7))) ? albedo : f16vec3(1);
 
         irr_samples /= albedo;
         const float alb_l = yuv_luminance(albedo);

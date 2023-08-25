@@ -54,7 +54,7 @@ layout(set = 0, binding = 3, scalar) buffer buf_prev_gbuf {
 
 // GRAPH image out
 layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
+layout(set = 0, binding = 5, rgba16f) uniform image2D img_albedo;
 layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
 layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
 layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
@@ -71,6 +71,9 @@ layout(set = 0, binding = 11, scalar) buffer buf_mc_exchange {
 };
 layout(set = 0, binding = 12, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
+};
+layout(set = 0, binding = 13, scalar) buffer buf_first_mats {
+    ShadingMaterial first_mats[];
 };
 
 // QUAKE 
