@@ -90,7 +90,7 @@ void main() {
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_mat.albedo.rgb, vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, vec3(1e-7))))
+        if (any(greaterThanEqual(first_mat.albedo.rgb, f16vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, f16vec3(1e-7))))
         for (int s = 0; s < SPP; s++) {
             vec3 wi = normalize(first_mat.pos - params.cam_x.xyz);
             ShadingMaterial current_mat = first_mat;
@@ -148,7 +148,7 @@ void main() {
                 }
 
                 // ray is below geometric surface
-                if (dot(wo, current_mat.geo_normal) <= 1e-6 || wodotn <= 1e-3)
+                if (dot(f16vec3(wo), current_mat.geo_normal) <= 1e-6 || wodotn <= 1e-3)
                     break;
 
                 // TRACE RAY TO NEXT SURFACE
@@ -169,7 +169,7 @@ void main() {
                 const vec3 next_lc = light_cache_get(next_mat.pos, next_mat.normal).rgb;
 
                 if (USE_LIGHT_CACHE_TAIL == 1) {
-                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc;
+                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc;
                     f = current_albedo * incident;
                 } else {
                     f = current_albedo * next_mat.emission;
@@ -178,7 +178,7 @@ void main() {
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 incident = (any(greaterThan(next_mat.emission, vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
+                    const vec3 incident = (any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
                     const float mc_f = yuv_luminance(incident);
                     if (!isinf(mc_f)) {
                         light_cache_update(current_mat.pos, current_mat.normal, incident);
@@ -231,7 +231,7 @@ void main() {
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-        vec3 albedo = any(greaterThan(first_mat.emission, vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
+        vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
         imageStore(img_albedo, pixel, vec4(albedo, 1));
         albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 

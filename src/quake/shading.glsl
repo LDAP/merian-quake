@@ -2,10 +2,10 @@
 #include "common/cubemap.glsl"
 
 struct ShadingMaterial {
-    vec4 albedo;
-    vec3 emission;
-    vec3 normal; // normalized
-    vec3 geo_normal;
+    f16vec4 albedo;
+    f16vec3 emission;
+    vec3 normal;
+    f16vec3 geo_normal;
     vec3 pos;
     float16_t gloss;
 };
@@ -23,43 +23,43 @@ void warp(inout vec2 st) {
     st -= vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5);
 }
 
-vec3 get_emission(const uint texnum_fb, const vec2 st, const vec3 albedo, const uint16_t flags) {
-    vec3 emission;
+f16vec3 get_emission(const uint texnum_fb, const vec2 st, const f16vec3 albedo, const uint16_t flags) {
+    f16vec3 emission;
 
     if (flags == MAT_FLAGS_LAVA)
-        return 20.0 * albedo;
+        return 20.0hf * albedo;
     else if (flags == MAT_FLAGS_SLIME)
-        return 0.5 * albedo;
+        return 0.5hf * albedo;
     else if (flags == MAT_FLAGS_TELE)
-        return 5.0 * albedo;
+        return 5.0hf * albedo;
     else if (flags == MAT_FLAGS_WATERFALL)
         return albedo;
     else if (flags == MAT_FLAGS_SPRITE)
         emission = albedo;
     else if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
-        emission = texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb;
+        emission = f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb);
     } else {
-        return vec3(0);
+        return f16vec3(0);
     }
 
-    const float sum = emission.x + emission.y + emission.z;
-    if (sum > 0) {
+    const float16_t sum = emission.x + emission.y + emission.z;
+    if (sum > 0.hf) {
         emission /= sum;
-        emission *= 10.0 * (exp2(3.5 * sum) - 1.0);
+        emission *= 10.0hf * (exp2(3.5hf * sum) - 1.0hf);
     }
     return emission;
 }
 
 void get_verts_pos_geonormal(out mat3 verts,
                              out vec3 pos,
-                             out vec3 geo_normal,
+                             out f16vec3 geo_normal,
                              const IntersectionInfo info) {
     const uvec3 prim_indexes = buf_idx[nonuniformEXT(info.instance_id)].i[info.primitive_index];
     verts = mat3(buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.x],
                  buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.y],
                  buf_vtx[nonuniformEXT(info.instance_id)].v[prim_indexes.z]);
     pos = verts * info.barycentrics;
-    geo_normal = normalize(cross(verts[2] - verts[0], verts[1] - verts[0]));
+    geo_normal = f16vec3(normalize(cross(verts[2] - verts[0], verts[1] - verts[0])));
 }
 
 vec3 apply_normalmap(const vec3 v0,
@@ -84,6 +84,7 @@ vec3 apply_normalmap(const vec3 v0,
 }
 
 void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
+    vec3 emm = vec3(0);
     if((params.sky_lf_ft & 0xffff) == 0xffff) {
         // classic quake sky
         const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
@@ -91,14 +92,13 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
         const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.1 * t);
         const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
-        mat.emission = 10.0 * (exp2(3.5 * tex) - 1.0);
+        emm = 10.0 * (exp2(3.5 * tex) - 1.0);
     } else {
         const vec3 sundir = normalize(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z));
         const vec3 suncolor = vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
         
-        mat.emission = vec3(0.0);
-        mat.emission += 0.5 * suncolor * pow(0.5 * (1.0 + dot(sundir, w)), 4.0);
-        mat.emission += 5. * suncolor * vmf_pdf(3000.0, dot(sundir, w));
+        emm += 0.5 * suncolor * pow(0.5 * (1.0 + dot(sundir, w)), 4.0);
+        emm += 5. * suncolor * vmf_pdf(3000.0, dot(sundir, w));
         
         // Evaluate cubemap
         uint side = 0;
@@ -112,12 +112,13 @@ void get_sky(const vec3 pos, const vec3 w, out ShadingMaterial mat) {
             case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5*vec2(-w.y, -w.x) / abs(w.z); break; } // dn
         }
         if (side < MAX_GLTEXTURES)
-            mat.emission += texture(img_tex[nonuniformEXT(side)], st).rgb;
+            emm += texture(img_tex[nonuniformEXT(side)], st).rgb;
     }
 
-    mat.albedo = vec4(0, 0, 0, 1);
+    mat.emission = f16vec3(emm);
+    mat.albedo = f16vec4(0, 0, 0, 1);
     mat.normal = -w;
-    mat.geo_normal = -w;
+    mat.geo_normal = f16vec3(-w);
     mat.pos = pos + T_MAX * w;
     mat.gloss = float16_t(0);
 }
@@ -146,10 +147,10 @@ void get_shading_material(const IntersectionInfo info,
         // Load albedo
         // const uint texnum = extra_data.texnum_alpha & 0xfff;
         // Clamp to 1e-3 (nothing is really 100% black)
-        mat.albedo = max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1));
+        mat.albedo = f16vec4(max(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st), vec4(vec3(1e-3), 1)));
         const uint16_t alpha = extra_data.texnum_alpha >> 12;
         if (alpha != 0)
-            mat.albedo.a = decode_alpha(alpha);
+            mat.albedo.a = float16_t(decode_alpha(alpha));
     }
     {
         // Load emission
