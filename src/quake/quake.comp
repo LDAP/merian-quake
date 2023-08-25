@@ -112,10 +112,11 @@ void main() {
                         [[unroll]]
                         for (int i = 0; i < MC_SAMPLES; i++) {
                             MCState state;
-                            if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB)
+                            if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
                                 mc_adaptive_load(state, current_mat.pos, current_mat.normal);
-                            else
+                            } else {
                                 mc_static_load(state, current_mat.pos, current_mat.normal);
+                            }
 
                             scores[i] = state.sum_w;
                             score_sum += scores[i];
@@ -184,8 +185,8 @@ void main() {
 
                         mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
                         if (XorShift32(rng_state) < mc_f / ((score_sum) / (MC_SAMPLES))) {
-                            mc_adaptive_save(mc_state, current_mat.pos, current_mat.normal);
                             mc_static_save(mc_state, current_mat.pos, current_mat.normal);
+                            mc_adaptive_save(mc_state, current_mat.pos, current_mat.normal);
                         }
                     }
                 }

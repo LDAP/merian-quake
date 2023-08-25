@@ -97,10 +97,10 @@ int main(const int argc, const char** argv) {
     graph.connect_image(quake, accum, 0, 2); // irr
     graph.connect_image(quake, accum, 2, 3); // mv
     graph.connect_image(quake, accum, 4, 4); // moments
-    graph.connect_buffer(quake, accum, 3, 0); // gbuffer
-    graph.connect_buffer(quake, accum, 3, 1);
+    graph.connect_buffer(quake, accum, 2, 0); // gbuffer
+    graph.connect_buffer(quake, accum, 2, 1);
 
-    graph.connect_buffer(quake, quake, 3, 1); // gbuf
+    graph.connect_buffer(quake, quake, 2, 1); // gbuf
 
     graph.connect_image(svgf, quake, 0, 1); // prev final image (with variance)
     graph.connect_buffer(median, quake, 0, 0);
@@ -112,8 +112,8 @@ int main(const int argc, const char** argv) {
     graph.connect_image(quake, svgf, 2, 4); // mv
     graph.connect_image(svgf, exposure, 0, 0);
     graph.connect_image(svgf, median, 0, 0);
-    graph.connect_buffer(quake, svgf, 3, 0); // gbuffer
-    graph.connect_buffer(quake, svgf, 3, 1);
+    graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
+    graph.connect_buffer(quake, svgf, 2, 1);
 
     graph.connect_image(exposure, tonemap, 0, 0);
     //graph.connect_image(tonemap, output, 0, 0);

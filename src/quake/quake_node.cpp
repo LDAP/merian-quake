@@ -1046,7 +1046,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     MC_ADAPTIVE_BUFFER_SIZE * sizeof(MCAdaptiveVertex),
+                                     (MC_ADAPTIVE_BUFFER_SIZE + MC_STATIC_BUFFER_SIZE) *
+                                         sizeof(MCState),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
             merian::NodeOutputDescriptorBuffer(
@@ -1054,14 +1055,6 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
                                      LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex),
-                                     vk::BufferUsageFlagBits::eStorageBuffer},
-                true),
-            merian::NodeOutputDescriptorBuffer(
-                "markovchainexchange",
-                vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::BufferCreateInfo{{},
-                                     MC_STATIC_BUFFER_SIZE * sizeof(MCStaticVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
             merian::NodeOutputDescriptorBuffer(
@@ -1272,23 +1265,21 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     if (dump_mc) {
-        const std::size_t count = std::min(128 * 1024 * 1024 / sizeof(MCAdaptiveVertex),
-                                           (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
-        const MCAdaptiveVertex* buf =
-            static_cast<const MCAdaptiveVertex*>(allocator->getStaging()->cmdFromBuffer(
-                cmd, *buffer_outputs[0], 0, sizeof(MCAdaptiveVertex) * count));
+        const std::size_t count =
+            std::min(128 * 1024 * 1024 / sizeof(MCState), (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
+        const MCState* buf = static_cast<const MCState*>(allocator->getStaging()->cmdFromBuffer(
+            cmd, *buffer_outputs[0], 0, sizeof(MCState) * count));
         run.add_submit_callback([buf](const merian::QueueHandle& queue) {
             queue->wait_idle();
             nlohmann::json j;
 
-            for (const MCAdaptiveVertex* v = buf; v < buf + count; v++) {
+            for (const MCState* v = buf; v < buf + count; v++) {
                 nlohmann::json o;
-                o["N"] = v->state.N;
-                o["hash"] = v->state.hash;
-                o["sum_len"] = v->state.sum_len;
-                o["sum_w"] = v->state.sum_w;
-                o["sum_tgt"] = fmt::format("{} {} {}", v->state.sum_tgt.x, v->state.sum_tgt.y,
-                                           v->state.sum_tgt.z);
+                o["N"] = v->N;
+                o["hash"] = v->hash;
+                o["sum_len"] = v->sum_len;
+                o["sum_w"] = v->sum_w;
+                o["sum_tgt"] = fmt::format("{} {} {}", v->sum_tgt.x, v->sum_tgt.y, v->sum_tgt.z);
 
                 j.emplace_back(o);
             }
