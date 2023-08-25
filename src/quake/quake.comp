@@ -249,8 +249,7 @@ void main() {
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 
-    // vec4 l = light_cache_get(first_mat.pos, first_mat.normal, rng_state);
-    // imageStore(img_albedo, pixel, l);
+    // imageStore(img_debug, pixel, vec4(light_cache_get(first_mat.pos, first_mat.normal), 1));
 
     // {
     //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);

@@ -116,12 +116,11 @@ int main(const int argc, const char** argv) {
     graph.connect_buffer(quake, svgf, 2, 1);
 
     graph.connect_image(exposure, tonemap, 0, 0);
-    //graph.connect_image(tonemap, output, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
     graph.connect_image(hud, output, 0, 0);
 
     //  debug output
-    //graph.connect_image(quake, output, 5, 0);
+    // graph.connect_image(quake, output, 3, 0);
 
     graph.connect_image(svgf, image_writer, 0, 0);
 

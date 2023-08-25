@@ -18,5 +18,6 @@ struct MCState {
 struct LightCacheVertex {
     uint hash; // grid_idx and level
     uint lock;
-    vec4 irr_N;
+    f16vec3 irr;
+    uint16_t N;
 };
