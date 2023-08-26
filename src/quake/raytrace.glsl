@@ -41,7 +41,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     uint16_t intersection = 0s;
 
     // TODO: Max bounces (prevent infinite bounces)
-    while (intersection++ < 20) {
+    while (intersection++ < MAX_INTERSECTIONS) {
         rayQueryEXT ray_query;
 
         // FIND NEXT HIT
@@ -172,19 +172,22 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             //hit.pos += 1e-3 * hit.wi;
             //continue;
         } else if (flags == MAT_FLAGS_SPRITE) {
-            f16vec3 hdr = ldr_to_hdr(albedo_texture.rgb);
-            contribution += throughput * hdr;
-            hit.albedo = hdr;
-
-            // if (albedo_texture.a < ALPHA_THRESHOLD) {
-            //     hit.pos += 1e-3 * hit.wi;
-            //     continue;
-            // }
+            hit.albedo = ldr_to_hdr(albedo_texture.rgb);
+            contribution += throughput * hit.albedo;
+        } else if (flags == MAT_FLAGS_LAVA) {
+            hit.albedo = 20.0hf * albedo_texture.rgb;
+            contribution += throughput * hit.albedo;
+        } else if (flags == MAT_FLAGS_SLIME) {
+            hit.albedo = 0.5hf * albedo_texture.rgb;
+            contribution += throughput * hit.albedo;
+        } else if (flags == MAT_FLAGS_TELE) {
+            hit.albedo = 5.0hf * albedo_texture.rgb;
+            contribution += throughput * hit.albedo;
         } else {
             const uint16_t texnum_fb = uint16_t(extra_data.texnum_fb_flags & 0xfff);
             hit.albedo = albedo_texture.rgb;
             if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
-                f16vec3 emission = ldr_to_hdr(f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb));
+                const f16vec3 emission = ldr_to_hdr(f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb));
                 if (any(greaterThan(emission, f16vec3(0)))) {
                     contribution += throughput * emission;
                     hit.albedo = emission;
@@ -192,9 +195,6 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
 
-        // throughput = f16vec3(0);
-        // contribution = f16vec3(0);
-        // alpha = 1.hf;
         break;
     }
 }

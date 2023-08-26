@@ -33,7 +33,7 @@ void main() {
 
     rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
     moments = f16vec2(0);
-    irr_samples = f16vec3(0); // store sample count in `a` for accum node
+    irr_samples = f16vec3(0);
     f16vec3 camera_throughput = f16vec3(1);
 
     Hit first_hit;
@@ -45,11 +45,9 @@ void main() {
         irr_samples += incident;
     }
 
-    const uint SPP = MAX_SPP;
     {
         // Store motion vector
         const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
-        // Should compensate pixel filter..
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
@@ -59,41 +57,12 @@ void main() {
             gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_hit.normal);
             gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_hit.pos);
         }
-
-        // if (ADAPTIVE_SAMPLING == 1) {
-        //     const ivec2 iold = ivec2(round(old_pixel));
-        //     const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
-        //     const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
-        //     const float new_z = distance(params.cam_x.xyz, first_hit.pos);
-        //     const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_hit.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
-            
-        //     const float mean = mean_variance[0];
-        //     const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
-        //     float normalized_variance = subgroupMax(var) / mean;
-        //     SPP = uint(ceil(min(normalized_variance, 1) * (MAX_SPP - 1)));
-        // } else {
-        //     SPP = MAX_SPP;
-        // }
     }
-
-    // {
-    //     // Evaluate direct light
-    //     if (MAX_PATH_LENGTH > 0) {
-    //         irr_samples = first_mat.emission;
-    //         float l = yuv_luminance(irr_samples);
-    //         moments += vec2(l, l * l);
-
-    //         // const float mc_f = yuv_luminance(first_mat.emission);
-    //         // MCState mc_state = mc_state_new();
-    //         // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
-    //         // mc_state_save_adaptive(mc_state, first_mat.pos, first_mat.normal, rng_state);
-    //     }
-    // }
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
         if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr_samples, vec3(1e-7))))
-        for (int s = 0; s < SPP; s++) {
+        for (int s = 0; s < MAX_SPP; s++) {
             Hit current_hit = first_hit;
             vec3 current_throughput = camera_throughput;
             vec3 f = vec3(0);
@@ -202,9 +171,9 @@ void main() {
             // Albdeo demodulation
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr_samples += contrib * (1.0 / SPP);
+                irr_samples += contrib * (1.0 / MAX_SPP);
                 float l = yuv_luminance(contrib);
-                moments += vec2(l, l * l) * (1. / SPP);
+                moments += vec2(l, l * l) * (1. / MAX_SPP);
             }
         }
     }
