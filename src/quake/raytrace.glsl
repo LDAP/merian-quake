@@ -132,11 +132,6 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             dv = verts[1] - verts[0];
         }
 
-        // if (albedo_texture.a < ALPHA_THRESHOLD) {
-        //     hit.pos += 1e-3 * hit.wi;
-        //     continue;
-        // }
-
         if (extra_data.n1_brush == 0xffffffff) {
             const uint16_t texnum_normal = uint16_t(extra_data.n0_gloss_norm >> 16);
             // const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
@@ -173,14 +168,13 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             //continue;
         } else if (flags == MAT_FLAGS_WATERFALL) {
             contribution += throughput * albedo_texture.rgb;
-            throughput *= albedo_texture.rgb;
             hit.albedo = albedo_texture.rgb;
             //hit.pos += 1e-3 * hit.wi;
             //continue;
         } else if (flags == MAT_FLAGS_SPRITE) {
             f16vec3 hdr = ldr_to_hdr(albedo_texture.rgb);
-            contribution += throughput * hdr * albedo_texture.a;
-            hit.albedo = mix(f16vec3(1), hdr, albedo_texture.a);
+            contribution += throughput * hdr;
+            hit.albedo = hdr;
 
             // if (albedo_texture.a < ALPHA_THRESHOLD) {
             //     hit.pos += 1e-3 * hit.wi;
@@ -188,16 +182,13 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             // }
         } else {
             const uint16_t texnum_fb = uint16_t(extra_data.texnum_fb_flags & 0xfff);
+            hit.albedo = albedo_texture.rgb;
             if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
                 f16vec3 emission = ldr_to_hdr(f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb));
                 if (any(greaterThan(emission, f16vec3(0)))) {
                     contribution += throughput * emission;
                     hit.albedo = emission;
-                } else {
-                    hit.albedo = albedo_texture.rgb;
                 }
-            } else {
-                hit.albedo = albedo_texture.rgb;
             }
         }
 

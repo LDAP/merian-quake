@@ -32,7 +32,7 @@ void main() {
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
 
     rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
-    moments = vec2(0);
+    moments = f16vec2(0);
     irr_samples = f16vec3(0); // store sample count in `a` for accum node
     f16vec3 camera_throughput = f16vec3(1);
 
@@ -40,9 +40,9 @@ void main() {
     {
         first_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         first_hit.pos = params.cam_x.xyz;
-        f16vec3 contrib = f16vec3(0);
-        trace_ray(camera_throughput, contrib, first_hit);
-        irr_samples += contrib;
+        f16vec3 incident = f16vec3(0);
+        trace_ray(camera_throughput, incident, first_hit);
+        irr_samples += incident;
     }
 
     const uint SPP = MAX_SPP;
@@ -163,20 +163,21 @@ void main() {
 
 
                 // EVALUATE BSDF
-                current_throughput *= throughput * f16vec3(bsdf_diffuse_eval(current_hit.albedo) * wodotn);
-                const vec3 next_lc = light_cache_get(next_hit.pos, next_hit.normal).rgb;
+                current_throughput *= f16vec3(bsdf_diffuse_eval(current_hit.albedo) * wodotn);
+                const f16vec3 next_lc = light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
-                // if (USE_LIGHT_CACHE_TAIL == 1) {
-                //     const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc;
-                //     f = current_albedo * incident;
-                // } else {
-                // }
-                f = current_throughput * incident;
+                if (USE_LIGHT_CACHE_TAIL == 1) {
+                    const f16vec3 lc_incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(incident, f16vec3(0))) ? incident : next_lc;
+                    f = current_throughput * lc_incident;
+                } else {
+                    f = current_throughput * incident;
+                }
                 p *= wo_p;
+                current_throughput *= throughput;
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 lc_incident = (any(greaterThan(incident, f16vec3(0))) ? incident * throughput: next_lc) * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p;
+                    const vec3 lc_incident = (any(greaterThan(incident, f16vec3(0))) ? incident : throughput * next_lc) * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p;
                     const float mc_f = yuv_luminance(lc_incident);
                     if (!isinf(mc_f)) {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident);
@@ -193,8 +194,7 @@ void main() {
                 {
                     // we stop if we won't transport any more light or if we found emissive material
                     if (all(lessThan(current_throughput, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
-                    break;
-
+                        break;
                     current_hit = next_hit;
                 }
             }
@@ -202,9 +202,9 @@ void main() {
             // Albdeo demodulation
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr_samples += f16vec3(contrib * (1.0 / SPP));
+                irr_samples += contrib * (1.0 / SPP);
                 float l = yuv_luminance(contrib);
-                moments += vec2(l, l * l) * (1.0 / SPP);
+                moments += vec2(l, l * l) * (1. / SPP);
             }
         }
     }

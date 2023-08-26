@@ -1040,7 +1040,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
     return {
         {
             merian::NodeOutputDescriptorImage::compute_write(
-                "irradiance", vk::Format::eR16G16B16A16Sfloat, width, height),
+                "irradiance", vk::Format::eR32G32B32A32Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16Sfloat, width,
