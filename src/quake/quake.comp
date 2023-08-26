@@ -33,44 +33,39 @@ void main() {
 
     rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
     moments = vec2(0);
-    irr_samples = vec3(0); // store sample count in `a` for accum node
+    irr_samples = f16vec3(0); // store sample count in `a` for accum node
+    f16vec3 camera_throughput = f16vec3(1);
 
-    ShadingMaterial first_mat;
+    Hit first_hit;
     {
-        const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        // Find first surface
-        IntersectionInfo info;
-        trace_ray(params.cam_x.xyz, first_wi, info);
-        if (info.t > 0) {
-            get_shading_material(info, params.cam_x.xyz, first_wi, first_mat);
-        } else {
-            get_sky(params.cam_x.xyz, first_wi, first_mat);
-        }
+        first_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        first_hit.pos = params.cam_x.xyz;
+        f16vec3 contrib = f16vec3(0);
+        trace_ray(camera_throughput, contrib, first_hit);
+        irr_samples += contrib;
     }
 
     const uint SPP = MAX_SPP;
     {
         // Store motion vector
-        const vec3 old_dir = first_mat.pos - params.prev_cam_x.xyz;
+        const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
         // Should compensate pixel filter..
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-
-            const vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-            imageStore(img_albedo, pixel, vec4(albedo, 1));
+            imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
 
             // Store GBuffer
-            gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_mat.normal);
-            gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_mat.pos);
+            gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_hit.normal);
+            gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_hit.pos);
         }
 
         // if (ADAPTIVE_SAMPLING == 1) {
         //     const ivec2 iold = ivec2(round(old_pixel));
         //     const vec2 old_gbuf = texelFetch(img_prev_gbuf, iold, 0).rg;
         //     const vec3 old_n = geo_decode_normal_float(old_gbuf.r);
-        //     const float new_z = distance(params.cam_x.xyz, first_mat.pos);
-        //     const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_mat.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
+        //     const float new_z = distance(params.cam_x.xyz, first_hit.pos);
+        //     const bool reuse = all(lessThan(iold, resolution)) && dot(old_n, first_hit.normal) > .8 && abs(old_gbuf.g - new_z) / max(old_gbuf.g, new_z) < 0.1;
             
         //     const float mean = mean_variance[0];
         //     const float var = reuse ? texelFetch(img_prev_filtered, iold, 0).a : mean;
@@ -81,27 +76,26 @@ void main() {
         // }
     }
 
-    {
-        // Evaluate direct light
-        if (MAX_PATH_LENGTH > 0) {
-            irr_samples = first_mat.emission;
-            float l = yuv_luminance(irr_samples);
-            moments += vec2(l, l * l);
+    // {
+    //     // Evaluate direct light
+    //     if (MAX_PATH_LENGTH > 0) {
+    //         irr_samples = first_mat.emission;
+    //         float l = yuv_luminance(irr_samples);
+    //         moments += vec2(l, l * l);
 
-            // const float mc_f = yuv_luminance(first_mat.emission);
-            // MCState mc_state = mc_state_new();
-            // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
-            // mc_state_save_adaptive(mc_state, first_mat.pos, first_mat.normal, rng_state);
-        }
-    }
+    //         // const float mc_f = yuv_luminance(first_mat.emission);
+    //         // MCState mc_state = mc_state_new();
+    //         // mc_state_add_sample(mc_state, first_mat.pos + vec3(1), mc_f, first_mat.pos);
+    //         // mc_state_save_adaptive(mc_state, first_mat.pos, first_mat.normal, rng_state);
+    //     }
+    // }
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_mat.albedo.rgb, f16vec3(1e-7))) && !any(greaterThanEqual(first_mat.emission, f16vec3(1e-7))))
+        if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr_samples, vec3(1e-7))))
         for (int s = 0; s < SPP; s++) {
-            vec3 wi = normalize(first_mat.pos - params.cam_x.xyz);
-            ShadingMaterial current_mat = first_mat;
-            vec3 current_albedo = vec3(1);
+            Hit current_hit = first_hit;
+            vec3 current_throughput = camera_throughput;
             vec3 f = vec3(0);
             float p = 1.0;
 
@@ -120,14 +114,14 @@ void main() {
                         for (int i = 0; i < MC_SAMPLES; i++) {
                             MCState state;
                             if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
-                                mc_adaptive_load(state, current_mat.pos, current_mat.normal);
+                                mc_adaptive_load(state, current_hit.pos, current_hit.normal);
                             } else {
-                                mc_static_load(state, current_mat.pos, current_mat.normal);
+                                mc_static_load(state, current_hit.pos, current_hit.normal);
                             }
 
                             scores[i] = state.sum_w;
                             score_sum += scores[i];
-                            vmfs[i] = mc_state_get_vmf(state, current_mat.pos);
+                            vmfs[i] = mc_state_get_vmf(state, current_hit.pos);
                             if (XorShift32(rng_state) < scores[i] / score_sum) {
                                 // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
                                 mc_state = state;
@@ -138,10 +132,10 @@ void main() {
 
                     if (XorShift32(rng_state) < bsdf_p() || score_sum == 0) {
                         // BSDF Sampling
-                        wo = bsdf_diffuse_sample(current_mat.normal, XorShift32Vec2(rng_state));
-                        mc_state = mc_state_new(current_mat.pos, current_mat.normal);
+                        wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+                        mc_state = mc_state_new(current_hit.pos, current_hit.normal);
                     } // else {VMF Sampling // wo = set above }
-                    wodotn = dot(wo, current_mat.normal);
+                    wodotn = dot(wo, current_hit.normal);
 
 
                     // Multiple importance sampling
@@ -155,45 +149,42 @@ void main() {
                 }
 
                 // ray is below geometric surface
-                if (dot(f16vec3(wo), current_mat.geo_normal) <= 1e-6 || wodotn <= 1e-3)
+                if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
                     break;
 
                 // TRACE RAY TO NEXT SURFACE
-                ShadingMaterial next_mat;
-                {
-                    IntersectionInfo info;
-                    // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
-                    trace_ray(current_mat.pos - wi * 1e-3, wo, info);
-                    if (info.t > 0) {
-                        get_shading_material(info, current_mat.pos, wo, next_mat);
-                    } else {
-                        get_sky(current_mat.pos, wo, next_mat);
-                    }
-                }
+                Hit next_hit;
+                next_hit.wi = wo;
+                // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
+                f16vec3 incident = f16vec3(0);
+                f16vec3 throughput = f16vec3(1);
+                trace_ray(throughput, incident, next_hit);
+
 
                 // EVALUATE BSDF
-                current_albedo *= bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn;
-                const vec3 next_lc = light_cache_get(next_mat.pos, next_mat.normal).rgb;
+                current_throughput *= throughput * f16vec3(bsdf_diffuse_eval(current_hit.albedo) * wodotn);
+                const vec3 next_lc = light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
-                if (USE_LIGHT_CACHE_TAIL == 1) {
-                    const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc;
-                    f = current_albedo * incident;
-                } else {
-                    f = current_albedo * next_mat.emission;
-                }
+                // if (USE_LIGHT_CACHE_TAIL == 1) {
+                //     const vec3 incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc;
+                //     f = current_albedo * incident;
+                // } else {
+                // }
+                f = current_throughput * incident;
                 p *= wo_p;
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 incident = (any(greaterThan(next_mat.emission, f16vec3(0))) ? next_mat.emission : next_lc) * bsdf_diffuse_eval(current_mat.albedo.rgb) * wodotn / wo_p;
-                    const float mc_f = yuv_luminance(incident);
+                    const vec3 lc_incident = (any(greaterThan(incident, f16vec3(0))) ? incident * throughput: next_lc) * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p;
+                    const float mc_f = yuv_luminance(lc_incident);
                     if (!isinf(mc_f)) {
-                        light_cache_update(current_mat.pos, current_mat.normal, incident);
+                        light_cache_update(current_hit.pos, current_hit.normal, lc_incident);
 
-                        mc_state_add_sample(mc_state, current_mat.pos, mc_f, next_mat.pos);
+                        mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos);
                         if (XorShift32(rng_state) < mc_f / ((score_sum) / (MC_SAMPLES))) {
-                            mc_static_save(mc_state, current_mat.pos, current_mat.normal);
-                            mc_adaptive_save(mc_state, current_mat.pos, current_mat.normal);
+                            mc_static_save(mc_state, current_hit.pos, current_hit.normal);
+                            mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
                         }
                     }
                 }
@@ -201,33 +192,33 @@ void main() {
                 // PREPARE NEXT ITERATION
                 {
                     // we stop if we won't transport any more light or if we found emissive material
-                    if (all(lessThan(current_albedo, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
+                    if (all(lessThan(current_throughput, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                     break;
 
-                    wi = wo;
-                    current_mat = next_mat;
+                    current_hit = next_hit;
                 }
             }
 
             // Albdeo demodulation
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr_samples += contrib * (1.0 / SPP);
+                irr_samples += f16vec3(contrib * (1.0 / SPP));
                 float l = yuv_luminance(contrib);
                 moments += vec2(l, l * l) * (1.0 / SPP);
             }
         }
     }
+    // irr_samples = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-        vec3 albedo = any(greaterThan(first_mat.emission, f16vec3(0))) ? first_mat.emission : first_mat.albedo.rgb;
-        albedo = all(greaterThan(albedo.rgb, vec3(1e-7))) ? albedo : vec3(1);
 
-        irr_samples /= albedo;
-        const float alb_l = yuv_luminance(albedo);
-        moments /= vec2(alb_l, alb_l * alb_l);
+        if (all(greaterThan(first_hit.albedo, f16vec3(0)))) {
+            irr_samples /= first_hit.albedo;
+            const float alb_l = yuv_luminance(first_hit.albedo);
+            moments /= vec2(alb_l, alb_l * alb_l);
+        }
 
         imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
@@ -239,7 +230,7 @@ void main() {
     // }
 
     // show light cache
-    // irr_samples = vec3(light_cache_get(first_mat.pos, first_mat.normal, rng_state));
+    
     
     // MCState mc_state = mc_state_new();
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);

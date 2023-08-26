@@ -10,7 +10,10 @@
 // max ray tracing distance.
 #define T_MAX 10000.0
 // continue tracing if alpha of texture is smaller
-#define ALPHA_THRESHOLD .666 
+#define ALPHA_THRESHOLD .666
+// A ray may travel through multiple intersections
+// for example transparent surfaces / water
+#define MAX_INTERSECTIONS 5
 
 // BINDINGS
 
