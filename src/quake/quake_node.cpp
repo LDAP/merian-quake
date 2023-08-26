@@ -221,6 +221,8 @@ void add_particles(std::vector<float>& vtx,
         for (int l = 0; l < 3; l++)
             vtx.emplace_back(vert[3][l]);
 
+        const uint32_t idx_size = idx.size();
+
         idx.emplace_back(vtx_cnt);
         idx.emplace_back(vtx_cnt + 1);
         idx.emplace_back(vtx_cnt + 2);
@@ -238,7 +240,14 @@ void add_particles(std::vector<float>& vtx,
         idx.emplace_back(vtx_cnt + 3);
 
         for (int k = 0; k < 4; k++) {
-            ext.emplace_back(tex_col, tex_lum, 0, 0, 0, merian::float_to_half_aprox(0),
+            const glm::vec3 n =
+                glm::normalize(glm::cross(*merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 2]]) -
+                                              *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]]),
+                                          *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 1]]) -
+                                              *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]])));
+            const uint32_t enc_n = merian::encode_normal(n);
+
+            ext.emplace_back(tex_col, tex_lum, enc_n, enc_n, enc_n, merian::float_to_half_aprox(0),
                              merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
                              merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
                              merian::float_to_half_aprox(0));
