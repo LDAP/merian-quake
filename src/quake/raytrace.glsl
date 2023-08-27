@@ -43,6 +43,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     // TODO: Max bounces (prevent infinite bounces)
     while (intersection++ < MAX_INTERSECTIONS) {
         rayQueryEXT ray_query;
+        VertexExtraData extra_data;
+        uint16_t flags;
+        vec2 st;
 
         // FIND NEXT HIT
         rayQueryInitializeEXT(ray_query,
@@ -65,21 +68,17 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 continue;
             } else {
                 bool confirm;
-                const VertexExtraData extra_data =  buf_ext[nonuniformEXT(instance_id_uc(ray_query))].v[primitive_index_uc(ray_query)];
+                extra_data = buf_ext[nonuniformEXT(instance_id_uc(ray_query))].v[primitive_index_uc(ray_query)];
+                flags = extra_data.texnum_fb_flags >> 12;
                 const uint16_t alpha = extra_data.texnum_alpha >> 12;
-                const uint16_t flags = extra_data.texnum_fb_flags >> 12;
                 if (flags != MAT_FLAGS_NONE && flags != MAT_FLAGS_SPRITE) {
                     // treat sky, lava, slime,... not transparent for now
                     confirm = true;
                 } else if (alpha != 0) { // 0 means use texture
                     confirm = decode_alpha(alpha) >= ALPHA_THRESHOLD;
                 } else {
-                    const vec2 st = extra_data.st * barycentrics_uc(ray_query);
-
                     // We covered the flags above, this surface cannot warp
-                    // if (flags > 0 && flags < 6) {
-                    //     warp(st);
-                    // }
+                    st = extra_data.st * barycentrics_uc(ray_query);
                     confirm = textureGather(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 3).r >= ALPHA_THRESHOLD;
                 }
 
@@ -101,8 +100,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         }
 
         // HIT
-        const VertexExtraData extra_data =  buf_ext[nonuniformEXT(instance_id(ray_query))].v[primitive_index(ray_query)];
-        const uint16_t flags = extra_data.texnum_fb_flags >> 12;
+        extra_data = buf_ext[nonuniformEXT(instance_id(ray_query))].v[primitive_index(ray_query)];
+        flags = extra_data.texnum_fb_flags >> 12;
 
         if (flags == MAT_FLAGS_SKY) {
             const f16vec3 sky = get_sky(hit.wi);
@@ -115,7 +114,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             break;
         }
 
-        const vec2 st = (flags > 0 && flags < 5) ? warp(extra_data.st * barycentrics(ray_query)) : extra_data.st * barycentrics(ray_query);
+        st = (flags > 0 && flags < 5) ? warp(extra_data.st * barycentrics(ray_query)) : extra_data.st * barycentrics(ray_query);
         const f16vec4 albedo_texture = f16vec4(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st));
         // NORMALS AND GLOSS
         vec3 du, dv;
