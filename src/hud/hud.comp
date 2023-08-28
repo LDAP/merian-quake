@@ -37,7 +37,7 @@ void main() {
         }
     }
 
-    if (distance(pixel, imageSize(img_out) / vec2(2)) < .004 * imageSize(img_out).x) {
+    if (pc.health > 0 && distance(pixel, imageSize(img_out) / vec2(2)) < .004 * imageSize(img_out).x) {
         color = any(lessThan(abs(vec2(pixel) - imageSize(img_out).rg / vec2(2)), vec2(2))) ? vec3(.1, .1, .1) : color;
     }
 

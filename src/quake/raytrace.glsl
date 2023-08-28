@@ -37,6 +37,10 @@ vec2 warp(const vec2 st) {
 
 // Initialize pos and wi with ray origin and ray direction and
 // throughput, contribution as needed
+// 
+// Returns the troughput along the ray (without hit)
+// and contribution (with hit) multiplied with throuhput.
+// (allows for volumetric effects)
 void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
     uint16_t intersection = 0s;
 

@@ -54,8 +54,8 @@ void main() {
             imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
 
             // Store GBuffer
-            gbuffer[gbuffer_index(pixel, resolution)].enc_normal = geo_encode_normal(first_hit.normal);
-            gbuffer[gbuffer_index(pixel, resolution)].linear_z = distance(params.cam_x.xyz, first_hit.pos);
+            const GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos)};
+            gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
         }
     }
 

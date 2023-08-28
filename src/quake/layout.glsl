@@ -35,10 +35,9 @@ layout(push_constant) uniform PushConstant {
     uint rt_config; // see `RTConfig` in in quake_node.hpp
 } params;
 
-uint rt_flags()        { return params.rt_config & 0xff; }
-float bsdf_p()         { return ((params.rt_config >> 16) & 0xff) / 255.; }
-float ml_prior()       { return ((params.rt_config >> 24) & 0xff) / 255.; }
-
+#define rt_flags() (params.rt_config & 0xff)
+#define bsdf_p() (((params.rt_config >> 16) & 0xff) / 255.)
+#define ml_prior() (((params.rt_config >> 24) & 0xff) / 255.)
 
 // GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
