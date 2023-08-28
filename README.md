@@ -1,6 +1,6 @@
 # Merian-Quake RT
 
-This is a ray traced engine for [quakespasm](https://github.com/sezero/quakespasm).
+A path-tracer for the original Quake game on top of  [quakespasm](https://github.com/sezero/quakespasm).
 
 ## Usage
 
