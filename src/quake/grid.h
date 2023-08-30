@@ -1,8 +1,8 @@
 #include "merian-nodes/common/types.glsl.h"
 
-#define MC_ADAPTIVE_BUFFER_SIZE 16777216
-#define MC_STATIC_BUFFER_SIZE 400000
-#define MC_STATIC_VERTEX_STATE_COUNT 25
+#define MC_ADAPTIVE_BUFFER_SIZE 16777259
+#define MC_STATIC_BUFFER_SIZE 400009
+#define MC_STATIC_VERTEX_STATE_COUNT 23
 
 struct MCState {
     vec3 sum_tgt;
