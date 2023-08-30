@@ -1632,7 +1632,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("spp", spp, 0, 15, "samples per pixel");
     config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
-    config.config_percent("BDSF Prob", bsdp_p, "the probability to use BSDF sampling");
+    config.config_percent("BSDF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
     config.config_bool("light cache tail", use_light_cache_tail,
                        "use the light cache for the path tail");
