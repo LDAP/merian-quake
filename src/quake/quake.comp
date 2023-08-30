@@ -106,6 +106,9 @@ void main() {
                     } // else {VMF Sampling // wo = set above }
                     wodotn = dot(wo, current_hit.normal);
 
+                    // ray is below geometric surface
+                    if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
+                        break;
 
                     // Multiple importance sampling
                     [[unroll]]
@@ -116,10 +119,6 @@ void main() {
                     wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_diffuse_pdf(wodotn) + (1 - bsdf_p()) * wo_p;
 
                 }
-
-                // ray is below geometric surface
-                if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
-                    break;
 
                 // TRACE RAY TO NEXT SURFACE
                 Hit next_hit;
