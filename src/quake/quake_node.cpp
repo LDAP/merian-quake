@@ -1256,7 +1256,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     if (skybox_name[0]) {
         for (int i = 0; i < 6; i++)
             pc.sky[i] = skybox_textures[i]->texnum;
-    } else {
+    } else if (solidskytexture) {
         pc.sky[0] = solidskytexture->texnum;
         pc.sky[1] = alphaskytexture->texnum;
         pc.sky[2] = static_cast<uint16_t>(-1u);
