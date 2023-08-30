@@ -77,6 +77,8 @@ int main(const int argc, const char** argv) {
     auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
     auto hud = std::make_shared<merian::QuakeHud>(context, alloc);
 
+    image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
+
     graph.add_node("output", output);
     graph.add_node("black_color", black);
     graph.add_node("blue_noise", blue_noise);
@@ -89,14 +91,13 @@ int main(const int argc, const char** argv) {
     graph.add_node("median variance", median);
     graph.add_node("hud", hud);
 
-
     graph.connect_image(blue_noise, quake, 0, 0);
 
     graph.connect_image(accum, accum, 0, 0); // feedback
     graph.connect_image(accum, accum, 1, 1);
-    graph.connect_image(quake, accum, 0, 2); // irr
-    graph.connect_image(quake, accum, 2, 3); // mv
-    graph.connect_image(quake, accum, 4, 4); // moments
+    graph.connect_image(quake, accum, 0, 2);  // irr
+    graph.connect_image(quake, accum, 2, 3);  // mv
+    graph.connect_image(quake, accum, 4, 4);  // moments
     graph.connect_buffer(quake, accum, 2, 0); // gbuffer
     graph.connect_buffer(quake, accum, 2, 1);
 
