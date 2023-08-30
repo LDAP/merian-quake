@@ -44,7 +44,6 @@ vec2 warp(const vec2 st) {
 void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
     uint16_t intersection = 0s;
 
-    // TODO: Max bounces (prevent infinite bounces)
     while (intersection++ < MAX_INTERSECTIONS) {
         rayQueryEXT ray_query;
         VertexExtraData extra_data;
