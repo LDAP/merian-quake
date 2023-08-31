@@ -20,6 +20,7 @@ main() {
   imageStore(img_irradiance, ipos, vec4(0));
   imageStore(img_albedo, ipos, vec4(0));
   imageStore(img_mv, ipos, vec4(0));
+  imageStore(img_debug, ipos, vec4(0));
 
   gbuffer[gbuffer_index(ipos, imageSize(img_irradiance))].enc_normal = 0;
   gbuffer[gbuffer_index(ipos, imageSize(img_irradiance))].linear_z = 0;
