@@ -15,6 +15,7 @@
 #include "common/bsdf_diffuse.glsl"
 #include "common/grid.glsl"
 #include "common/colors_yuv.glsl"
+#include "common/hash.glsl"
 
 uint rng_state;
 vec2 moments;
@@ -31,7 +32,7 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
 
-    rng_state = 9771967 * (pixel.y + resolution.y * pixel.x) + params.frame * resolution.x * resolution.y;
+    rng_state = pcg3d16(uvec3(pixel, params.frame));
     moments = f16vec2(0);
     irr_samples = f16vec3(0);
     f16vec3 camera_throughput = f16vec3(1);
