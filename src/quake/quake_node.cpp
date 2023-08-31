@@ -1176,7 +1176,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     // UPDATE GEOMETRY
-    {
+    if (cl.worldmodel) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update geo");
         if (worldspawn) {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload static");
@@ -1201,7 +1201,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         update_textures(cmd);
     }
 
-    if (worldspawn) {
+    if (cl.worldmodel && worldspawn) {
         key_dest = key_game;
         m_state = m_none;
 
