@@ -67,7 +67,10 @@ ShaderModuleHandle QuakePost::get_shader_module() {
 }
 
 void QuakePost::get_configuration(Configuration& config, bool& needs_rebuild) {
-    int32_t old_enable = enable;
+    config.output_text(
+        fmt::format("current fog ({}, {}, {}), {}", pc.fog.r, pc.fog.g, pc.fog.b, pc.fog.a));
+
+        int32_t old_enable = enable;
     config.config_bool("enable", enable);
     needs_rebuild |= enable != old_enable;
 }
