@@ -4,6 +4,7 @@
 #include "common/gbuffer.glsl.h"
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+layout(constant_id = 2) const int ENABLE = 1;
 
 layout(set = 0, binding = 0) uniform sampler2D img_in;
 layout(set = 0, binding = 1, scalar) buffer buf_gbuf {
@@ -21,6 +22,11 @@ void main() {
 
     if (any(greaterThanEqual(pixel, imageSize(img_out))))
         return;
+
+    if (ENABLE == 0) {
+        imageStore(img_out, pixel, texelFetch(img_in, pixel, 0));
+        return;
+    }
 
     const vec3 color_in = texelFetch(img_in, pixel, 0).rgb;
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, imageSize(img_out))];

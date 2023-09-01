@@ -43,6 +43,7 @@ class QuakePost : public ComputeNode {
     vk::Extent3D extent;
     PushConstant pc;
     ShaderModuleHandle shader;
+    int32_t enable = 1;
 };
 
 } // namespace merian

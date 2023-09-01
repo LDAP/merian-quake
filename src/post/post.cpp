@@ -45,7 +45,7 @@ QuakePost::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connec
 
 SpecializationInfoHandle QuakePost::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_builder.add_entry(local_size_x, local_size_y, enable);
     return spec_builder.build();
 }
 
@@ -66,6 +66,10 @@ ShaderModuleHandle QuakePost::get_shader_module() {
     return shader;
 }
 
-void QuakePost::get_configuration(Configuration&, bool&) {}
+void QuakePost::get_configuration(Configuration& config, bool& needs_rebuild) {
+    int32_t old_enable = enable;
+    config.config_bool("enable", enable);
+    needs_rebuild |= enable != old_enable;
+}
 
 } // namespace merian
