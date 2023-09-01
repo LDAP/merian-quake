@@ -31,6 +31,7 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
+#include "post/post.hpp"
 #include "quake/quake_node.hpp"
 
 struct FrameData {
@@ -76,6 +77,7 @@ int main(const int argc, const char** argv) {
     auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
     auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
     auto hud = std::make_shared<merian::QuakeHud>(context, alloc);
+    auto post = std::make_shared<merian::QuakePost>(context, alloc);
 
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
@@ -90,6 +92,7 @@ int main(const int argc, const char** argv) {
     graph.add_node("exposure", exposure);
     graph.add_node("median variance", median);
     graph.add_node("hud", hud);
+    graph.add_node("post", post);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -111,10 +114,13 @@ int main(const int argc, const char** argv) {
     graph.connect_image(accum, svgf, 1, 2); // moments
     graph.connect_image(quake, svgf, 1, 3); // albedo
     graph.connect_image(quake, svgf, 2, 4); // mv
-    graph.connect_image(svgf, exposure, 0, 0);
     graph.connect_image(svgf, median, 0, 0);
     graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
     graph.connect_buffer(quake, svgf, 2, 1);
+    graph.connect_image(svgf, post, 0, 0);
+
+    graph.connect_buffer(quake, post, 2, 0);
+    graph.connect_image(post, exposure, 0, 0);
 
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);

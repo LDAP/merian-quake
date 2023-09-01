@@ -1249,9 +1249,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     float rgt[3];
     AngleVectors(r_refdef.viewangles, &pc.cam_w.x, rgt, &pc.cam_u.x);
     pc.cam_x = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
-    // float fog_density = Fog_GetDensity();
-    // fog_density *= fog_density;
-    // pc.fog = glm::vec4(*merian::as_vec3(Fog_GetColor()), fog_density);
     pc.sky.fill(0);
     if (skybox_name[0]) {
         for (int i = 0; i < 6; i++)
