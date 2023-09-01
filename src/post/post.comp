@@ -31,7 +31,7 @@ void main() {
     const vec3 color_in = texelFetch(img_in, pixel, 0).rgb;
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, imageSize(img_out))];
 
-    const float mu_t = 0.003 * pc.fog.w;
+    const float mu_t = 0.001 * pc.fog.w;
     const float T = exp(-min(gbuf.linear_z, 1000.0) * mu_t);
 
     const vec3 color_out = mix(pc.fog.rgb, color_in, T);
