@@ -183,8 +183,10 @@ void main() {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
 
-        if (all(greaterThan(first_hit.albedo, f16vec3(0)))) {
-            irr_samples /= first_hit.albedo;
+        if (any(greaterThan(first_hit.albedo, f16vec3(0)))) {
+            irr_samples /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
+                                   first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
+                                   first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
             const float alb_l = yuv_luminance(first_hit.albedo);
             moments /= vec2(alb_l, alb_l * alb_l);
         }
