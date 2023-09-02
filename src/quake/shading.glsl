@@ -9,9 +9,9 @@ f16vec3 get_sky(const vec3 w) {
 
     if((params.sky_lf_ft & 0xffff) == 0xffff) {
         // classic quake sky
-        const vec2 st = 0.5 + 0.5 * vec2(-w.y,w.x) / abs(w.z);
-        const vec2 t = params.cl_time * vec2(0.12, 0.06);
-        const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.1 * t);
+        const vec2 st = 0.5 + 1. * vec2(w.x , w.y) / abs(w.z);
+        const vec2 t = params.cl_time * vec2(0.12, 0.12);
+        const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.5 * t);
         const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         emm = 10.0hf * (exp2(3.5hf * f16vec3(tex)) - 1.0hf);
