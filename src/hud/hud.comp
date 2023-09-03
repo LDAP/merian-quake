@@ -38,7 +38,7 @@ void main() {
     }
 
     if (pc.health > 0 && distance(pixel, imageSize(img_out) / vec2(2)) < .004 * imageSize(img_out).x) {
-        color = any(lessThan(abs(vec2(pixel) - imageSize(img_out).rg / vec2(2)), vec2(2))) ? vec3(.1, .1, .1) : color;
+        color = any(lessThan(abs(vec2(pixel) - imageSize(img_out).rg / vec2(2)), vec2(1))) ? vec3(.9, .9, .9) : color;
     }
 
     imageStore(img_out, pixel, vec4(color, 1));
