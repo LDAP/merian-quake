@@ -4,6 +4,7 @@
 #include "merian-nodes/accumulate/accumulate.hpp"
 #include "merian-nodes/blit_external/blit_external.hpp"
 #include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
+#include "merian-nodes/bloom/bloom.hpp"
 #include "merian-nodes/color_output/color_output.hpp"
 #include "merian-nodes/exposure/exposure.hpp"
 #include "merian-nodes/image/image.hpp"
@@ -78,6 +79,7 @@ int main(const int argc, const char** argv) {
     auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
     auto hud = std::make_shared<merian::QuakeHud>(context, alloc);
     auto post = std::make_shared<merian::QuakePost>(context, alloc);
+    auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
 
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
@@ -93,6 +95,7 @@ int main(const int argc, const char** argv) {
     graph.add_node("median variance", median);
     graph.add_node("hud", hud);
     graph.add_node("post", post);
+    graph.add_node("bloom", bloom);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -117,10 +120,12 @@ int main(const int argc, const char** argv) {
     graph.connect_image(svgf, median, 0, 0);
     graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
     graph.connect_buffer(quake, svgf, 2, 1);
-    graph.connect_image(svgf, post, 0, 0);
 
+    graph.connect_image(svgf, post, 0, 0);
     graph.connect_buffer(quake, post, 2, 0);
-    graph.connect_image(post, exposure, 0, 0);
+
+    graph.connect_image(post, bloom, 0, 0);
+    graph.connect_image(bloom, exposure, 0, 0);
 
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
