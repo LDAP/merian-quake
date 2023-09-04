@@ -33,7 +33,7 @@ void main() {
         }
         const float off = (pixel.x / float(imageSize(img_out).x) - 0.8) / 0.1;
         if (off * 100 < val) {
-            color = mix(color, col, 0.5);
+            color = mix(color, col, 0.8);
         }
     }
 
