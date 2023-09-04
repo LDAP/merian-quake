@@ -16,6 +16,7 @@
 #include "common/grid.glsl"
 #include "common/colors_yuv.glsl"
 #include "common/hash.glsl"
+#include "common/bsdf_rough_diffuse.glsl"
 
 uint rng_state;
 vec2 moments;
@@ -132,7 +133,8 @@ void main() {
 
 
                 // EVALUATE BSDF
-                current_throughput *= f16vec3(bsdf_diffuse_eval(current_hit.albedo) * wodotn);
+                mat3 frame = make_frame(current_hit.normal);
+                current_throughput *= f16vec3(bsdf_rough_diffuse_eval(-current_hit.wi, frame[0], frame[1], current_hit.normal, next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
                 const f16vec3 next_lc = light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
                 if (USE_LIGHT_CACHE_TAIL == 1) {

@@ -7,6 +7,7 @@ struct Hit {
 
     // Material
     f16vec3 albedo;
+    float16_t roughness;
 };
 
 #define _get_t(ray_query, commited) rayQueryGetIntersectionTEXT(ray_query, commited)
@@ -90,6 +91,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
 
+        hit.roughness = 0.01hf;
+
         // NO HIT this should not happen in Quake, but it does -> treat that as sky.
         if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
             const f16vec3 sky = get_sky(hit.wi);
@@ -136,7 +139,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
 
         if (extra_data.n1_brush == 0xffffffff) {
             const uint16_t texnum_normal = uint16_t(extra_data.n0_gloss_norm >> 16);
-            // const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
+            const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
 
             if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
                 const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
@@ -152,10 +155,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 hit.normal = normalize(mat3(du, dv, hit.normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
             }
 
-
-            // if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
-            //     mat.gloss = float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r);
-            // }
+            if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
+                hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r));
+            }
         } else {
             hit.normal = normalize(mat3(geo_decode_normal(extra_data.n0_gloss_norm),
                                         geo_decode_normal(extra_data.n1_brush),
@@ -165,12 +167,14 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         // MATERIAL
         if (flags == MAT_FLAGS_WATER) {
             hit.albedo = albedo_texture.rgb;
+            hit.roughness = 0.001hf;
             //throughput *= albedo_texture.rgb;
             //hit.pos += 1e-3 * hit.wi;
             //continue;
         } else if (flags == MAT_FLAGS_WATERFALL) {
             contribution += throughput * albedo_texture.rgb;
             hit.albedo = albedo_texture.rgb;
+            hit.roughness = 0.001hf;
             //hit.pos += 1e-3 * hit.wi;
             //continue;
         } else if (flags == MAT_FLAGS_SPRITE) {
