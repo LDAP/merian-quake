@@ -91,7 +91,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
 
-        hit.roughness = 0.01hf;
+        hit.roughness = 0.02hf;
 
         // NO HIT this should not happen in Quake, but it does -> treat that as sky.
         if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
