@@ -53,7 +53,10 @@ void main() {
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-            imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
+            const f16vec3 albedo = f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
+                                           first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
+                                           first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
+            imageStore(img_albedo, pixel, vec4(albedo, 1));
 
             // Store GBuffer
             const GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos)};
@@ -186,6 +189,7 @@ void main() {
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
 
         if (any(greaterThan(first_hit.albedo, f16vec3(0)))) {
+            // same as when storing albedo
             irr_samples /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
                                    first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
                                    first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
