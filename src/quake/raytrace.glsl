@@ -152,7 +152,13 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                     du = du2;
                 }
 
+                const vec3 geo_normal = hit.normal;
                 hit.normal = normalize(mat3(du, dv, hit.normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
+                // Keller et al. [2017] workaround for artifacts
+                const vec3 r = reflect(hit.wi, hit.normal);
+                if (dot(r, geo_normal) < 0) {
+                    hit.normal = normalize((-hit.wi + normalize(r - geo_normal * dot(geo_normal, r))) / 2);
+                } 
             }
 
             if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
