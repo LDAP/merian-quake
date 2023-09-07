@@ -20,6 +20,7 @@ layout (constant_id = 11) const float SUN_COLOR_B = 0;
 layout (constant_id = 12) const int ADAPTIVE_SAMPLING = 0;
 layout (constant_id = 13) const int VOLUME_SPP = 0;
 layout (constant_id = 14) const float MU_T = 0.;
+layout (constant_id = 15) const float MU_S = 0.;
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x;

@@ -36,7 +36,6 @@ void main() {
     // must equal quake.comp
     rng_state = pcg3d16(uvec3(pixel, params.frame));
     irr = f16vec3(0);
-    f16vec3 camera_throughput = f16vec3(1);
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
 
@@ -100,7 +99,7 @@ void main() {
 
         Hit next_hit;
         next_hit.wi = wo;
-        next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
+        next_hit.pos = current_hit.pos;
         f16vec3 incident = f16vec3(0);
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
@@ -111,9 +110,9 @@ void main() {
         }
 #endif
 
-        incident *= f16vec3(bsdf_volume_isotropic_eval());
+        incident *= f16vec3(bsdf_volume_isotropic_eval()) * float16_t(MU_S);
 
-        vec3 contrib = incident * exp(-min(t, 1000.0) * MU_T) / p;
+        vec3 contrib = incident * exp(-min(t, VOLUME_MAX_T) * MU_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib)))
             irr += contrib;
 

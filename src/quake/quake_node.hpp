@@ -338,6 +338,7 @@ class QuakeNode : public merian::Node {
     int32_t use_light_cache_tail = 0;
     int32_t adaptive_sampling = 0;
     float mu_t = 0.;
+    float mu_s = 0.;
 
     bool dump_mc = false;
 };
