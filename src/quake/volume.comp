@@ -131,7 +131,7 @@ void main() {
     }
 
     if (all(lessThan(pixel, resolution))) {
-        imageStore(img_volume, pixel, vec4(irr / min(VOLUME_SPP, 1), 0));
+        imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
     }
 
 }
