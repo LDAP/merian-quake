@@ -20,6 +20,7 @@
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/utils/math.hpp"
 #include "quake.comp.spv.h"
+#include "volume.comp.spv.h"
 
 struct QuakeData {
     // The first quake node sets this
@@ -758,6 +759,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                                                        merian_quake_comp_spv());
     clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(),
                                                           merian_clear_comp_spv());
+    volume_shader = std::make_shared<merian::ShaderModule>(context, merian_volume_comp_spv_size(),
+                                                           merian_volume_comp_spv());
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -1049,6 +1052,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "debug", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write("moments", vk::Format::eR32G32Sfloat,
                                                              width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "volume", vk::Format::eR16G16B16A16Sfloat, width, height),
         },
         {
             merian::NodeOutputDescriptorBuffer(
@@ -1100,11 +1105,14 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
-                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling);
+                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
+                               volume_spp, mu_t);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
                                                                spec_builder.build());
+        volume_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, volume_shader,
+                                                                spec_builder.build());
     }
 
     // DUMMY IMAGE as placeholder
@@ -1266,6 +1274,19 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
         pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+    }
+    auto bar =
+        vk::MemoryBarrier{vk::AccessFlagBits::eMemoryWrite, vk::AccessFlagBits::eMemoryWrite};
+    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                        vk::PipelineStageFlagBits::eComputeShader, {}, bar, {}, {});
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume");
+        volume_pipe->bind(cmd);
+        volume_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        volume_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
+        volume_pipe->push_constant(cmd, pc);
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
@@ -1624,6 +1645,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_max_path_lenght = max_path_length;
     const int32_t old_use_light_cache_tail = use_light_cache_tail;
     const int32_t old_adaptive_sampling = adaptive_sampling;
+    const int32_t old_volume_spp = volume_spp;
+    const float old_mu_t = mu_t;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
     config.config_int("spp", spp, 0, 15, "samples per pixel");
@@ -1633,13 +1656,19 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_percent("ML Prior", ml_prior);
     config.config_bool("light cache tail", use_light_cache_tail,
                        "use the light cache for the path tail");
+
+    config.st_separate();
+    config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
+    config.config_float("mu_t", mu_t, "", 0.00001);
+
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
     pc.rt_config.flags = 0;
 
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
-        old_adaptive_sampling != adaptive_sampling) {
+        old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
+        old_mu_t != mu_t) {
         needs_rebuild = true;
     }
 

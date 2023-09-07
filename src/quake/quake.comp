@@ -20,7 +20,7 @@
 
 uint rng_state;
 vec2 moments;
-vec3 irr_samples;
+vec3 irr;
 
 #include "config.h"
 #include "layout.glsl"
@@ -35,7 +35,7 @@ void main() {
 
     rng_state = pcg3d16(uvec3(pixel, params.frame));
     moments = f16vec2(0);
-    irr_samples = f16vec3(0);
+    irr = f16vec3(0);
     f16vec3 camera_throughput = f16vec3(1);
 
     Hit first_hit;
@@ -44,7 +44,7 @@ void main() {
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         trace_ray(camera_throughput, incident, first_hit);
-        irr_samples += incident;
+        irr += incident;
     }
 
     {
@@ -63,7 +63,7 @@ void main() {
 
     {
         // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr_samples, vec3(1e-7))))
+        if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr, vec3(1e-7))))
         for (int s = 0; s < MAX_SPP; s++) {
             Hit current_hit = first_hit;
             vec3 current_throughput = camera_throughput;
@@ -173,31 +173,31 @@ void main() {
             // Albdeo demodulation
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr_samples += contrib * (1.0 / MAX_SPP);
+                irr += contrib * (1.0 / MAX_SPP);
                 float l = yuv_luminance(contrib);
                 moments += vec2(l, l * l) * (1. / MAX_SPP);
             }
         }
     }
-    // irr_samples = vec3(light_cache_get(first_hit.pos, first_hit.normal));
+    // irr = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
     if (all(lessThan(pixel, resolution))) {
         // Required for albedo demodulation
         // Since irradiance is blurred set it to 1 and keep detail in albedo texture
 
         if (any(greaterThan(first_hit.albedo, f16vec3(0)))) {
-            irr_samples /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
+            irr /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
                                    first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
                                    first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
             const float alb_l = yuv_luminance(first_hit.albedo);
             moments /= vec2(alb_l, alb_l * alb_l);
         }
 
-        imageStore(img_irradiance, pixel, vec4(irr_samples, 0));
+        imageStore(img_irradiance, pixel, vec4(irr, 0));
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
 
-    // irr_samples = filtered;
+    // irr = filtered;
     // if (all(lessThan(pixel, resolution))) {
     //     imageStore(img_debug, pixel, vec4(SPP) / MAX_SPP);
     // }
@@ -207,11 +207,11 @@ void main() {
     
     // MCState mc_state = mc_state_new();
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
-    // irr_samples = vec3(mc_state.level / float(MC_LEVELS));
+    // irr = vec3(mc_state.level / float(MC_LEVELS));
 
     // MCState mc_state = mc_state_new();
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
-    // irr_samples = vec3(mc_state.sum_w);
+    // irr = vec3(mc_state.sum_w);
 
     // imageStore(img_debug, pixel, vec4(light_cache_get(first_mat.pos, first_mat.normal), 1));
 

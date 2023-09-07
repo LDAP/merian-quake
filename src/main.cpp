@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "merian-nodes/ab_compare/ab_compare.hpp"
 #include "merian-nodes/accumulate/accumulate.hpp"
+#include "merian-nodes/add/add.hpp"
 #include "merian-nodes/blit_external/blit_external.hpp"
 #include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
 #include "merian-nodes/bloom/bloom.hpp"
@@ -72,6 +73,7 @@ int main(const int argc, const char** argv) {
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size(),
                                              argc - 1, argv + 1);
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
+    auto volume_accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
@@ -80,6 +82,7 @@ int main(const int argc, const char** argv) {
     auto hud = std::make_shared<merian::QuakeHud>(context, alloc);
     auto post = std::make_shared<merian::QuakePost>(context, alloc);
     auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
+    auto add = std::make_shared<merian::AddNode>(context, alloc);
 
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
@@ -96,9 +99,13 @@ int main(const int argc, const char** argv) {
     graph.add_node("hud", hud);
     graph.add_node("post", post);
     graph.add_node("bloom", bloom);
+    graph.add_node("volume accum", volume_accum);
+    graph.add_node("add", add);
+
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
+    // Solid
     graph.connect_image(accum, accum, 0, 0); // feedback
     graph.connect_image(accum, accum, 1, 1);
     graph.connect_image(quake, accum, 0, 2);  // irr
@@ -120,21 +127,34 @@ int main(const int argc, const char** argv) {
     graph.connect_image(svgf, median, 0, 0);
     graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
     graph.connect_buffer(quake, svgf, 2, 1);
+    graph.connect_image(svgf, image_writer, 0, 0);
 
-    graph.connect_image(svgf, post, 0, 0);
     graph.connect_buffer(quake, post, 2, 0);
 
+    //  debug output
+    //graph.connect_image(quake, output, 3, 0);
+
+    // Volume
+    graph.connect_image(volume_accum, volume_accum, 0, 0); // feedback
+    graph.connect_image(volume_accum, volume_accum, 1, 1);
+    graph.connect_image(quake, volume_accum, 5, 2);  // irr
+    graph.connect_image(quake, volume_accum, 2, 3);  // mv
+    graph.connect_image(quake, volume_accum, 4, 4);  // moments
+    graph.connect_buffer(quake, volume_accum, 2, 0); // gbuffer
+    graph.connect_buffer(quake, volume_accum, 2, 1);
+    //graph.connect_image(volume_accum, output, 0, 0);
+
+    // Composite / Post
+    graph.connect_image(svgf, add, 0, 1);
+    graph.connect_image(volume_accum, add, 0, 0);
+    
+    graph.connect_image(add, post, 0, 0);
     graph.connect_image(post, bloom, 0, 0);
     graph.connect_image(bloom, exposure, 0, 0);
-
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
     graph.connect_image(hud, output, 0, 0);
 
-    //  debug output
-    // graph.connect_image(quake, output, 3, 0);
-
-    graph.connect_image(svgf, image_writer, 0, 0);
 
     merian::ImGuiConfiguration config;
 

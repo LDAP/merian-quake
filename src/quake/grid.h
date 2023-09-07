@@ -1,7 +1,7 @@
 #include "merian-nodes/common/types.glsl.h"
 
-#define MC_ADAPTIVE_BUFFER_SIZE 16777259
-#define MC_STATIC_BUFFER_SIZE 400009
+#define MC_ADAPTIVE_BUFFER_SIZE 32777259
+#define MC_STATIC_BUFFER_SIZE 800009
 #define MC_STATIC_VERTEX_STATE_COUNT 23
 
 struct MCState {

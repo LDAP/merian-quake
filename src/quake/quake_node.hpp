@@ -218,6 +218,8 @@ class QuakeNode : public merian::Node {
 
     merian::ShaderModuleHandle rt_shader;
     merian::ShaderModuleHandle clear_shader;
+    merian::ShaderModuleHandle volume_shader;
+
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
     merian::DescriptorPoolHandle graph_pool;
     std::vector<merian::DescriptorSetHandle> graph_sets;
@@ -234,6 +236,7 @@ class QuakeNode : public merian::Node {
 
     merian::PipelineHandle pipe;
     merian::PipelineHandle clear_pipe;
+    merian::PipelineHandle volume_pipe;
 
     // ----------------------------------------------------
     // Params
@@ -330,9 +333,11 @@ class QuakeNode : public merian::Node {
     static constexpr uint32_t local_size_x = 8;
     static constexpr uint32_t local_size_y = 8;
     int32_t spp = 1;
+    int32_t volume_spp = 0;
     int32_t max_path_length = 3;
     int32_t use_light_cache_tail = 0;
     int32_t adaptive_sampling = 0;
+    float mu_t = 0.;
 
     bool dump_mc = false;
 };

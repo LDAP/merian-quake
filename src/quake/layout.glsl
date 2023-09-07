@@ -18,6 +18,8 @@ layout (constant_id = 9) const float SUN_COLOR_R = 0;
 layout (constant_id = 10) const float SUN_COLOR_G = 0;
 layout (constant_id = 11) const float SUN_COLOR_B = 0;
 layout (constant_id = 12) const int ADAPTIVE_SAMPLING = 0;
+layout (constant_id = 13) const int VOLUME_SPP = 0;
+layout (constant_id = 14) const float MU_T = 0.;
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x;
@@ -57,15 +59,16 @@ layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
 layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
 layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
 layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
+layout(set = 0, binding = 9) uniform writeonly image2D img_volume;
 
 // GRAPH buffer out
-layout(set = 0, binding = 9, scalar) buffer buf_mc_states {
+layout(set = 0, binding = 10, scalar) buffer buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 10, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 11, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 11, scalar) buffer buf_gbuf {
+layout(set = 0, binding = 12, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
 };
 

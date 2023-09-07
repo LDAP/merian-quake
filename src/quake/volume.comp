@@ -1,0 +1,134 @@
+#version 460
+#extension GL_GOOGLE_include_directive              : enable
+#extension GL_EXT_ray_tracing                       : enable
+#extension GL_EXT_ray_query                         : enable
+#extension GL_EXT_shader_explicit_arithmetic_types  : enable
+#extension GL_EXT_nonuniform_qualifier              : enable
+#extension GL_EXT_control_flow_attributes           : enable
+#extension GL_KHR_shader_subgroup_ballot            : enable
+#extension GL_KHR_shader_subgroup_arithmetic        : enable
+
+#include "common/camera.glsl"
+#include "common/random.glsl"
+#include "common/normal_encode.glsl"
+#include "common/raytrace.glsl"
+#include "common/bsdf_volume.glsl"
+#include "common/grid.glsl"
+#include "common/colors_yuv.glsl"
+#include "common/hash.glsl"
+#include "common/bsdf_microfacet.glsl"
+
+uint rng_state;
+vec3 irr;
+uint16_t samples;
+
+#include "config.h"
+#include "layout.glsl"
+#include "shading.glsl"
+#include "light_cache.glsl"
+#include "mc.glsl"
+#include "raytrace.glsl"
+
+void main() {
+    const ivec2 pixel = ivec2(gl_GlobalInvocationID);
+    const ivec2 resolution = ivec2(imageSize(img_irradiance));
+
+    // must equal quake.comp
+    rng_state = pcg3d16(uvec3(pixel, params.frame));
+    irr = f16vec3(0);
+    f16vec3 camera_throughput = f16vec3(1);
+
+    const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
+
+    for (int s = 0; s < VOLUME_SPP; s++) {
+
+        const float xi_max = 1. - exp(-gbuf.linear_z * MU_T);
+        const float t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
+
+        // must equal first hit in quake.comp
+        Hit current_hit;
+        current_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        current_hit.pos = params.cam_x.xyz + t * current_hit.wi;
+        // mc is normal-biased currently...
+        current_hit.normal = geo_decode_normal(gbuf.enc_normal);
+
+        float f = 0;
+        float p = (sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max);
+        vec3 wo;
+        float wo_p = 0;
+
+        float scores[MC_SAMPLES];
+        vec4 vmfs[MC_SAMPLES];
+        MCState mc_state;
+        float score_sum = 0;
+        // SAMPLE NEXT OUTGOING DIRECTION
+        {
+            [[unroll]]
+            for (int i = 0; i < MC_SAMPLES; i++) {
+                MCState state;
+                if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
+                    mc_adaptive_load(state, current_hit.pos, current_hit.normal);
+                } else {
+                    mc_static_load(state, current_hit.pos, current_hit.normal);
+                }
+
+                scores[i] = state.sum_w;
+                score_sum += scores[i];
+                vmfs[i] = mc_state_get_vmf(state, current_hit.pos);
+                if (XorShift32(rng_state) < scores[i] / score_sum) {
+                    // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
+                    mc_state = state;
+                    wo = vmf_sample(vmfs[i].xyz, vmfs[i].w, XorShift32Vec2(rng_state));
+                }
+            }
+
+            if (XorShift32(rng_state) < bsdf_p() || score_sum == 0) {
+                wo = bsdf_volume_isotropic_sample(XorShift32Vec2(rng_state));
+                mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+            }
+            
+            // Multiple importance sampling
+            [[unroll]]
+            for (int i = 0; i < MC_SAMPLES; i++) {
+                // score_sum > 0 ? results in black artifacts
+                wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
+            }
+            wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_volume_isotropic_pdf() + (1 - bsdf_p()) * wo_p;
+        }
+
+        p *= wo_p;
+
+        Hit next_hit;
+        next_hit.wi = wo;
+        next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
+        f16vec3 incident = f16vec3(0);
+        f16vec3 throughput = f16vec3(1);
+        trace_ray(throughput, incident, next_hit);
+
+        if (!any(greaterThan(incident, f16vec3(0)))) {
+            incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+        }
+        incident *= f16vec3(bsdf_volume_isotropic_eval());
+
+        vec3 contrib = incident * exp(-min(t, 1000.0) * MU_T) / p;
+        if (!any(isnan(contrib)) && !any(isinf(contrib)))
+            irr += contrib;
+
+        // Update markov chain
+        {
+            const float mc_f = yuv_luminance(incident / wo_p);
+            if (!isinf(mc_f)) {
+                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos);
+                if (XorShift32(rng_state) < mc_f / ((score_sum) / (MC_SAMPLES))) {
+                    mc_static_save(mc_state, current_hit.pos, current_hit.normal);
+                    mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                }
+            }
+        }
+    }
+
+    if (all(lessThan(pixel, resolution))) {
+        imageStore(img_volume, pixel, vec4(irr / min(VOLUME_SPP, 1), 0));
+    }
+
+}
