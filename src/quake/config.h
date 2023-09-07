@@ -15,6 +15,9 @@
 // for example transparent surfaces / water
 #define MAX_INTERSECTIONS 5
 
+// Limits indirectly the maximum absorption
+#define VOLUME_MAX_T 1000.
+
 // BINDINGS
 
 #define BINDING_VTX_BUF 0

@@ -91,7 +91,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
 
-        throughput *= float16_t(exp(-min(_get_t(ray_query, true), 1000.0) * MU_T));
+        throughput *= float16_t(exp(-min(_get_t(ray_query, true), VOLUME_MAX_T) * MU_T));
         hit.roughness = 0.02hf;
 
         // NO HIT this should not happen in Quake, but it does -> treat that as sky.
