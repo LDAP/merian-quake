@@ -106,11 +106,11 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-#if USE_LIGHT_CACHE
-        if (!any(greaterThan(incident, f16vec3(0)))) {
-            incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+        if (VOLUME_USE_LIGHT_CACHE != 0)
+            if (!any(greaterThan(incident, f16vec3(0)))) {
+                incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
         }
-#endif
+
 
         incident *= f16vec3(bsdf_volume_isotropic_eval()) * float16_t(MU_S);
 

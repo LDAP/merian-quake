@@ -1108,7 +1108,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
-                               volume_spp, mu_t, mu_s);
+                               volume_spp, mu_t, mu_s, volume_use_light_cache);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1648,6 +1648,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_use_light_cache_tail = use_light_cache_tail;
     const int32_t old_adaptive_sampling = adaptive_sampling;
     const int32_t old_volume_spp = volume_spp;
+    const int32_t old_volume_use_light_cache = volume_use_light_cache;
     const float old_mu_t = mu_t;
     const float old_mu_s = mu_s;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -1664,6 +1665,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
     config.config_float("mu_t", mu_t, "", 0.00001);
     config.config_float("mu_s", mu_s, "", 0.00001);
+    config.config_bool("use light cache", volume_use_light_cache);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
@@ -1672,7 +1674,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
         old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
-        old_mu_t != mu_t || old_mu_s != mu_s) {
+        old_mu_t != mu_t || old_mu_s != mu_s ||
+        old_volume_use_light_cache != volume_use_light_cache) {
         needs_rebuild = true;
     }
 
