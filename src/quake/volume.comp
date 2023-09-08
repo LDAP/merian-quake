@@ -20,6 +20,7 @@
 
 uint rng_state;
 vec3 irr;
+vec2 moments;
 uint16_t samples;
 
 #include "config.h"
@@ -36,6 +37,7 @@ void main() {
     // must equal quake.comp
     rng_state = pcg3d16(uvec3(pixel, params.frame));
     irr = f16vec3(0);
+    moments = vec2(0);
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
 
@@ -113,8 +115,11 @@ void main() {
         incident *= f16vec3(bsdf_volume_isotropic_eval()) * float16_t(MU_S);
 
         vec3 contrib = incident * exp(-min(t, VOLUME_MAX_T) * MU_T) / p;
-        if (!any(isnan(contrib)) && !any(isinf(contrib)))
+        if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irr += contrib;
+            const float l = yuv_luminance(irr);
+            moments += vec2(l, l * l);
+        }
 
         // Update markov chain
         {
@@ -131,6 +136,7 @@ void main() {
 
     if (all(lessThan(pixel, resolution))) {
         imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
+        imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
     }
 
 }

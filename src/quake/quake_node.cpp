@@ -1054,6 +1054,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                                                              width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "volume", vk::Format::eR16G16B16A16Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write(
+                "volume_moments", vk::Format::eR32G32Sfloat, width, height),
         },
         {
             merian::NodeOutputDescriptorBuffer(

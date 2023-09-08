@@ -68,13 +68,16 @@ int main(const int argc, const char** argv) {
     // output->get_swapchain()->set_vsync(true);
     auto blue_noise = std::make_shared<merian::ImageNode>(
         alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
-    auto black = std::make_shared<merian::ColorOutputNode>(vk::Format::eR16G16B16A16Sfloat,
-                                                           vk::Extent3D{1920, 1080, 1});
+    const std::array<float, 4> white_color = {1., 1., 1., 1.};
+    auto one = std::make_shared<merian::ColorOutputNode>(vk::Format::eR16G16B16A16Sfloat,
+                                                         vk::Extent3D{1920, 1080, 1},
+                                                         vk::ClearColorValue(white_color));
     auto quake = std::make_shared<QuakeNode>(context, alloc, controller, ring_fences->ring_size(),
                                              argc - 1, argv + 1);
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto volume_accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
+    auto volume_svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
     auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
@@ -87,11 +90,12 @@ int main(const int argc, const char** argv) {
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
     graph.add_node("output", output);
-    graph.add_node("black_color", black);
+    graph.add_node("one", one);
     graph.add_node("blue_noise", blue_noise);
     graph.add_node("quake", quake);
     graph.add_node("accum", accum);
     graph.add_node("denoiser", svgf);
+    graph.add_node("volume denoiser", volume_svgf);
     graph.add_node("tonemap", tonemap);
     graph.add_node("image writer", image_writer);
     graph.add_node("exposure", exposure);
@@ -101,7 +105,6 @@ int main(const int argc, const char** argv) {
     graph.add_node("bloom", bloom);
     graph.add_node("volume accum", volume_accum);
     graph.add_node("add", add);
-
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -132,29 +135,37 @@ int main(const int argc, const char** argv) {
     graph.connect_buffer(quake, post, 2, 0);
 
     //  debug output
-    //graph.connect_image(quake, output, 3, 0);
+    // graph.connect_image(quake, output, 3, 0);
 
     // Volume
     graph.connect_image(volume_accum, volume_accum, 0, 0); // feedback
     graph.connect_image(volume_accum, volume_accum, 1, 1);
     graph.connect_image(quake, volume_accum, 5, 2);  // irr
     graph.connect_image(quake, volume_accum, 2, 3);  // mv
-    graph.connect_image(quake, volume_accum, 4, 4);  // moments
+    graph.connect_image(quake, volume_accum, 6, 4);  // moments
     graph.connect_buffer(quake, volume_accum, 2, 0); // gbuffer
     graph.connect_buffer(quake, volume_accum, 2, 1);
-    //graph.connect_image(volume_accum, output, 0, 0);
+
+    graph.connect_image(volume_svgf, volume_svgf, 0, 0);  // feedback
+    graph.connect_image(volume_accum, volume_svgf, 0, 1); // irr
+    graph.connect_image(volume_accum, volume_svgf, 1, 2); // moments
+    graph.connect_image(one, volume_svgf, 0, 3);        // albedo
+    graph.connect_image(quake, volume_svgf, 2, 4);        // mv
+    graph.connect_buffer(quake, volume_svgf, 2, 0); // gbuffer
+    graph.connect_buffer(quake, volume_svgf, 2, 1);
+
+    // graph.connect_image(volume_accum, output, 0, 0);
 
     // Composite / Post
     graph.connect_image(svgf, add, 0, 1);
-    graph.connect_image(volume_accum, add, 0, 0);
-    
+    graph.connect_image(volume_svgf, add, 0, 0);
+
     graph.connect_image(add, post, 0, 0);
     graph.connect_image(post, bloom, 0, 0);
     graph.connect_image(bloom, exposure, 0, 0);
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
     graph.connect_image(hud, output, 0, 0);
-
 
     merian::ImGuiConfiguration config;
 

@@ -61,15 +61,16 @@ layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
 layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
 layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
 layout(set = 0, binding = 9) uniform writeonly image2D img_volume;
+layout(set = 0, binding = 10) uniform writeonly image2D img_volume_moments;
 
 // GRAPH buffer out
-layout(set = 0, binding = 10, scalar) buffer buf_mc_states {
+layout(set = 0, binding = 11, scalar) buffer buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 11, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 12, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 12, scalar) buffer buf_gbuf {
+layout(set = 0, binding = 13, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
 };
 
