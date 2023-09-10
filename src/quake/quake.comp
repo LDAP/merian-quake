@@ -134,11 +134,7 @@ void main() {
                 const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
                 // EVALUATE BSDF
-                f16vec3 microfacet_bsdf;
-                {
-                    const mat3 frame = make_frame(current_hit.normal);
-                    microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, frame[0], frame[1], current_hit.normal, next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
-                }
+                const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
                 
                 current_throughput *= microfacet_bsdf;
                 if (USE_LIGHT_CACHE_TAIL == 1) {
