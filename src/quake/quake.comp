@@ -127,19 +127,22 @@ void main() {
                 next_hit.wi = wo;
                 // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
                 next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
-                f16vec3 incident = f16vec3(0);
+                f16vec3 incident = f16vec3(0); // contains throughput already
                 f16vec3 throughput = f16vec3(1);
                 trace_ray(throughput, incident, next_hit);
-
+                // Full GI (infinite diffuse bounces)
+                const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
                 // EVALUATE BSDF
-                const mat3 frame = make_frame(current_hit.normal);
-                current_throughput *= f16vec3(bsdf_microfacet_eval(-current_hit.wi, frame[0], frame[1], current_hit.normal, next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
-                const f16vec3 next_lc = light_cache_get(next_hit.pos, next_hit.normal).rgb;
-
+                f16vec3 microfacet_bsdf;
+                {
+                    const mat3 frame = make_frame(current_hit.normal);
+                    microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, frame[0], frame[1], current_hit.normal, next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
+                }
+                
+                current_throughput *= microfacet_bsdf;
                 if (USE_LIGHT_CACHE_TAIL == 1) {
-                    const f16vec3 lc_incident = segment < MAX_PATH_LENGTH - 1 || any(greaterThan(incident, f16vec3(0))) ? incident : next_lc;
-                    f = current_throughput * lc_incident;
+                    f = current_throughput * (segment < MAX_PATH_LENGTH - 1 ? incident : lc_incident);
                 } else {
                     f = current_throughput * incident;
                 }
@@ -148,10 +151,9 @@ void main() {
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
-                    const vec3 lc_incident = (any(greaterThan(incident, f16vec3(0))) ? incident : throughput * next_lc) * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p;
-                    const float mc_f = yuv_luminance(lc_incident);
+                    const float mc_f = yuv_luminance(lc_incident * microfacet_bsdf / wo_p);
                     if (!isinf(mc_f)) {
-                        light_cache_update(current_hit.pos, current_hit.normal, lc_incident);
+                        light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
 
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos);
                         if (XorShift32(rng_state) < mc_f / ((score_sum) / (MC_SAMPLES))) {
@@ -189,7 +191,7 @@ void main() {
             irr /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
                                    first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
                                    first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
-            const float alb_l = yuv_luminance(first_hit.albedo);
+            const float alb_l = yuv_luminance_f16(first_hit.albedo);
             moments /= vec2(alb_l, alb_l * alb_l);
         }
 
