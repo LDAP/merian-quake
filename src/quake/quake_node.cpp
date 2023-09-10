@@ -717,13 +717,11 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
         vertex_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
                                        vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
                                        vk::AccessFlagBits2::eTransferWrite,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
-                                           vk::AccessFlagBits2::eShaderRead),
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR),
         index_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
                                       vk::AccessFlagBits2::eTransferWrite,
-                                      vk::AccessFlagBits2::eAccelerationStructureReadKHR |
-                                          vk::AccessFlagBits2::eShaderRead),
+                                      vk::AccessFlagBits2::eAccelerationStructureReadKHR),
         ext_buffer->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eComputeShader,
             vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead),
