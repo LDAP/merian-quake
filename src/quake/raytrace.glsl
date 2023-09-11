@@ -158,7 +158,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 // Keller et al. [2017] workaround for artifacts
                 const vec3 r = reflect(hit.wi, hit.normal);
                 if (dot(r, geo_normal) < 0) {
-                    hit.normal = normalize((-hit.wi + normalize(r - geo_normal * dot(geo_normal, r))) / 2);
+                    hit.normal = normalize(-hit.wi + normalize(r - geo_normal * dot(geo_normal, r)));
                 } 
             }
 
