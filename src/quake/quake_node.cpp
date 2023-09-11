@@ -325,7 +325,7 @@ void add_geo_alias(entity_t* ent,
         idx.emplace_back(vtx_cnt + indexes[i]);
 
     // normals for each vertex from above
-    uint32_t* tmpn = (uint32_t*)alloca(sizeof(uint32_t) * hdr->numverts_vbo);
+    std::vector<uint32_t> tmpn(hdr->numverts_vbo);
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
@@ -336,7 +336,7 @@ void add_geo_alias(entity_t* ent,
         // convert to worldspace
         const glm::vec3 world_n =
             glm::normalize(mat_model_inv_t * glm::mix(*n_pose1, *n_pose2, lerpdata.blend));
-        *(tmpn + v) = merian::encode_normal(world_n);
+        tmpn[v] = merian::encode_normal(world_n);
     }
 
     // add extra data for each primitive
@@ -355,9 +355,9 @@ void add_geo_alias(entity_t* ent,
             n2 = 0;
         } else {
             // the vertex normals
-            n0 = *(tmpn + indexes[3 * i + 0]);
-            n1 = *(tmpn + indexes[3 * i + 1]);
-            n2 = *(tmpn + indexes[3 * i + 2]);
+            n0 = tmpn[indexes[3 * i + 0]];
+            n1 = tmpn[indexes[3 * i + 1]];
+            n2 = tmpn[indexes[3 * i + 2]];
         }
 
         ext.emplace_back(texnum_alpha, fb_texnum, n0, n1, n2,
