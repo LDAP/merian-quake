@@ -301,6 +301,7 @@ void add_geo_alias(entity_t* ent,
     mat_model[3] = glm::vec4(*merian::as_vec3(lerpdata.origin), 1);
     mat_model[1] *= -1;
 
+    // * ENTSCALE_DECODE(ent->scale)?
     mat_model = mat_model * glm::translate(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale_origin) * fovscale);
     mat_model = mat_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
 
