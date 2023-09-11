@@ -294,11 +294,15 @@ void add_geo_alias(entity_t* ent,
 
     // angles: pitch yaw roll. axes: right fwd up
     lerpdata.angles[0] *= -1;
-    glm::mat3 mat_model;
+    glm::mat4 mat_model = glm::identity<glm::mat4>();
     glm::vec3 pos_pose1, pos_pose2;
 
     AngleVectors(lerpdata.angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
+    mat_model[3] = glm::vec4(*merian::as_vec3(lerpdata.origin), 1);
     mat_model[1] *= -1;
+
+    mat_model = mat_model * glm::translate(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_model = mat_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
 
     const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
@@ -308,15 +312,11 @@ void add_geo_alias(entity_t* ent,
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
         // get model pos
         for (int k = 0; k < 3; k++) {
-            pos_pose1[k] = trivertexes[i_pose1].v[k] * hdr->scale[k] * fovscale[k] +
-                           hdr->scale_origin[k] * fovscale[k];
-            pos_pose2[k] = trivertexes[i_pose2].v[k] * hdr->scale[k] * fovscale[k] +
-                           hdr->scale_origin[k] * fovscale[k];
+            pos_pose1[k] = trivertexes[i_pose1].v[k];
+            pos_pose2[k] = trivertexes[i_pose2].v[k];
         }
         // convert to world space
-
-        const glm::vec3 world_pos = *merian::as_vec3(lerpdata.origin) +
-                                    mat_model * glm::mix(pos_pose1, pos_pose2, lerpdata.blend);
+        const glm::vec3 world_pos = mat_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, lerpdata.blend), 1.0);
         for (int k = 0; k < 3; k++)
             vtx.emplace_back(world_pos[k]);
     }
