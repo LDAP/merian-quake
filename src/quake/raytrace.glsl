@@ -166,9 +166,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r));
             }
         } else {
-            hit.normal = normalize(mat3(geo_decode_normal(extra_data.n0_gloss_norm),
-                                        geo_decode_normal(extra_data.n1_brush),
-                                        geo_decode_normal(extra_data.n2)) * barycentrics(ray_query));
+            // Only for alias models. Disabled for now, results in artifacts.
+
+            // hit.normal = normalize(mat3(geo_decode_normal(extra_data.n0_gloss_norm),
+            //                             geo_decode_normal(extra_data.n1_brush),
+            //                             geo_decode_normal(extra_data.n2)) * barycentrics(ray_query));
         }
 
         // MATERIAL
