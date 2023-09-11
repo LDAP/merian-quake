@@ -129,7 +129,15 @@ void main() {
                 if (XorShift32(rng_state) < mc_f / ((score_sum) / (MC_SAMPLES))) {
                     mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                     mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                } 
+                #if MC_FAST_RECOVERY
+                else if (mc_f < 1e-12 * mc_state.sum_w) {
+                    // fix slow recovery after light source disappears
+                    mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+                    mc_static_save(mc_state, current_hit.pos, current_hit.normal);
+                    mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
                 }
+                #endif
             }
         }
     }

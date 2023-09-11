@@ -18,6 +18,8 @@
 // Limits indirectly the maximum absorption
 #define VOLUME_MAX_T 1000.
 
+#define MC_FAST_RECOVERY 0
+
 // BINDINGS
 
 #define BINDING_VTX_BUF 0
