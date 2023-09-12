@@ -48,7 +48,7 @@ void main() {
         trace_ray(camera_throughput, incident, first_hit);
         irr += incident;
 
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0)};
+        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), dot(params.cam_x.xyz - params.prev_cam_x.xyz, first_hit.wi)};
 
         // Calculate depth gradient
         const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
