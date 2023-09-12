@@ -40,23 +40,28 @@ void main() {
 
     Hit first_hit;
     {
-        first_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        const vec2 jitter = vec2(0);/* pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/
+
+        first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         trace_ray(camera_throughput, incident, first_hit);
         irr += incident;
-    }
 
-    {
+        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0)};
+
+        // Calculate depth gradient
+        const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        gbuf.grad_z = dot(first_hit.normal, first_hit.pos - params.cam_x.xyz) / vec2(dot(first_hit.normal, r_x), dot(first_hit.normal, r_y)) - gbuf.linear_z;
+
         // Store motion vector
         const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
             imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
-
-            // Store GBuffer
-            const GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos)};
             gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
         }
     }
