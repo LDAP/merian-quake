@@ -12,11 +12,10 @@
 #include "common/random.glsl"
 #include "common/normal_encode.glsl"
 #include "common/raytrace.glsl"
-#include "common/bsdf_volume.glsl"
+#include "common/phase_isotropic.glsl"
 #include "common/grid.glsl"
 #include "common/colors_yuv.glsl"
 #include "common/hash.glsl"
-#include "common/bsdf_microfacet.glsl"
 
 uint rng_state;
 vec3 irr;
@@ -84,7 +83,7 @@ void main() {
             }
 
             if (XorShift32(rng_state) < bsdf_p() || score_sum == 0) {
-                wo = bsdf_volume_isotropic_sample(XorShift32Vec2(rng_state));
+                wo = phase_isotropic_sample(XorShift32Vec2(rng_state));
                 mc_state = mc_state_new(current_hit.pos, current_hit.normal);
             }
             
@@ -94,7 +93,7 @@ void main() {
                 // score_sum > 0 ? results in black artifacts
                 wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
             }
-            wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * bsdf_volume_isotropic_pdf() + (1 - bsdf_p()) * wo_p;
+            wo_p = (score_sum > 0 ? bsdf_p() : 1.0) * phase_isotropic_pdf() + (1 - bsdf_p()) * wo_p;
         }
 
         p *= wo_p;
@@ -112,7 +111,7 @@ void main() {
         }
 
 
-        incident *= f16vec3(bsdf_volume_isotropic_eval()) * float16_t(MU_S);
+        incident *= f16vec3(phase_isotropic_eval()) * float16_t(MU_S);
 
         vec3 contrib = incident * exp(-min(t, VOLUME_MAX_T) * MU_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
