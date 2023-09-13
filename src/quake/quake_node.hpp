@@ -340,6 +340,7 @@ class QuakeNode : public merian::Node {
     float mu_t = 0.;
     float mu_s = 0.;
     int32_t volume_use_light_cache = 0;
+    float volume_particle_size_um = 25.0;
 
     bool dump_mc = false;
 };

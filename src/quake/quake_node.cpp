@@ -302,8 +302,10 @@ void add_geo_alias(entity_t* ent,
     mat_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_model = mat_model * glm::translate(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale_origin) * fovscale);
-    mat_model = mat_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
+    mat_model = mat_model * glm::translate(glm::identity<glm::mat4>(),
+                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_model =
+        mat_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
 
     const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
@@ -317,7 +319,8 @@ void add_geo_alias(entity_t* ent,
             pos_pose2[k] = trivertexes[i_pose2].v[k];
         }
         // convert to world space
-        const glm::vec3 world_pos = mat_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, lerpdata.blend), 1.0);
+        const glm::vec3 world_pos =
+            mat_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, lerpdata.blend), 1.0);
         for (int k = 0; k < 3; k++)
             vtx.emplace_back(world_pos[k]);
     }
@@ -1104,10 +1107,12 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
         auto spec_builder = merian::SpecializationInfoBuilder();
+        const float draine_g = std::exp(-2.20679 / (volume_particle_size_um + 3.91029) - 0.428934);
+        const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
-                               volume_spp, mu_t, mu_s, volume_use_light_cache);
+                               volume_spp, mu_t, mu_s, volume_use_light_cache, draine_g, draine_a);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1648,6 +1653,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_adaptive_sampling = adaptive_sampling;
     const int32_t old_volume_spp = volume_spp;
     const int32_t old_volume_use_light_cache = volume_use_light_cache;
+    const float old_volume_particle_size_um = volume_particle_size_um;
     const float old_mu_t = mu_t;
     const float old_mu_s = mu_s;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -1664,6 +1670,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
     config.config_float("mu_t", mu_t, "", 0.00001);
     config.config_float("mu_s", mu_s, "", 0.00001);
+    config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_bool("use light cache", volume_use_light_cache);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
@@ -1674,7 +1681,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_use_light_cache_tail != use_light_cache_tail ||
         old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
         old_mu_t != mu_t || old_mu_s != mu_s ||
-        old_volume_use_light_cache != volume_use_light_cache) {
+        old_volume_use_light_cache != volume_use_light_cache ||
+        old_volume_particle_size_um != volume_particle_size_um) {
         needs_rebuild = true;
     }
 
