@@ -11,7 +11,7 @@ DistanceMCState distance_mc_state_new() {
 vec2 distance_mc_state_get_normal_dist(const DistanceMCState distance_mc_state) {
     const vec2 moments = distance_mc_state.moments / (distance_mc_state.sum_w > 0.0 ? distance_mc_state.sum_w : 1.0);
     float sigma = sqrt(max(moments.y - moments.x * moments.x, 0.0));
-    sigma = (distance_mc_state.N * distance_mc_state.N * sigma) / (distance_mc_state.N * distance_mc_state.N + 1.);
+    sigma = 1. / (distance_mc_state.N * distance_mc_state.N) + (1. - 1. / (distance_mc_state.N * distance_mc_state.N)) * sigma;
     return vec2(moments.x, sigma);
 }
 
