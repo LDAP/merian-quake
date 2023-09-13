@@ -21,7 +21,6 @@
 uint rng_state;
 vec3 irr;
 vec2 moments;
-uint16_t samples;
 
 #include "config.h"
 #include "layout.glsl"
