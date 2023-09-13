@@ -59,7 +59,7 @@ class QuakeNode : public merian::Node {
 
     struct RTConfig {
         unsigned char flags = 0;
-        unsigned char unused;
+        unsigned char dist_guide_p = static_cast<unsigned char>(0.0 * 255);
         unsigned char bsdp_p = static_cast<unsigned char>(0.1 * 255);
         unsigned char ml_prior = static_cast<unsigned char>(0.01 * 255);
     };

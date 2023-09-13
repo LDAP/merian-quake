@@ -21,3 +21,9 @@ struct LightCacheVertex {
     f16vec3 irr;
     uint16_t N;
 };
+
+struct DistanceMCState {
+    float sum_w;
+    uint N;
+    vec2 moments;
+};

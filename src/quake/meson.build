@@ -11,6 +11,7 @@ included_files = files(
     'grid.h',
     'shading.glsl',
     'mc.glsl',
+    'mc_distance.glsl',
     'light_cache.glsl',
     'raytrace.glsl'
     # Not working currently..
