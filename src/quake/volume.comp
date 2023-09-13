@@ -70,7 +70,7 @@ void main() {
                 if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
                     mc_adaptive_load(state, current_hit.pos, current_hit.normal);
                 } else {
-                    mc_static_load(state, current_hit.pos, current_hit.normal);
+                    mc_static_load(state, current_hit.pos);
                 }
 
                 scores[i] = state.sum_w;
