@@ -34,6 +34,10 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
 
+    if (any(greaterThan(pixel, resolution))) {
+        return;
+    }
+
     // must equal quake.comp
     rng_state = pcg3d16(uvec3(pixel, params.frame));
     irr = f16vec3(0);
@@ -141,10 +145,9 @@ void main() {
             }
         }
     }
-
-    if (all(lessThan(pixel, resolution))) {
-        imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
-        imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
-    }
+    
+    imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
+    imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
+    
 
 }
