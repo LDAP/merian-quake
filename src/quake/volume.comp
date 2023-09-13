@@ -16,6 +16,7 @@
 #include "common/grid.glsl"
 #include "common/colors_yuv.glsl"
 #include "common/hash.glsl"
+#include "common/phase_draine.glsl"
 
 uint rng_state;
 vec3 irr;
@@ -111,7 +112,7 @@ void main() {
         }
 
 
-        incident *= f16vec3(phase_isotropic_eval()) * float16_t(MU_S);
+        incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), 0.6250844703668166, 32.315427791972155)) * float16_t(MU_S);
 
         vec3 contrib = incident * exp(-min(t, VOLUME_MAX_T) * MU_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
