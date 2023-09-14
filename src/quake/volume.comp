@@ -45,13 +45,14 @@ void main() {
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
 
+    float marsaglia_spare = 0.0 / 0.0;
     for (int s = 0; s < VOLUME_SPP; s++) {
         float f = 0.0;
         float p = 0.0;
         float t;
 
         // CAMERA-DISTANCE SAMPLING
-        DistanceMCState dist_mc_state;
+        DistanceMCState dist_mc_state = distance_mc_state_new();
         float dist_score_sum = 0.0;
         {
             const float xi_max = 1. - exp(-gbuf.linear_z * MU_T);
@@ -59,10 +60,11 @@ void main() {
             float scores[4];
             vec2 normal_dists[4];
 
-            [[unroll]]
-            for (int i = 0; i < 1; i++) {
-                [[unroll]]
-                for (int j = 0; j < 1; j++) {
+            int i = 0, j = 0;
+            //[[unroll]]
+            //for (int i = 0; i < 1; i++) {
+            //    [[unroll]]
+            //    for (int j = 0; j < 1; j++) {
                     const DistanceMCState state = distance_mc_states[distance_mc_buf_idx((pixel + ivec2(i, j)), resolution)];
                     scores[2 * i + j] = state.sum_w;
                     dist_score_sum += scores[2 * i + j];
@@ -72,25 +74,31 @@ void main() {
                         dist_mc_state = state;
                         t = sample_normal_box_muller(normal_dists[2 * i + j].x, normal_dists[2 * i + j].y, XorShift32Vec2(rng_state)).x;
                     }
-               }
-            }
+            //   }
+            //}
 
             if (distance_guide_p() < XorShift32(rng_state) || dist_score_sum == 0) {
                 t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
                 dist_mc_state = distance_mc_state_new();
+                p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
+            } else {
+                p = (1.0 - distance_guide_p()) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * sample_normal_pdf(normal_dists[2 * i + j].x, normal_dists[2 * i + j].y, t);
             }
 
             if (t >= gbuf.linear_z || t <= 0)
                 continue;
 
-            [[unroll]]
-            for (int i = 0; i < 1; i++) {
-                [[unroll]]
-                for (int j = 0; j < 1; j++) {
-                    p += (scores[2 * i + j] > 0 ? scores[2 * i + j] * sample_normal_pdf(normal_dists[2 * i + j].x, normal_dists[2 * i + j].y, t) / dist_score_sum : 0);
-               }
-            }
-            p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * p;
+            // [[unroll]]
+            // for (int i = 0; i < 1; i++) {
+            //     [[unroll]]
+            //     for (int j = 0; j < 1; j++) {
+            //         p += (scores[2 * i + j] > 0 ? scores[2 * i + j] * sample_normal_pdf(normal_dists[2 * i + j].x, normal_dists[2 * i + j].y, t) / dist_score_sum : 0);
+            //    }
+            // }
+            // p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * p;
+        
+            // t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
+            // p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
         }
 
         // must equal first hit in quake.comp
@@ -170,9 +178,9 @@ void main() {
             
             // UPDATE MC FOR CAMERA DISTANCE
             distance_mc_state_add_sample(dist_mc_state, t, l);
-            if (XorShift32(rng_state) < l / (dist_score_sum / 4)) {
+            if (XorShift32(rng_state) < l / (dist_score_sum)) {
                 const vec2 r = XorShift32Vec2(rng_state);
-                const ivec2 offset = ivec2(r.x <= .5, r.y <= .5);
+                const ivec2 offset = ivec2(0);//ivec2(r.x <= .5, r.y <= .5);
                 distance_mc_states[distance_mc_buf_idx((pixel + offset), resolution)] = dist_mc_state;
             }
 
@@ -196,7 +204,7 @@ void main() {
     }
     
     const DistanceMCState s = distance_mc_states[distance_mc_buf_idx(pixel, resolution)];
-    imageStore(img_debug, pixel, vec4(distance_guide_p()));
+    imageStore(img_debug, pixel, vec4(0.001 * distance_mc_state_get_normal_dist(s).x));
 
     imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
     imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
