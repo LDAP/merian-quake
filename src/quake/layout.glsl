@@ -78,7 +78,7 @@ layout(set = 0, binding = 13, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
 };
 layout(set = 0, binding = 14, scalar) buffer buf_dist_mc_states {
-    DistanceMCState distance_mc_states[];
+    DistanceMCVertex distance_mc_states[];
 };
 
 // QUAKE 

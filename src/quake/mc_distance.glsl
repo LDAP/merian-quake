@@ -27,3 +27,18 @@ void distance_mc_state_add_sample(inout DistanceMCState mc_state,
 }
 
 #define distance_mc_buf_idx(index, resolution) (index.x + (resolution.x + 1) * index.y)
+
+void distance_mc_load(out DistanceMCState mc_state, const vec2 pixel, const uvec2 resolution) {
+    const ivec2 grid_idx = grid_idx_interpolate(pixel, DISTANCE_MC_GRID_WIDTH, XorShift32(rng_state));
+    const uint state_idx = uint(XorShift32(rng_state) * DISTANCE_MC_VERTEX_STATE_COUNT);
+
+    mc_state = distance_mc_states[distance_mc_buf_idx(grid_idx, resolution)].states[state_idx];
+}
+
+
+void distance_mc_save(in DistanceMCState mc_state, const vec2 pixel, const uvec2 resolution) {
+    const ivec2 grid_idx = grid_idx_interpolate(pixel, DISTANCE_MC_GRID_WIDTH, XorShift32(rng_state));
+    const uint state_idx = uint(XorShift32(rng_state) * DISTANCE_MC_VERTEX_STATE_COUNT);
+
+    distance_mc_states[distance_mc_buf_idx(grid_idx, resolution)].states[state_idx] = mc_state;
+}

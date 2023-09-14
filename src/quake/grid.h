@@ -27,3 +27,10 @@ struct DistanceMCState {
     uint N;
     vec2 moments;
 };
+
+#define DISTANCE_MC_VERTEX_STATE_COUNT 25
+#define DISTANCE_MC_GRID_WIDTH 13
+
+struct DistanceMCVertex {
+    DistanceMCState states[DISTANCE_MC_VERTEX_STATE_COUNT];
+};
