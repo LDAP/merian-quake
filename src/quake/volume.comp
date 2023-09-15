@@ -162,7 +162,7 @@ void main() {
         }
 
 
-        incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), DRAINE_G, DRAINE_A)) * float16_t(MU_S);
+        incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), DRAINE_G, DRAINE_A) * MU_S);
 
         const vec3 contrib = incident * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
