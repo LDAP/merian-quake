@@ -1086,7 +1086,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     (width + 1) * (height + 1) * sizeof(DistanceMCVertex),
+                                     (width / DISTANCE_MC_GRID_WIDTH + 2) * (height / DISTANCE_MC_GRID_WIDTH + 2) * sizeof(DistanceMCVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },

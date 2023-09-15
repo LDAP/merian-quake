@@ -38,6 +38,8 @@ void main() {
         return;
     }
 
+    const uint grid_max_x = resolution.x / DISTANCE_MC_GRID_WIDTH + 1;
+
     // must equal quake.comp
     rng_state = pcg3d16(uvec3(pixel, params.frame));
     irr = f16vec3(0);
@@ -45,7 +47,6 @@ void main() {
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
 
-    float marsaglia_spare = 0.0 / 0.0;
     for (int s = 0; s < VOLUME_SPP; s++) {
         float f = 0.0;
         float p = 0.0;
@@ -63,7 +64,7 @@ void main() {
             [[unroll]]
             for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 DistanceMCState state;
-                distance_mc_load(state, pixel, resolution);
+                distance_mc_load(state, pixel, grid_max_x);
 
                 normal_dists[i] = distance_mc_state_get_normal_dist(state);
                 scores[i] = state.sum_w * float(normal_dists[i].x < gbuf.linear_z);
@@ -89,15 +90,6 @@ void main() {
             }
             p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * p;
 
-            // [[unroll]]
-            // for (int i = 0; i < 1; i++) {
-            //     [[unroll]]
-            //     for (int j = 0; j < 1; j++) {
-            //         p += (scores[2 * i + j] > 0 ? scores[2 * i + j] * sample_normal_pdf(normal_dists[2 * i + j].x, normal_dists[2 * i + j].y, t) / dist_score_sum : 0);
-            //    }
-            // }
-            // p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * p;
-        
             // t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
             // p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
         }
@@ -180,7 +172,7 @@ void main() {
             // UPDATE MC FOR CAMERA DISTANCE
             distance_mc_state_add_sample(dist_mc_state, t, l);
             if (XorShift32(rng_state) < l / (dist_score_sum / DISTANCE_MC_SAMPLES)) {
-                distance_mc_save(dist_mc_state, pixel, resolution);
+                distance_mc_save(dist_mc_state, pixel, grid_max_x);
             }
 
             // UPDATE MC FOR OUTGOING DIRECTIONS
@@ -202,9 +194,9 @@ void main() {
         }
     }
     
-    DistanceMCState s;
-    distance_mc_load(s, pixel, resolution);
-    imageStore(img_debug, pixel, vec4(grid_idx_interpolate(pixel, 50, XorShift32(rng_state)).x) - pixel.x / 50);
+    // DistanceMCState s;
+    // distance_mc_load(s, pixel, resolution);
+    // imageStore(img_debug, pixel, vec4(1 / 1000. * distance_mc_state_get_normal_dist(s).y));
 
     imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
     imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));

@@ -26,19 +26,19 @@ void distance_mc_state_add_sample(inout DistanceMCState mc_state,
     mc_state.moments = mix(mc_state.moments, w * vec2(distance, distance * distance), alpha);
 }
 
-#define distance_mc_buf_idx(index, resolution) (index.x + (resolution.x + 1) * index.y)
+#define distance_mc_buf_idx(index, grid_max_x) (index.x + grid_max_x * index.y)
 
-void distance_mc_load(out DistanceMCState mc_state, const vec2 pixel, const uvec2 resolution) {
+void distance_mc_load(out DistanceMCState mc_state, const vec2 pixel, const uint grid_max_x) {
     const ivec2 grid_idx = grid_idx_interpolate(pixel, DISTANCE_MC_GRID_WIDTH, XorShift32(rng_state));
     const uint state_idx = uint(XorShift32(rng_state) * DISTANCE_MC_VERTEX_STATE_COUNT);
 
-    mc_state = distance_mc_states[distance_mc_buf_idx(grid_idx, resolution)].states[state_idx];
+    mc_state = distance_mc_states[distance_mc_buf_idx(grid_idx, grid_max_x)].states[state_idx];
 }
 
 
-void distance_mc_save(in DistanceMCState mc_state, const vec2 pixel, const uvec2 resolution) {
+void distance_mc_save(in DistanceMCState mc_state, const vec2 pixel, const uint grid_max_x) {
     const ivec2 grid_idx = grid_idx_interpolate(pixel, DISTANCE_MC_GRID_WIDTH, XorShift32(rng_state));
     const uint state_idx = uint(XorShift32(rng_state) * DISTANCE_MC_VERTEX_STATE_COUNT);
 
-    distance_mc_states[distance_mc_buf_idx(grid_idx, resolution)].states[state_idx] = mc_state;
+    distance_mc_states[distance_mc_buf_idx(grid_idx, grid_max_x)].states[state_idx] = mc_state;
 }
