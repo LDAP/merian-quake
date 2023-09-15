@@ -95,7 +95,7 @@ void main() {
             // p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
         }
 
-        // must equal first hit in quake.comp
+        // must equal first hit in quake.comp (make sure random state is the same)
         Hit current_hit;
         current_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         current_hit.pos = params.cam_x.xyz + t * current_hit.wi;
