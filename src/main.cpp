@@ -86,6 +86,7 @@ int main(const int argc, const char** argv) {
     auto post = std::make_shared<merian::QuakePost>(context, alloc);
     auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
     auto add = std::make_shared<merian::AddNode>(context, alloc);
+    auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
 
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
@@ -105,6 +106,7 @@ int main(const int argc, const char** argv) {
     graph.add_node("bloom", bloom);
     graph.add_node("volume accum", volume_accum);
     graph.add_node("add", add);
+    graph.add_node("beauty image write", beauty_image_write);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -166,6 +168,8 @@ int main(const int argc, const char** argv) {
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
     graph.connect_image(hud, output, 0, 0);
+
+    graph.connect_image(tonemap, beauty_image_write, 0, 0);
 
     merian::ImGuiConfiguration config;
 

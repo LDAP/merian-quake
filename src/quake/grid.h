@@ -21,3 +21,17 @@ struct LightCacheVertex {
     f16vec3 irr;
     uint16_t N;
 };
+
+struct DistanceMCState {
+    float sum_w;
+    uint N;
+    vec2 moments;
+};
+
+#define DISTANCE_MC_VERTEX_STATE_COUNT 10
+// in pixel
+#define DISTANCE_MC_GRID_WIDTH 25
+
+struct DistanceMCVertex {
+    DistanceMCState states[DISTANCE_MC_VERTEX_STATE_COUNT];
+};

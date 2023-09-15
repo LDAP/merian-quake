@@ -48,5 +48,6 @@
 #define MC_SAMPLES 5
 #define MC_SAMPLES_ADAPTIVE_PROB .7
 
+#define DISTANCE_MC_SAMPLES 3
 
 #endif

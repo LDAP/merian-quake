@@ -1081,6 +1081,14 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::BufferCreateInfo{{},
                                      width * height * sizeof(merian::GBuffer),
                                      vk::BufferUsageFlagBits::eStorageBuffer}),
+            merian::NodeOutputDescriptorBuffer(
+                "volume_distancemc",
+                vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::PipelineStageFlagBits2::eComputeShader,
+                vk::BufferCreateInfo{{},
+                                     (width / DISTANCE_MC_GRID_WIDTH + 2) * (height / DISTANCE_MC_GRID_WIDTH + 2) * sizeof(DistanceMCVertex),
+                                     vk::BufferUsageFlagBits::eStorageBuffer},
+                true),
         },
     };
 }
@@ -1152,10 +1160,11 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         update.update(context);
     }
 
-    // ZERO markov chain and light cache
+    // ZERO markov chains and light cache
     cmd.fillBuffer(*buffer_outputs[0][0], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][1], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][2], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*buffer_outputs[0][3], 0, VK_WHOLE_SIZE, 0);
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -1658,6 +1667,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_mu_s = mu_s;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
+    float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
     config.config_int("spp", spp, 0, 15, "samples per pixel");
     config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
@@ -1671,10 +1681,12 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("mu_t", mu_t, "", 0.00001);
     config.config_float("mu_s", mu_s, "", 0.00001);
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
+    config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_bool("use light cache", volume_use_light_cache);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
+    pc.rt_config.dist_guide_p = static_cast<unsigned char>(std::round(dist_guide_p * 255.));
     pc.rt_config.flags = 0;
 
     if (old_spp != spp || old_max_path_lenght != max_path_length ||

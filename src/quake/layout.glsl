@@ -44,6 +44,7 @@ layout(push_constant) uniform PushConstant {
 #define rt_flags() (params.rt_config & 0xff)
 #define bsdf_p() (((params.rt_config >> 16) & 0xff) / 255.)
 #define ml_prior() (((params.rt_config >> 24) & 0xff) / 255.)
+#define distance_guide_p() (((params.rt_config >> 8) & 0xff) / 255.)
 
 // GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
@@ -75,6 +76,9 @@ layout(set = 0, binding = 12, scalar) buffer buf_light_cache {
 };
 layout(set = 0, binding = 13, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
+};
+layout(set = 0, binding = 14, scalar) buffer buf_dist_mc_states {
+    DistanceMCVertex distance_mc_states[];
 };
 
 // QUAKE 
