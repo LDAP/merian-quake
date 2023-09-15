@@ -13,6 +13,7 @@
 #include "common/normal_encode.glsl"
 #include "common/raytrace.glsl"
 #include "common/phase_isotropic.glsl"
+#include "common/phase_rayleigh.glsl"
 #include "common/grid.glsl"
 #include "common/colors_yuv.glsl"
 #include "common/hash.glsl"
@@ -162,7 +163,7 @@ void main() {
         }
 
 
-        incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), DRAINE_G, DRAINE_A) * MU_S);
+        incident *= f16vec3(phase_rayleigh(dot(current_hit.wi, next_hit.wi)) * rayleigh_sun * MU_S);
 
         const vec3 contrib = incident * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {

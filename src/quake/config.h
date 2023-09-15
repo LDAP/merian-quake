@@ -8,7 +8,7 @@
 // Configure ray tracing
 
 // max ray tracing distance.
-#define T_MAX 10000.0
+#define T_MAX 500000.0
 // continue tracing if alpha of texture is smaller
 #define ALPHA_THRESHOLD .666
 // A ray may travel through multiple intersections
@@ -16,7 +16,7 @@
 #define MAX_INTERSECTIONS 5
 
 // Limits indirectly the maximum absorption
-#define VOLUME_MAX_T 1000.
+#define VOLUME_MAX_T 500000.
 
 #define MC_FAST_RECOVERY 0
 

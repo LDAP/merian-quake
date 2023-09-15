@@ -1678,8 +1678,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
 
     config.st_separate();
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
-    config.config_float("mu_t", mu_t, "", 0.00001);
-    config.config_float("mu_s", mu_s, "", 0.00001);
+    config.config_float("mu_t", mu_t, "", 0.000000001);
+    config.config_float("mu_s", mu_s, "", 0.000000001);
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_bool("use light cache", volume_use_light_cache);

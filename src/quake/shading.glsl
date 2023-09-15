@@ -19,23 +19,23 @@ f16vec3 get_sky(const vec3 w) {
         const vec3 sundir = normalize(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z));
         const f16vec3 suncolor = f16vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
         
-        emm += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(sundir, w))), 4.0hf);
+        //emm += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(sundir, w))), 4.0hf);
         emm += 5.0hf * float16_t(vmf_pdf(3000.0, dot(sundir, w)));
         emm *= suncolor;
 
         // Evaluate cubemap
-        uint side = 0;
-        vec2 st;
-        switch(cubemap_side(w)) {
-            case 0: { side = params.sky_rt_bk & 0xffff; st = 0.5 + 0.5 * vec2(-w.y, -w.z) / abs(w.x); break; } // rt
-            case 1: { side = params.sky_lf_ft & 0xffff; st = 0.5 + 0.5 * vec2( w.y, -w.z) / abs(w.x); break; } // lf
-            case 2: { side = params.sky_rt_bk >> 16   ; st = 0.5 + 0.5 * vec2( w.x, -w.z) / abs(w.y); break; } // bk
-            case 3: { side = params.sky_lf_ft >> 16   ; st = 0.5 + 0.5 * vec2(-w.x, -w.z) / abs(w.y); break; } // ft
-            case 4: { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5 * vec2(-w.y,  w.x) / abs(w.z); break; } // up
-            case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5 * vec2(-w.y, -w.x) / abs(w.z); break; } // dn
-        }
-        if (side < MAX_GLTEXTURES)
-            emm += f16vec3(texture(img_tex[nonuniformEXT(side)], st).rgb);
+        // uint side = 0;
+        // vec2 st;
+        // switch(cubemap_side(w)) {
+        //     case 0: { side = params.sky_rt_bk & 0xffff; st = 0.5 + 0.5 * vec2(-w.y, -w.z) / abs(w.x); break; } // rt
+        //     case 1: { side = params.sky_lf_ft & 0xffff; st = 0.5 + 0.5 * vec2( w.y, -w.z) / abs(w.x); break; } // lf
+        //     case 2: { side = params.sky_rt_bk >> 16   ; st = 0.5 + 0.5 * vec2( w.x, -w.z) / abs(w.y); break; } // bk
+        //     case 3: { side = params.sky_lf_ft >> 16   ; st = 0.5 + 0.5 * vec2(-w.x, -w.z) / abs(w.y); break; } // ft
+        //     case 4: { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5 * vec2(-w.y,  w.x) / abs(w.z); break; } // up
+        //     case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5 * vec2(-w.y, -w.x) / abs(w.z); break; } // dn
+        // }
+        // if (side < MAX_GLTEXTURES)
+        //     emm += f16vec3(texture(img_tex[nonuniformEXT(side)], st).rgb);
     }
 
     return emm;
