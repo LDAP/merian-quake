@@ -65,9 +65,9 @@ void main() {
                 DistanceMCState state;
                 distance_mc_load(state, pixel, resolution);
 
-                scores[i] = state.sum_w;
-                dist_score_sum += scores[i];
                 normal_dists[i] = distance_mc_state_get_normal_dist(state);
+                scores[i] = state.sum_w * float(normal_dists[i].x < gbuf.linear_z);
+                dist_score_sum += scores[i];
                 if (XorShift32(rng_state) < scores[i] / dist_score_sum) {
                     // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
                     dist_mc_state = state;
