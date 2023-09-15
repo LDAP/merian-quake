@@ -17,6 +17,7 @@
 #include "common/colors_yuv.glsl"
 #include "common/hash.glsl"
 #include "common/phase_draine.glsl"
+#include "common/transmittance.glsl"
 
 uint rng_state;
 vec3 irr;
@@ -56,7 +57,7 @@ void main() {
         DistanceMCState dist_mc_state = distance_mc_state_new();
         float dist_score_sum = 0.0;
         {
-            const float xi_max = 1. - exp(-gbuf.linear_z * MU_T);
+            const float xi_max = transmittance_xi_max(min(gbuf.linear_z, VOLUME_MAX_T), MU_T);
 
             float scores[DISTANCE_MC_SAMPLES];
             vec2 normal_dists[DISTANCE_MC_SAMPLES];
@@ -77,7 +78,7 @@ void main() {
             }
 
             if (distance_guide_p() < XorShift32(rng_state) || dist_score_sum == 0) {
-                t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
+                t = transmittance_sample2(MU_T, XorShift32(rng_state), xi_max);
                 dist_mc_state = distance_mc_state_new();
             }
 
@@ -88,7 +89,7 @@ void main() {
             for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 p += (scores[i] > 0 ? scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum : 0);
             }
-            p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max + distance_guide_p() * p;
+            p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + distance_guide_p() * p;
 
             // t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
             // p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
@@ -163,7 +164,7 @@ void main() {
 
         incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), DRAINE_G, DRAINE_A)) * float16_t(MU_S);
 
-        const vec3 contrib = incident * exp(-min(t, VOLUME_MAX_T) * MU_T) / p;
+        const vec3 contrib = incident * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irr += contrib;
             const float l = yuv_luminance(contrib);
