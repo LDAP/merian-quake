@@ -41,7 +41,11 @@ extern "C" {
 static QuakeData quake_data;
 // from r_alias.c
 extern float r_avertexnormals[162][3];
+// from r_part.c
 extern particle_t* active_particles;
+extern gltexture_t* particletexture;
+extern float texturescalefactor;
+
 extern cvar_t scr_fov, cl_gun_fovscale;
 
 extern cvar_t cl_maxpitch; // johnfitz -- variable pitch clamping
@@ -186,9 +190,8 @@ void add_particles(std::vector<float>& vtx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
                    const uint32_t texnum_blood,
                    const uint32_t texnum_explosion) {
-    merian::XORShift32 xrand{1337};
 
-    static const float voff[4][3] = {
+    static const glm::vec3 voff[4] = {
         {0.0, 1.0, 0.0},
         {-0.5, -0.5, 0.87},
         {-0.5, -0.5, -0.87},
@@ -196,20 +199,46 @@ void add_particles(std::vector<float>& vtx,
     };
 
     for (particle_t* p = active_particles; p; p = p->next) {
-        uint8_t* c = (uint8_t*)&d_8to24table[(int)p->color]; // that would be the colour. pick
-                                                             // texture based on this:
-        // smoke is r=g=b
-        // blood is g=b=0
-        // rocket trails are r=2*g=2*b a bit randomised
-        const uint16_t tex_col = c[1] == 0 && c[2] == 0 ? texnum_blood : texnum_explosion;
-        const uint16_t tex_lum = c[1] == 0 && c[2] == 0 ? 0 : texnum_explosion;
+        uint32_t c = d_8to24table[(int)p->color];
+        merian::XORShift32 xrand{static_cast<uint32_t>(reinterpret_cast<uint64_t>(p))};
 
-        float vert[4][3];
+        // Some heuristics to improve blood, fire, explosions
+        uint32_t texnum = 0;
+        uint32_t texnum_fb = 0;
+        uint8_t* color_bytes = (uint8_t*)&c;
+
+        float scale = 1.0;
+
+        if (color_bytes[1] == 0 && color_bytes[2] == 0) {
+            texnum = texnum_blood;
+        } else if (p->type == pt_explode2) {
+            texnum = texnum_explosion;
+            texnum_fb = texnum_explosion;
+            scale = 2.0;
+        } else if (p->type == pt_fire &&
+                   (color_bytes[0] != color_bytes[1] || color_bytes[1] != color_bytes[2] ||
+                    color_bytes[0] != color_bytes[2])) {
+            texnum = texnum_explosion;
+            texnum_fb = texnum_explosion;
+            scale = 2.0;
+        } else if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] > 200) {
+            // very bright colors are probably fire
+            texnum = texnum_explosion;
+            texnum_fb = texnum_explosion;
+            scale = 2.0;
+        }
+
+        glm::vec3 vert[4];
         for (int l = 0; l < 3; l++) {
-            float off = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
-            for (int k = 0; k < 4; k++)
-                vert[k][l] =
-                    p->org[l] + off + 2 * voff[k][l] + (xrand.get() - 0.5) + (xrand.get() - 0.5);
+            const float particle_offset = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
+            const glm::mat4 rotation = glm::rotate<float>(
+                glm::identity<glm::mat4>(), (xrand.get() + cl.time) * 2 * M_PI,
+                glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get())));
+            for (int k = 0; k < 4; k++) {
+                const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
+                vert[k] = *merian::as_vec3(p->org) + particle_offset +
+                          glm::vec3(rotation * glm::vec4(scale * voff[k] * (1 + (float)xrand.get()) + vertex_offset, 1));
+            }
         }
 
         const uint32_t vtx_cnt = vtx.size() / 3;
@@ -240,18 +269,33 @@ void add_particles(std::vector<float>& vtx,
         idx.emplace_back(vtx_cnt + 3);
         idx.emplace_back(vtx_cnt + 2);
 
+        // regular particle
         for (int k = 0; k < 4; k++) {
-            const glm::vec3 n =
-                glm::normalize(glm::cross(*merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 2]]) -
-                                              *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]]),
-                                          *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 1]]) -
-                                              *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]])));
-            const uint32_t enc_n = merian::encode_normal(n);
+            if (texnum) {
+                // texture patch
+                const glm::vec3 n = glm::normalize(
+                    glm::cross(*merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 2]]) -
+                                   *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]]),
+                               *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 1]]) -
+                                   *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]])));
+                const uint32_t enc_n = merian::encode_normal(n);
 
-            ext.emplace_back(tex_col, tex_lum, enc_n, enc_n, enc_n, merian::float_to_half_aprox(0),
-                             merian::float_to_half_aprox(1), merian::float_to_half_aprox(0),
-                             merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                             merian::float_to_half_aprox(0));
+                ext.emplace_back(texnum, texnum_fb, enc_n, enc_n, enc_n,
+                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
+                                 merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
+            } else {
+                uint32_t c_fb = 0;
+                if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] > 150) {
+                    // bright colors are probably emitting
+                    c_fb = c;
+                }
+
+                ext.emplace_back(0, 0 | (MAT_FLAGS_SOLID << 12), c, c_fb, 0,
+                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
+                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
+                                 merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
+            }
         }
     }
 }
@@ -1086,7 +1130,9 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     (width / DISTANCE_MC_GRID_WIDTH + 2) * (height / DISTANCE_MC_GRID_WIDTH + 2) * sizeof(DistanceMCVertex),
+                                     (width / DISTANCE_MC_GRID_WIDTH + 2) *
+                                         (height / DISTANCE_MC_GRID_WIDTH + 2) *
+                                         sizeof(DistanceMCVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },

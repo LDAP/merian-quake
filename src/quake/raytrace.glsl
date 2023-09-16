@@ -76,7 +76,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 extra_data = buf_ext[nonuniformEXT(instance_id_uc(ray_query))].v[primitive_index_uc(ray_query)];
                 flags = extra_data.texnum_fb_flags >> 12;
                 const uint16_t alpha = extra_data.texnum_alpha >> 12;
-                if (flags != MAT_FLAGS_NONE && flags != MAT_FLAGS_SPRITE) {
+                if (flags > 0 && flags < 7) {
                     // treat sky, lava, slime,... not transparent for now
                     confirm = true;
                 } else if (alpha != 0) { // 0 means use texture
@@ -123,7 +123,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         }
 
         st = (flags > 0 && flags < 5) ? warp(extra_data.st * barycentrics(ray_query)) : extra_data.st * barycentrics(ray_query);
-        const f16vec4 albedo_texture = f16vec4(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st));
+
         // NORMALS AND GLOSS
         vec3 du, dv;
         {
@@ -166,6 +166,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
                 hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r));
             }
+        } else if (flags == MAT_FLAGS_SOLID) {
+            hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
+            contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) / 255.hf);
+            break;
         } else {
             // Only for alias models. Disabled for now, results in artifacts.
 
@@ -173,6 +177,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             //                             geo_decode_normal(extra_data.n1_brush),
             //                             geo_decode_normal(extra_data.n2)) * barycentrics(ray_query));
         }
+
+        const f16vec4 albedo_texture = f16vec4(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st));
 
         // MATERIAL
         if (flags == MAT_FLAGS_WATER) {

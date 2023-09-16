@@ -35,9 +35,11 @@
 #define MAT_FLAGS_SLIME 2
 #define MAT_FLAGS_TELE 3
 #define MAT_FLAGS_WATER 4
-#define MAT_FLAGS_SPRITE 5
-#define MAT_FLAGS_SKY 6
-#define MAT_FLAGS_WATERFALL 7
+#define MAT_FLAGS_SKY 5
+#define MAT_FLAGS_WATERFALL 6
+#define MAT_FLAGS_SPRITE 7
+// material has a solid color. n0 is albedo, n1 is emission (tex can still be used for alpha)
+#define MAT_FLAGS_SOLID 8
 
 // Player flags
 
