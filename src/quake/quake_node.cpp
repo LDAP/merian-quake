@@ -190,8 +190,8 @@ void add_particles(std::vector<float>& vtx,
 
     static const float voff[4][3] = {
         {0.0, 1.0, 0.0},
-        {-0.5, -0.5, -0.87},
         {-0.5, -0.5, 0.87},
+        {-0.5, -0.5, -0.87},
         {1.0, -0.5, 0.0},
     };
 
@@ -237,8 +237,8 @@ void add_particles(std::vector<float>& vtx,
         idx.emplace_back(vtx_cnt + 1);
 
         idx.emplace_back(vtx_cnt + 1);
-        idx.emplace_back(vtx_cnt + 2);
         idx.emplace_back(vtx_cnt + 3);
+        idx.emplace_back(vtx_cnt + 2);
 
         for (int k = 0; k < 4; k++) {
             const glm::vec3 n =
