@@ -43,8 +43,6 @@ static QuakeData quake_data;
 extern float r_avertexnormals[162][3];
 // from r_part.c
 extern particle_t* active_particles;
-extern gltexture_t* particletexture;
-extern float texturescalefactor;
 
 extern cvar_t scr_fov, cl_gun_fovscale;
 
@@ -198,7 +196,21 @@ void add_particles(std::vector<float>& vtx,
         {1.0, -0.5, 0.0},
     };
 
+    vec3_t vpn, vright, vup, r_origin;
+    VectorCopy(r_refdef.vieworg, r_origin);
+    AngleVectors(r_refdef.viewangles, vpn, vright, vup);
+
     for (particle_t* p = active_particles; p; p = p->next) {
+        // from r_part.c
+        float scale = (p->org[0] - r_origin[0]) * vpn[0] + (p->org[1] - r_origin[1]) * vpn[1] +
+                      (p->org[2] - r_origin[2]) * vpn[2];
+        if (scale < 20)
+            scale = 1 + 0.08;
+        else
+            scale = 1 + scale * 0.004;
+
+        scale *= 0.5;
+
         uint32_t c = d_8to24table[(int)p->color];
         merian::XORShift32 xrand{static_cast<uint32_t>(reinterpret_cast<uint64_t>(p))};
 
@@ -207,25 +219,23 @@ void add_particles(std::vector<float>& vtx,
         uint32_t texnum_fb = 0;
         uint8_t* color_bytes = (uint8_t*)&c;
 
-        float scale = 1.0;
-
         if (color_bytes[1] == 0 && color_bytes[2] == 0) {
             texnum = texnum_blood;
         } else if (p->type == pt_explode2) {
             texnum = texnum_explosion;
             texnum_fb = texnum_explosion;
-            scale = 2.0;
+            scale *= 2.0;
         } else if (p->type == pt_fire &&
                    (color_bytes[0] != color_bytes[1] || color_bytes[1] != color_bytes[2] ||
                     color_bytes[0] != color_bytes[2])) {
             texnum = texnum_explosion;
             texnum_fb = texnum_explosion;
-            scale = 2.0;
+            scale *= 2.0;
         } else if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] > 200) {
             // very bright colors are probably fire
             texnum = texnum_explosion;
             texnum_fb = texnum_explosion;
-            scale = 2.0;
+            scale *= 2.0;
         }
 
         glm::vec3 vert[4];
@@ -236,8 +246,11 @@ void add_particles(std::vector<float>& vtx,
                 glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get())));
             for (int k = 0; k < 4; k++) {
                 const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
-                vert[k] = *merian::as_vec3(p->org) + particle_offset +
-                          glm::vec3(rotation * glm::vec4(scale * voff[k] * (1 + (float)xrand.get()) + vertex_offset, 1));
+                vert[k] =
+                    *merian::as_vec3(p->org) + particle_offset +
+                    glm::vec3(
+                        rotation *
+                        glm::vec4(scale * voff[k] * (1 + (float)xrand.get()) + vertex_offset, 1));
             }
         }
 
@@ -286,7 +299,8 @@ void add_particles(std::vector<float>& vtx,
                                  merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
             } else {
                 uint32_t c_fb = 0;
-                if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] > 150) {
+                if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] >
+                    150) {
                     // bright colors are probably emitting
                     c_fb = c;
                 }
