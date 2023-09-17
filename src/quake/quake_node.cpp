@@ -219,7 +219,7 @@ void add_particles(std::vector<float>& vtx,
         uint32_t texnum_fb = 0;
         uint8_t* color_bytes = (uint8_t*)&c;
 
-        if (color_bytes[1] == 0 && color_bytes[2] == 0) {
+        if (color_bytes[1] == 0 && color_bytes[2] == 0 && color_bytes[0] > 10) {
             texnum = texnum_blood;
         } else if (p->type == pt_explode2) {
             texnum = texnum_explosion;
@@ -242,7 +242,7 @@ void add_particles(std::vector<float>& vtx,
         for (int l = 0; l < 3; l++) {
             const float particle_offset = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
             const glm::mat4 rotation = glm::rotate<float>(
-                glm::identity<glm::mat4>(), (xrand.get() + cl.time) * 2 * M_PI,
+                glm::identity<glm::mat4>(), (xrand.get() + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
                 glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get())));
             for (int k = 0; k < 4; k++) {
                 const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
