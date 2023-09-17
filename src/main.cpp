@@ -60,7 +60,8 @@ static void QuakeMessageOverlay() {
         if (sw.seconds() < 3) {
             merian::split(last, "\n", [](const std::string& s) {
                 // hack to display centered text
-                const float font_size = ImGui::GetFontSize() * s.size() / 2;
+                const float font_size = ImGui::CalcTextSize(s.c_str()).x;
+
                 ImGui::Text("%s", "");
                 ImGui::SameLine(ImGui::GetWindowSize().x / 2 - font_size + (font_size / 2));
                 ImGui::Text("%s", s.c_str());
@@ -211,6 +212,11 @@ int main(const int argc, const char** argv) {
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
     merian::GLFWImGui imgui(context, true);
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->AddFontDefault();
+    ImFont* quake_font = io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->c_str(), 24);
+
     merian::Profiler::Report report;
     bool clear_profiler = false;
     merian::Stopwatch report_intervall;
@@ -257,7 +263,9 @@ int main(const int argc, const char** argv) {
 
             ImGui::End();
 
+            ImGui::PushFont(quake_font);
             QuakeMessageOverlay();
+            ImGui::PopFont();
 
             imgui.render(cmd);
             controller->set_active(
