@@ -149,10 +149,9 @@ void init_quake(const int quakespasm_argc, const char** quakespasm_argv) {
     Sys_Printf("Host_Init\n");
     Host_Init();
 
-    // close menu because we don't have an esc key:
+    // Set target
     key_dest = key_game;
     m_state = m_none;
-    IN_Activate();
 }
 
 void deinit_quake() {
@@ -876,7 +875,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         else if (keymap.contains(key)) key = keymap.at(key);
 
         SPDLOG_DEBUG("key event key: {}, scancode: {}", key, scancode);
-        
+
         if (action == merian::InputController::PRESS) {
             Key_Event(key, true);
         } else if (action == merian::InputController::RELEASE) {
