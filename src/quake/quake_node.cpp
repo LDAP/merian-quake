@@ -804,7 +804,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                      const uint32_t frames_in_flight,
                      const int quakespasm_argc,
                      const char** quakespasm_argv)
-    : context(context), allocator(allocator), frames(frames_in_flight) {
+    : context(context), allocator(allocator), controller(controller), frames(frames_in_flight) {
 
     // QUAKE INIT
     if (quake_data.node) {
@@ -879,13 +879,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         } else if (action == merian::InputController::RELEASE) {
             Key_Event(key, false);
         }
-
-        if (scancode == 1) { // ESCAPE
-            controller.request_raw_mouse_input(false);
-        }
     });
     controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
-        bool raw = controller.get_raw_mouse_input();
+        const bool raw = controller.get_raw_mouse_input();
 
         if (raw) {
             this->mouse_x = xpos;
@@ -899,13 +895,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
    
         raw_mouse_was_enabled = raw;
     });
-    controller->set_mouse_button_callback([&](merian::InputController& controller, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
-        if (button == merian::InputController::MOUSE1) {
-            if (!controller.get_raw_mouse_input()) {
-                controller.request_raw_mouse_input(true);
-                return;
-            }
-        }
+    controller->set_mouse_button_callback([&](merian::InputController&, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
         const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
         Key_Event(remap[button], status == merian::InputController::PRESS);
     });
@@ -1289,6 +1279,12 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         // init some left/right vectors also used for sound
         R_SetupView();
         old_time = newtime;
+    }
+
+    if (key_dest == key_game) {
+        controller->request_raw_mouse_input(true);
+    } else {
+        controller->request_raw_mouse_input(false);
     }
 
     // UPDATE GEOMETRY

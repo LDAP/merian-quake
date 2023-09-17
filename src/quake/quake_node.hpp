@@ -213,6 +213,7 @@ class QuakeNode : public merian::Node {
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
+    const std::shared_ptr<merian::InputController> controller;
 
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
 
