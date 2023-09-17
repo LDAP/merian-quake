@@ -36,6 +36,41 @@
 #include "post/post.hpp"
 #include "quake/quake_node.hpp"
 
+static void QuakeMessageOverlay() {
+    const ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+
+    const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    const ImVec2 window_pos(center.x, (center.y + 0) / 2);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+
+    ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    if (ImGui::Begin("Quake Messages", NULL, window_flags)) {
+        static std::string last;
+        static merian::Stopwatch sw;
+
+        if (last != con_lastcenterstring) {
+            sw.reset();
+            last = con_lastcenterstring;
+        }
+
+        if (sw.seconds() < 3) {
+            merian::split(last, "\n", [](const std::string& s) {
+                // hack to display centered text
+                const float font_size = ImGui::GetFontSize() * s.size() / 2;
+                ImGui::Text("%s", "");
+                ImGui::SameLine(ImGui::GetWindowSize().x / 2 - font_size + (font_size / 2));
+                ImGui::Text("%s", s.c_str());
+            });
+        }
+    }
+    ImGui::PopStyleVar(1);
+    ImGui::End();
+}
+
 struct FrameData {
     merian::StagingMemoryManager::SetID staging_set_id{};
     merian::ProfilerHandle profiler{};
@@ -151,9 +186,9 @@ int main(const int argc, const char** argv) {
     graph.connect_image(volume_svgf, volume_svgf, 0, 0);  // feedback
     graph.connect_image(volume_accum, volume_svgf, 0, 1); // irr
     graph.connect_image(volume_accum, volume_svgf, 1, 2); // moments
-    graph.connect_image(one, volume_svgf, 0, 3);        // albedo
+    graph.connect_image(one, volume_svgf, 0, 3);          // albedo
     graph.connect_image(quake, volume_svgf, 2, 4);        // mv
-    graph.connect_buffer(quake, volume_svgf, 2, 0); // gbuffer
+    graph.connect_buffer(quake, volume_svgf, 2, 0);       // gbuffer
     graph.connect_buffer(quake, volume_svgf, 2, 1);
 
     // graph.connect_image(volume_accum, output, 0, 0);
@@ -221,6 +256,8 @@ int main(const int argc, const char** argv) {
             graph.get_configuration(config);
 
             ImGui::End();
+
+            QuakeMessageOverlay();
 
             imgui.render(cmd);
             controller->set_active(
