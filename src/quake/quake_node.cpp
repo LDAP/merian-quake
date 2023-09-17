@@ -874,8 +874,6 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
         if (key >= 65 && key <= 90) key |= 32;
         else if (keymap.contains(key)) key = keymap.at(key);
 
-        SPDLOG_DEBUG("key event key: {}, scancode: {}", key, scancode);
-
         if (action == merian::InputController::PRESS) {
             Key_Event(key, true);
         } else if (action == merian::InputController::RELEASE) {
