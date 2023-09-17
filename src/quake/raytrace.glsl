@@ -182,17 +182,23 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
 
         // MATERIAL
         if (flags == MAT_FLAGS_WATER) {
-            hit.albedo = albedo_texture.rgb;
-            hit.roughness = 0.001hf;
+            if (XorShift32(rng_state) < 0.5) {
+                hit.albedo = albedo_texture.rgb;
+                hit.roughness = 0.001hf;
+            } else {
+                hit.pos += 1e-3 * hit.wi;
+                continue;
+            }
             //throughput *= albedo_texture.rgb;
-            //hit.pos += 1e-3 * hit.wi;
-            //continue;
         } else if (flags == MAT_FLAGS_WATERFALL) {
-            contribution += throughput * albedo_texture.rgb;
-            hit.albedo = albedo_texture.rgb;
-            hit.roughness = 0.001hf;
-            //hit.pos += 1e-3 * hit.wi;
-            //continue;
+            if (XorShift32(rng_state) < 0.5) {
+                contribution += throughput * albedo_texture.rgb;
+                hit.albedo = albedo_texture.rgb;
+                hit.roughness = 0.001hf;
+            } else {
+                hit.pos += 1e-3 * hit.wi;
+                continue;
+            }
         } else if (flags == MAT_FLAGS_SPRITE) {
             hit.albedo = ldr_to_hdr(albedo_texture.rgb);
             contribution += throughput * hit.albedo;
