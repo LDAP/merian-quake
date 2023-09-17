@@ -21,6 +21,7 @@
 #include "merian/vk/utils/math.hpp"
 #include "quake.comp.spv.h"
 #include "volume.comp.spv.h"
+#include "GLFW/glfw3.h"
 
 struct QuakeData {
     // The first quake node sets this
@@ -841,12 +842,47 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController& controller, int key, int scancode, merian::InputController::KeyStatus action, int){
-        if(key >= 65 && key <= 90) key |= 32;
+        static const std::map<int, int> keymap = {
+            {GLFW_KEY_TAB, K_TAB},
+            {GLFW_KEY_ENTER, K_ENTER},
+            {GLFW_KEY_ESCAPE, K_ESCAPE},
+            {GLFW_KEY_SPACE, K_SPACE},
+
+            {GLFW_KEY_BACKSPACE, K_BACKSPACE},
+            {GLFW_KEY_UP, K_UPARROW},
+            {GLFW_KEY_DOWN, K_DOWNARROW},
+            {GLFW_KEY_LEFT, K_LEFTARROW},
+            {GLFW_KEY_RIGHT, K_RIGHTARROW},
+
+            {GLFW_KEY_LEFT_ALT, K_ALT},
+            {GLFW_KEY_LEFT_CONTROL, K_CTRL},
+            {GLFW_KEY_LEFT_SHIFT, K_SHIFT},
+            {GLFW_KEY_F1, K_F1},
+            {GLFW_KEY_F2, K_F2},
+            {GLFW_KEY_F3, K_F3},
+            {GLFW_KEY_F4, K_F4},
+            {GLFW_KEY_F5, K_F5},
+            {GLFW_KEY_F6, K_F6},
+            {GLFW_KEY_F7, K_F7},
+            {GLFW_KEY_F8, K_F8},
+            {GLFW_KEY_F9, K_F9},
+            {GLFW_KEY_F10, K_F10},
+            {GLFW_KEY_F11, K_F11},
+            {GLFW_KEY_F12, K_F12},
+        };
+
+        // normal keys sould be passed as lowercased ascii
+        if (key >= 65 && key <= 90) key |= 32;
+        else if (keymap.contains(key)) key = keymap.at(key);
+
+        SPDLOG_DEBUG("key event key: {}, scancode: {}", key, scancode);
+        
         if (action == merian::InputController::PRESS) {
             Key_Event(key, true);
         } else if (action == merian::InputController::RELEASE) {
             Key_Event(key, false);
         }
+
         if (scancode == 1) { // ESCAPE
             controller.request_raw_mouse_input(false);
         }
