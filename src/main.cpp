@@ -57,7 +57,7 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
     if (ImGui::Begin("Quake Messages", NULL, window_flags)) {
-        if (cl.time < scr_centertime_start + scr_centertime_off) {
+        if (scr_centertime_start <= cl.time && cl.time < scr_centertime_start + scr_centertime_off) {
             const std::string s = scr_centerstring;
             merian::split(s, "\n", [](const std::string& s) {
                 // hack to display centered text
