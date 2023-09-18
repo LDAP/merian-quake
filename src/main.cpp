@@ -33,7 +33,6 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
-#include "post/post.hpp"
 #include "quake/quake_node.hpp"
 #include <merian/vk/window/imgui_context.hpp>
 
@@ -121,7 +120,6 @@ int main(const int argc, const char** argv) {
     auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
     auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
     auto hud = std::make_shared<merian::QuakeHud>(context, alloc);
-    auto post = std::make_shared<merian::QuakePost>(context, alloc);
     auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
     auto add = std::make_shared<merian::AddNode>(context, alloc);
     auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
@@ -140,7 +138,6 @@ int main(const int argc, const char** argv) {
     graph.add_node("exposure", exposure);
     graph.add_node("median variance", median);
     graph.add_node("hud", hud);
-    graph.add_node("post", post);
     graph.add_node("bloom", bloom);
     graph.add_node("volume accum", volume_accum);
     graph.add_node("add", add);
@@ -172,8 +169,6 @@ int main(const int argc, const char** argv) {
     graph.connect_buffer(quake, svgf, 2, 1);
     graph.connect_image(svgf, image_writer, 0, 0);
 
-    graph.connect_buffer(quake, post, 2, 0);
-
     //  debug output
     // graph.connect_image(quake, output, 3, 0);
 
@@ -196,12 +191,11 @@ int main(const int argc, const char** argv) {
 
     // graph.connect_image(volume_accum, output, 0, 0);
 
-    // Composite / Post
+    // Composite
     graph.connect_image(svgf, add, 0, 1);
     graph.connect_image(volume_svgf, add, 0, 0);
 
-    graph.connect_image(add, post, 0, 0);
-    graph.connect_image(post, bloom, 0, 0);
+    graph.connect_image(add, bloom, 0, 0);
     graph.connect_image(bloom, exposure, 0, 0);
     graph.connect_image(exposure, tonemap, 0, 0);
     graph.connect_image(tonemap, hud, 0, 0);
