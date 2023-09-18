@@ -1,5 +1,6 @@
 #include "hud.hpp"
 #include "hud.comp.spv.h"
+#include "merian/utils/glm.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "quake/quake_node.hpp"
 
@@ -50,6 +51,7 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] GraphRun& run) {
         // Demos do not have a player set
         pc.health = sv_player->v.health;
         pc.armor = sv_player->v.armorvalue;
+        pc.blend = *merian::as_vec4(v_blend);
     } else {
         pc.health = 0;
         pc.armor = 0;
