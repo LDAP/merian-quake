@@ -258,7 +258,7 @@ int main(const int argc, const char** argv) {
             frametime.reset();
             ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
                                      frametime_ms, 1000 / frametime_ms)
-                             .c_str());
+                             .c_str(), NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
