@@ -35,6 +35,7 @@
 #include "merian/vk/window/glfw_imgui.hpp"
 #include "post/post.hpp"
 #include "quake/quake_node.hpp"
+#include <merian/vk/window/imgui_context.hpp>
 
 static void QuakeMessageOverlay() {
     const ImGuiWindowFlags window_flags =
@@ -211,7 +212,8 @@ int main(const int argc, const char** argv) {
 
     auto ring_cmd_pool =
         make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-    merian::GLFWImGui imgui(context, true);
+    merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
+    merian::GLFWImGui imgui(context, debug_ctx, true);
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
