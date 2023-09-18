@@ -113,7 +113,7 @@ int main(const int argc, const char** argv) {
                                              argc - 1, argv + 1);
     auto accum = std::make_shared<merian::AccumulateNode>(context, alloc);
     auto volume_accum = std::make_shared<merian::AccumulateNode>(context, alloc);
-    auto svgf = std::make_shared<merian::SVGFNode>(context, alloc, vk::Format::eR16G16B16A16Sfloat);
+    auto svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto volume_svgf = std::make_shared<merian::SVGFNode>(context, alloc);
     auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
     auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
