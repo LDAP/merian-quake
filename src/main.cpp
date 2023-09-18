@@ -37,6 +37,14 @@
 #include "quake/quake_node.hpp"
 #include <merian/vk/window/imgui_context.hpp>
 
+extern "C" {
+
+extern char        scr_centerstring[1024];
+extern float       scr_centertime_start;
+extern float       scr_centertime_off;
+
+}
+
 static void QuakeMessageOverlay() {
     const ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration |
@@ -50,16 +58,9 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
     if (ImGui::Begin("Quake Messages", NULL, window_flags)) {
-        static std::string last;
-        static merian::Stopwatch sw;
-
-        if (last != con_lastcenterstring) {
-            sw.reset();
-            last = con_lastcenterstring;
-        }
-
-        if (sw.seconds() < 3) {
-            merian::split(last, "\n", [](const std::string& s) {
+        if (cl.time < scr_centertime_start + scr_centertime_off) {
+            const std::string s = scr_centerstring;
+            merian::split(s, "\n", [](const std::string& s) {
                 // hack to display centered text
                 const float font_size = ImGui::CalcTextSize(s.c_str()).x;
 
