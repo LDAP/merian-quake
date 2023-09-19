@@ -212,7 +212,7 @@ void add_particles(std::vector<float>& vtx,
         scale *= 0.5;
 
         uint32_t c = d_8to24table[(int)p->color];
-        merian::XORShift32 xrand{static_cast<uint32_t>(reinterpret_cast<uint64_t>(p))};
+        merian::XORShift32 xrand{static_cast<uint32_t>(p->die)};
 
         // Some heuristics to improve blood, fire, explosions
         uint32_t texnum = 0;
