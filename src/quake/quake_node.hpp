@@ -344,4 +344,6 @@ class QuakeNode : public merian::Node {
     float volume_particle_size_um = 25.0;
 
     bool dump_mc = false;
+
+    bool reproducible_renders = false;
 };

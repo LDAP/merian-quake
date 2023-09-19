@@ -1,4 +1,5 @@
 #include "quake/quake_node.hpp"
+#include "GLFW/glfw3.h"
 #include "clear.comp.spv.h"
 #include "ext/json.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -21,7 +22,6 @@
 #include "merian/vk/utils/math.hpp"
 #include "quake.comp.spv.h"
 #include "volume.comp.spv.h"
-#include "GLFW/glfw3.h"
 
 struct QuakeData {
     // The first quake node sets this
@@ -187,7 +187,8 @@ void add_particles(std::vector<float>& vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
                    const uint32_t texnum_blood,
-                   const uint32_t texnum_explosion) {
+                   const uint32_t texnum_explosion,
+                   const bool no_random) {
 
     static const glm::vec3 voff[4] = {
         {0.0, 1.0, 0.0},
@@ -212,7 +213,9 @@ void add_particles(std::vector<float>& vtx,
         scale *= 0.5;
 
         uint32_t c = d_8to24table[(int)p->color];
-        merian::XORShift32 xrand{static_cast<uint32_t>(p->die)};
+        uint32_t seed = no_random ? static_cast<uint32_t>(p->die)
+                                  : static_cast<uint32_t>(reinterpret_cast<uint64_t>(p));
+        merian::XORShift32 xrand{seed};
 
         // Some heuristics to improve blood, fire, explosions
         uint32_t texnum = 0;
@@ -242,7 +245,8 @@ void add_particles(std::vector<float>& vtx,
         for (int l = 0; l < 3; l++) {
             const float particle_offset = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
             const glm::mat4 rotation = glm::rotate<float>(
-                glm::identity<glm::mat4>(), (xrand.get() + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
+                glm::identity<glm::mat4>(),
+                (xrand.get() + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
                 glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get())));
             for (int k = 0; k < 4; k++) {
                 const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
@@ -298,11 +302,13 @@ void add_particles(std::vector<float>& vtx,
                                  merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
                                  merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
             } else {
+                for (int i = 0; i < 3; i++)
+                    color_bytes[0] = std::clamp(color_bytes[0] * (1 + xrand.get() * 0.1 - 0.05), 0., 255.);
+
                 uint32_t c_fb = 0;
                 if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] >
                     150) {
-                    // bright colors are probably emitting
-                    c_fb = c;
+                    c_fb = c;  // bright colors are probably emitting
                 }
 
                 ext.emplace_back(0, 0 | (MAT_FLAGS_SOLID << 12), c, c_fb, 0,
@@ -1551,7 +1557,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
             add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
             add_geo(&cl_entities[cl.viewentity], dynamic_vtx, dynamic_idx, dynamic_ext);
         }
-        add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion);
+        add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion,
+                      reproducible_renders);
     });
 
     const uint32_t concurrency = std::thread::hardware_concurrency();
@@ -1788,8 +1795,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     }
 
     config.st_separate("Reproducibility");
+    config.config_bool("reproducible renders", reproducible_renders,
+                       "e.g. disables random behavior");
     config.config_int("stop and rebuild after worldspawn", stop_after_worldspawn,
-                      "Can be used for reference renders. -1 to disable");
+                      "Can be used for reference renders.");
     config.config_float("force timediff (ms)", force_timediff,
                         "For reference renders and video outputs.");
 
