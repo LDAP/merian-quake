@@ -18,7 +18,7 @@
 // Limits indirectly the maximum absorption
 #define VOLUME_MAX_T 1000.
 
-#define MC_FAST_RECOVERY 0
+#define MC_FAST_RECOVERY 1
 
 // BINDINGS
 
