@@ -46,7 +46,9 @@ void main() {
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         trace_ray(camera_throughput, incident, first_hit);
-        irr += incident;
+        irr += incident / f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
+                                  first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
+                                  first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
 
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), dot(params.cam_x.xyz - params.prev_cam_x.xyz, first_hit.wi)};
 
@@ -67,6 +69,8 @@ void main() {
     }
 
     {
+        vec3 indirect = vec3(0);
+
         // Evaluate indirect light (if light can be transported and the material is not emissive)
         if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr, vec3(1e-7))))
         for (int s = 0; s < MAX_SPP; s++) {
@@ -187,18 +191,18 @@ void main() {
 
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr += contrib;
+                indirect += contrib;
                 const float l = yuv_luminance(contrib);
                 moments += vec2(l, l * l);
             }
         }
+
+        irr += indirect / MAX_SPP;
+        moments /= MAX_SPP;
     }
     // irr = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
     if (all(lessThan(pixel, resolution))) {
-        irr /= MAX_SPP;
-        moments /= MAX_SPP;
-
         imageStore(img_irradiance, pixel, vec4(irr, 0));
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
     }
