@@ -58,7 +58,10 @@ static void QuakeMessageOverlay() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
     if (ImGui::Begin("Quake Messages", NULL, window_flags)) {
         if (scr_centertime_start <= cl.time && cl.time < scr_centertime_start + scr_centertime.value) {
-            const std::string s = scr_centerstring;
+            std::string s = scr_centerstring;
+            // undo colored text
+            for (uint32_t i = 0; i < s.size(); i++)
+                s[i] &= ~128;
             merian::split(s, "\n", [](const std::string& s) {
                 // hack to display centered text
                 const float font_size = ImGui::CalcTextSize(s.c_str()).x;
