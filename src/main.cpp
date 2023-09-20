@@ -38,10 +38,19 @@
 
 extern "C" {
 
-extern char        scr_centerstring[1024];
-extern float       scr_centertime_start;
-extern cvar_t      scr_centertime;
+// centerstring
+extern char scr_centerstring[1024];
+extern float scr_centertime_start;
+extern cvar_t scr_centertime;
 
+// console notify
+extern int con_linewidth;
+extern char* con_text;
+extern int con_current;
+extern cvar_t con_notifytime;
+// from console.c
+#define NUM_CON_TIMES 4
+extern float con_times[NUM_CON_TIMES];
 }
 
 static void QuakeMessageOverlay() {
@@ -52,12 +61,13 @@ static void QuakeMessageOverlay() {
 
     const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     const ImVec2 window_pos(center.x, (center.y + 0) / 2);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-
-    ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    if (ImGui::Begin("Quake Messages", NULL, window_flags)) {
-        if (scr_centertime_start <= cl.time && cl.time < scr_centertime_start + scr_centertime.value) {
+
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
+    if (ImGui::Begin("CenterString", NULL, window_flags)) {
+        if (scr_centertime_start <= cl.time &&
+            cl.time < scr_centertime_start + scr_centertime.value) {
             std::string s = scr_centerstring;
             // undo colored text
             for (uint32_t i = 0; i < s.size(); i++)
@@ -72,8 +82,35 @@ static void QuakeMessageOverlay() {
             });
         }
     }
-    ImGui::PopStyleVar(1);
     ImGui::End();
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
+    if (ImGui::Begin("ConsoleNotify", NULL, window_flags)) {
+        // mostly from console.c
+        std::string s;
+        for (int i = con_current - NUM_CON_TIMES + 1; i <= con_current; i++) {
+            if (i < 0)
+                continue;
+            float time = con_times[i % NUM_CON_TIMES];
+            if (time == 0)
+                continue;
+            time = realtime - time;
+            if (time > con_notifytime.value)
+                continue;
+            const char* text = con_text + (i % con_totallines) * con_linewidth;
+            s += text;
+            s += "\n";
+        }
+        // undo colored text
+        for (uint32_t i = 0; i < s.size(); i++)
+            s[i] &= ~128;
+
+        ImGui::Text("%s", s.c_str());
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(1);
 }
 
 struct FrameData {
@@ -256,7 +293,8 @@ int main(const int argc, const char** argv) {
             frametime.reset();
             ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
                                      frametime_ms, 1000 / frametime_ms)
-                             .c_str(), NULL, ImGuiWindowFlags_NoFocusOnAppearing);
+                             .c_str(),
+                         NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
