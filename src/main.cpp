@@ -215,7 +215,7 @@ int main(const int argc, const char** argv) {
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
-    ImFont* quake_font = io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->c_str(), 24);
+    ImFont* quake_font = io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->c_str(), 26);
 
     merian::Profiler::Report report;
     bool clear_profiler = false;
