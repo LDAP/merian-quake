@@ -139,7 +139,8 @@ void main() {
                 const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
                 // EVALUATE BSDF
-                const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), next_hit.wi, vec2(current_hit.roughness)) * current_hit.albedo * wodotn);
+                // without albedo (added below to skip first albedo)
+                const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), next_hit.wi, vec2(current_hit.roughness)) * wodotn);
                 
                 current_throughput *= microfacet_bsdf;
                 if (USE_LIGHT_CACHE_TAIL == 1) {
@@ -152,6 +153,7 @@ void main() {
 
                 // UPDATE MARKOV CHAIN and LIGHT_CACHE
                 {
+                    // multiply albedo?
                     const float mc_f = yuv_luminance(lc_incident * microfacet_bsdf / wo_p);
                     if (!isinf(mc_f)) {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
@@ -174,35 +176,28 @@ void main() {
 
                 // PREPARE NEXT ITERATION
                 {
+                    current_throughput *= next_hit.albedo;
+                    current_hit = next_hit;
+
                     // we stop if we won't transport any more light or if we found emissive material
                     if (all(lessThan(current_throughput, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                         break;
-                    current_hit = next_hit;
                 }
             }
 
-            // Albdeo demodulation
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                irr += contrib * (1.0 / MAX_SPP);
-                float l = yuv_luminance(contrib);
-                moments += vec2(l, l * l) * (1. / MAX_SPP);
+                irr += contrib;
+                const float l = yuv_luminance(contrib);
+                moments += vec2(l, l * l);
             }
         }
     }
     // irr = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
     if (all(lessThan(pixel, resolution))) {
-        // Required for albedo demodulation
-        // Since irradiance is blurred set it to 1 and keep detail in albedo texture
-
-        if (any(greaterThan(first_hit.albedo, f16vec3(0)))) {
-            irr /= f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
-                                   first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
-                                   first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
-            const float alb_l = yuv_luminance_f16(first_hit.albedo);
-            moments /= vec2(alb_l, alb_l * alb_l);
-        }
+        irr /= MAX_SPP;
+        moments /= MAX_SPP;
 
         imageStore(img_irradiance, pixel, vec4(irr, 0));
         imageStore(img_moments, pixel, vec4(moments, 0, 0));
@@ -224,7 +219,7 @@ void main() {
     // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
     // irr = vec3(mc_state.sum_w);
 
-    // imageStore(img_debug, pixel, vec4(light_cache_get(first_mat.pos, first_mat.normal), 1));
+    // imageStore(img_debug, pixel, vec4(light_cache_get(first_hit.pos, first_hit.normal), 1));
 
     // {
     //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);
