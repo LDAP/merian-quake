@@ -100,13 +100,10 @@ static void QuakeMessageOverlay() {
             if (time > con_notifytime.value)
                 continue;
             const char* text = con_text + (i % con_totallines) * con_linewidth;
-            s += text;
+            for (int i = 0; i < con_linewidth; i++)
+                s += (text[i] & ~128);
             s += "\n";
         }
-        // undo colored text
-        for (uint32_t i = 0; i < s.size(); i++)
-            s[i] &= ~128;
-
         ImGui::Text("%s", s.c_str());
     }
     ImGui::End();
