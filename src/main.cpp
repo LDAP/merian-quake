@@ -62,6 +62,7 @@ static void QuakeMessageOverlay() {
     const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     const ImVec2 window_pos(center.x, (center.y + 0) / 2);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5, 0.5, 0.5, 1));
 
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
@@ -110,7 +111,8 @@ static void QuakeMessageOverlay() {
     }
     ImGui::End();
 
-    ImGui::PopStyleVar(1);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 }
 
 struct FrameData {
