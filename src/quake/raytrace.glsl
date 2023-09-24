@@ -43,7 +43,7 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
 void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
     uint16_t intersection = 0s;
 
-    while (intersection++ < MAX_INTERSECTIONS) {
+    do {
         rayQueryEXT ray_query;
         VertexExtraData extra_data;
         uint16_t flags;
@@ -205,5 +205,5 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         }
 
         break;
-    }
+    } while (intersection++ < MAX_INTERSECTIONS);
 }
