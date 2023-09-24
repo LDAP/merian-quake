@@ -47,7 +47,7 @@ SpecializationInfoHandle QuakeHud::get_specialization_info() const noexcept {
 }
 
 const void* QuakeHud::get_push_constant([[maybe_unused]] GraphRun& run) {
-    if (sv_player) {
+    if (cl.worldmodel && sv_player) {
         // Demos do not have a player set
         pc.health = sv_player->v.health;
         pc.armor = sv_player->v.armorvalue;
