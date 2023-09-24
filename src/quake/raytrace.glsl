@@ -186,26 +186,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         if (flags == MAT_FLAGS_WATER) {
             hit.albedo = albedo_texture.rgb;
             hit.roughness = 0.001hf;
-            //throughput *= albedo_texture.rgb;
-            //hit.pos += 1e-3 * hit.wi;
-            //continue;
         } else if (flags == MAT_FLAGS_WATERFALL) {
             contribution += throughput * albedo_texture.rgb;
             hit.albedo = albedo_texture.rgb;
-            hit.roughness = 0.001hf;
-            //hit.pos += 1e-3 * hit.wi;
-            //continue;
-        } else if (flags == MAT_FLAGS_SPRITE) {
+        } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
             hit.albedo = ldr_to_hdr(albedo_texture.rgb);
-            contribution += throughput * hit.albedo;
-        } else if (flags == MAT_FLAGS_LAVA) {
-            hit.albedo = 20.0hf * albedo_texture.rgb;
-            contribution += throughput * hit.albedo;
-        } else if (flags == MAT_FLAGS_SLIME) {
-            hit.albedo = 0.5hf * albedo_texture.rgb;
-            contribution += throughput * hit.albedo;
-        } else if (flags == MAT_FLAGS_TELE) {
-            hit.albedo = 5.0hf * albedo_texture.rgb;
             contribution += throughput * hit.albedo;
         } else {
             const uint16_t texnum_fb = uint16_t(extra_data.texnum_fb_flags & 0xfff);
