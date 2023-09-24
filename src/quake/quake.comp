@@ -55,6 +55,7 @@ void main() {
         // Calculate depth gradient
         const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        // use geo normal?
         gbuf.grad_z = dot(first_hit.normal, first_hit.pos - params.cam_x.xyz) / vec2(dot(first_hit.normal, r_x), dot(first_hit.normal, r_y)) - gbuf.linear_z;
 
         // Store motion vector
