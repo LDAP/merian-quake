@@ -69,7 +69,7 @@ void main() {
         }
     }
 
-    {
+    if (MAX_SPP > 0) {
         vec3 indirect = vec3(0);
 
         // Evaluate indirect light (if light can be transported and the material is not emissive)
