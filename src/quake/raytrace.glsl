@@ -29,13 +29,10 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
     return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.5hf * sum) - 1.0hf) : f16vec3(0);
 }
 
-// Get warped texture coordinate
-vec2 warp(const vec2 st) {
-    return st + vec2(0.1 * sin(st.y * 1.5 + params.cl_time * 1.0),
-              0.1 * sin(st.x * 1.4 + params.cl_time * 1.0))
-    - vec2(.1, 0) * cos(st.x * 5 + params.cl_time * 2) * pow(max(sin(st.x * 5 + params.cl_time * 2), 0), 5)
-    - vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5);
-}
+// adapted from gl_warp.c
+#define WARPCALC(st) 2 * (st + 0.125 * sin(vec2(3 * st.yx + 0.5 * params.cl_time)))
+#define WATER_WAVES(st) (-vec2(.1, 0) * cos(st.x * 5 + params.cl_time * 2) * pow(max(sin(st.x * 5 + params.cl_time * 2), 0), 5) \
+                         -vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5))
 
 // Initialize pos and wi with ray origin and ray direction and
 // throughput, contribution as needed
@@ -122,7 +119,12 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             break;
         }
 
-        st = (flags > 0 && flags < 5) ? warp(extra_data.st * barycentrics(ray_query)) : extra_data.st * barycentrics(ray_query);
+        st = extra_data.st * barycentrics(ray_query);
+        if (flags > 0 && flags < 5) {
+            st = WARPCALC(st);
+            if (flags == MAT_FLAGS_WATER)
+                st += WATER_WAVES(st);
+        }
 
         // NORMALS AND GLOSS
         vec3 du, dv;
