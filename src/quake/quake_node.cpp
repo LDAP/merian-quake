@@ -384,18 +384,17 @@ void add_geo_alias(entity_t* ent,
 
     const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
-
     glm::mat4 mat_old_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_old_model[0].x, &mat_old_model[1].x, &mat_old_model[2].x);
+    AngleVectors(ent->prev_lerp_angles, &mat_old_model[0].x, &mat_old_model[1].x,
+                 &mat_old_model[2].x);
     mat_old_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
     mat_old_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
     mat_old_model = mat_old_model * glm::translate(glm::identity<glm::mat4>(),
-                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
-    mat_old_model =
-        mat_old_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
-
+                                                   *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_old_model = mat_old_model *
+                    glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
 
     uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
