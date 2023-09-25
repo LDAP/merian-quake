@@ -52,12 +52,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         // FIND NEXT HIT
         rayQueryInitializeEXT(ray_query,
                               tlas,
-                              gl_RayFlagsCullBackFacingTrianglesEXT, 
-                                                                        // Ray flags, None means: If not set in the instance the triangle
-                                                                        // may not be opaque. This is a major performance hit
-                                                                        // since we need to load the texture to determine if we want to trace
-                                                                        // further.
-                                                                        // Use gl_RayFlagsOpaqueEXT to treat all geometry as opaque
+                              gl_RayFlagsCullBackFacingTrianglesEXT,  // We need to cull backfaces
+                                                                      // else we get z-fighting in Quake
                               0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
                               hit.pos,
                               0,                     // Minimum t-value (we set it here to 0 and pull back the ray)
