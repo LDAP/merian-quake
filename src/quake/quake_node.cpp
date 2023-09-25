@@ -363,6 +363,18 @@ void add_geo_alias(entity_t* ent,
     if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
 
+
+    glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
+    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x, &mat_prev_model[2].x);
+    mat_prev_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
+    mat_prev_model[1] *= -1;
+
+    // * ENTSCALE_DECODE(ent->scale)?
+    mat_prev_model = mat_prev_model * glm::translate(glm::identity<glm::mat4>(),
+                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_prev_model =
+        mat_prev_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
+
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
     R_SetupEntityTransform(ent, &lerpdata);
@@ -384,18 +396,6 @@ void add_geo_alias(entity_t* ent,
 
     const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
-    glm::mat4 mat_old_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_old_model[0].x, &mat_old_model[1].x,
-                 &mat_old_model[2].x);
-    mat_old_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
-    mat_old_model[1] *= -1;
-
-    // * ENTSCALE_DECODE(ent->scale)?
-    mat_old_model = mat_old_model * glm::translate(glm::identity<glm::mat4>(),
-                                                   *merian::as_vec3(hdr->scale_origin) * fovscale);
-    mat_old_model = mat_old_model *
-                    glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
-
     uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
@@ -412,7 +412,7 @@ void add_geo_alias(entity_t* ent,
             vtx.emplace_back(world_pos[k]);
 
         const glm::vec3 old_world_pos =
-            mat_old_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->prev_lerp_blend), 1.0);
+            mat_prev_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->prev_lerp_blend), 1.0);
         for (int k = 0; k < 3; k++)
             prev_vtx.emplace_back(old_world_pos[k]);
     }
@@ -1580,7 +1580,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_prev_vtx, static_idx, static_ext, 1);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise
             | vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
         }
@@ -1594,7 +1594,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_prev_vtx, static_idx, static_ext, 2);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
         SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
