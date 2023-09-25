@@ -56,4 +56,4 @@ exe = executable(
     install : true,
 )
 
-install_subdir('res/blue_noise', install_dir : 'res')
+install_subdir('res', install_dir : '.')
