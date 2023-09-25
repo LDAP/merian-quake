@@ -480,6 +480,7 @@ void add_geo_alias(entity_t* ent,
 void add_geo_brush(entity_t* ent,
                    qmodel_t* m,
                    std::vector<float>& vtx,
+                   std::vector<float>& prev_vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
                    int geo_selector = 0) {
@@ -490,6 +491,14 @@ void add_geo_brush(entity_t* ent,
     AngleVectors(angles.data(), &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
     mat_model[1] *= -1;
     VectorCopy(ent->origin, &mat_model[3].x);
+
+    glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
+    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x, &mat_prev_model[2].x);
+    mat_prev_model[1] *= -1;
+    VectorCopy(ent->prev_lerp_origin, &mat_prev_model[3].x);
+
+    VectorCopy(ent->origin, ent->prev_lerp_origin);
+    VectorCopy(ent->angles, ent->prev_lerp_angles);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
@@ -513,10 +522,12 @@ void add_geo_brush(entity_t* ent,
         while (p) {
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
-                glm::vec3 coord = mat_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
+                const glm::vec3 coord = mat_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
+                const glm::vec3 prev_coord = mat_prev_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
 
                 for (int l = 0; l < 3; l++) {
                     vtx.emplace_back(coord[l]);
+                    prev_vtx.emplace_back(prev_coord[l]);
                 }
             }
 
@@ -750,8 +761,7 @@ void add_geo(entity_t* ent,
     if (m->type == mod_alias) { // alias model:
         add_geo_alias(ent, m, vtx, prev_vtx, idx, ext);
     } else if (m->type == mod_brush) { // brush model:
-        add_geo_brush(ent, m, vtx, idx, ext);
-        prev_vtx = vtx;
+        add_geo_brush(ent, m, vtx, prev_vtx, idx, ext);
     } else if (m->type == mod_sprite) {
         // explosions, decals, etc, this is R_DrawSpriteModel
         add_geo_sprite(ent, m, vtx, idx, ext);
@@ -1567,8 +1577,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         static_idx.clear();
         static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 1);
-        static_prev_vtx = static_vtx;
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_prev_vtx, static_idx, static_ext, 1);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
             current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
@@ -1582,8 +1591,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
         static_idx.clear();
         static_ext.clear();
 
-        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 2);
-        static_prev_vtx = static_vtx;
+        add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_prev_vtx, static_idx, static_ext, 2);
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
             current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
