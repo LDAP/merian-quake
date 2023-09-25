@@ -59,7 +59,7 @@ void main() {
         gbuf.grad_z = dot(first_hit.normal, first_hit.pos - params.cam_x.xyz) / vec2(dot(first_hit.normal, r_x), dot(first_hit.normal, r_y)) - gbuf.linear_z;
 
         // Store motion vector
-        const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
+        const vec3 old_dir = first_hit.prev_pos - params.prev_cam_x.xyz;
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         
         if (all(lessThan(pixel, resolution))) {

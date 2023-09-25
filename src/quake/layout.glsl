@@ -100,6 +100,11 @@ layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
     vec3 v[];
 } buf_vtx[MAX_GEOMETRIES];
 
+layout(set = 1, binding = BINDING_PREV_VTX_BUF, scalar) buffer buf_prev_vtx_t {
+    // vertex positons
+    vec3 v[];
+} buf_prev_vtx[MAX_GEOMETRIES];
+
 layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer buf_idx_t {
     // index data for every instance
     uvec3 i[];

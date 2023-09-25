@@ -27,6 +27,7 @@
 #define BINDING_EXT_BUF 2
 #define BINDING_IMG_TEX 3
 #define BINDING_TLAS 4
+#define BINDING_PREV_VTX_BUF 5
 
 // Material flags
 

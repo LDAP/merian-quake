@@ -184,6 +184,7 @@ make_texnum_alpha(gltexture_s* tex, entity_t* entity = nullptr, msurface_t* surf
 }
 
 void add_particles(std::vector<float>& vtx,
+                   std::vector<float>& prev_vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
                    const uint32_t texnum_blood,
@@ -259,14 +260,22 @@ void add_particles(std::vector<float>& vtx,
         }
 
         const uint32_t vtx_cnt = vtx.size() / 3;
-        for (int l = 0; l < 3; l++)
+        for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[0][l]);
-        for (int l = 0; l < 3; l++)
+            prev_vtx.emplace_back(vert[0][l]);
+        }
+        for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[1][l]);
-        for (int l = 0; l < 3; l++)
+            prev_vtx.emplace_back(vert[1][l]);
+        }
+        for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[2][l]);
-        for (int l = 0; l < 3; l++)
+            prev_vtx.emplace_back(vert[2][l]);
+        }
+        for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[3][l]);
+            prev_vtx.emplace_back(vert[3][l]);
+        }
 
         const uint32_t idx_size = idx.size();
 
@@ -303,12 +312,13 @@ void add_particles(std::vector<float>& vtx,
                                  merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
             } else {
                 for (int i = 0; i < 3; i++)
-                    color_bytes[0] = std::clamp(color_bytes[0] * (1 + xrand.get() * 0.1 - 0.05), 0., 255.);
+                    color_bytes[0] =
+                        std::clamp(color_bytes[0] * (1 + xrand.get() * 0.1 - 0.05), 0., 255.);
 
                 uint32_t c_fb = 0;
                 if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] >
                     150) {
-                    c_fb = c;  // bright colors are probably emitting
+                    c_fb = c; // bright colors are probably emitting
                 }
 
                 ext.emplace_back(0, 0 | (MAT_FLAGS_SOLID << 12), c, c_fb, 0,
@@ -323,6 +333,7 @@ void add_particles(std::vector<float>& vtx,
 void add_geo_alias(entity_t* ent,
                    qmodel_t* m,
                    std::vector<float>& vtx,
+                   std::vector<float>& prev_vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext) {
     assert(m->type == mod_alias);
@@ -347,14 +358,14 @@ void add_geo_alias(entity_t* ent,
     if (f < 0 || f >= hdr->numposes)
         return;
 
-    lerpdata_t lerpdata;
-    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
-    R_SetupEntityTransform(ent, &lerpdata);
-
     // makes gun fov independent
     glm::vec3 fovscale(1.);
     if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
+
+    lerpdata_t lerpdata;
+    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
+    R_SetupEntityTransform(ent, &lerpdata);
 
     // angles: pitch yaw roll. axes: right fwd up
     lerpdata.angles[0] *= -1;
@@ -373,6 +384,19 @@ void add_geo_alias(entity_t* ent,
 
     const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
 
+
+    glm::mat4 mat_old_model = glm::identity<glm::mat4>();
+    AngleVectors(ent->prev_lerp_angles, &mat_old_model[0].x, &mat_old_model[1].x, &mat_old_model[2].x);
+    mat_old_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
+    mat_old_model[1] *= -1;
+
+    // * ENTSCALE_DECODE(ent->scale)?
+    mat_old_model = mat_old_model * glm::translate(glm::identity<glm::mat4>(),
+                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_old_model =
+        mat_old_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
+
+
     uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
@@ -387,7 +411,16 @@ void add_geo_alias(entity_t* ent,
             mat_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, lerpdata.blend), 1.0);
         for (int k = 0; k < 3; k++)
             vtx.emplace_back(world_pos[k]);
+
+        const glm::vec3 old_world_pos =
+            mat_old_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->prev_lerp_blend), 1.0);
+        for (int k = 0; k < 3; k++)
+            prev_vtx.emplace_back(old_world_pos[k]);
     }
+
+    ent->prev_lerp_blend = lerpdata.blend;
+    VectorCopy(lerpdata.angles, ent->prev_lerp_angles);
+    VectorCopy(lerpdata.origin, ent->prev_lerp_origin);
 
     for (int i = 0; i < hdr->numindexes; i++)
         idx.emplace_back(vtx_cnt + indexes[i]);
@@ -710,6 +743,7 @@ void add_geo_sprite(entity_t* ent,
 // Adds the geo from entity into the vectors.
 void add_geo(entity_t* ent,
              std::vector<float>& vtx,
+             std::vector<float>& prev_vtx,
              std::vector<uint32_t>& idx,
              std::vector<QuakeNode::VertexExtraData>& ext) {
     if (!ent)
@@ -719,19 +753,19 @@ void add_geo(entity_t* ent,
         return;
 
     if (m->type == mod_alias) { // alias model:
-        add_geo_alias(ent, m, vtx, idx, ext);
-        assert(ext.size() == idx.size() / 3);
-        assert(vtx.size() % 3 == 0);
+        add_geo_alias(ent, m, vtx, prev_vtx, idx, ext);
     } else if (m->type == mod_brush) { // brush model:
         add_geo_brush(ent, m, vtx, idx, ext);
-        assert(ext.size() == idx.size() / 3);
-        assert(vtx.size() % 3 == 0);
+        prev_vtx = vtx;
     } else if (m->type == mod_sprite) {
         // explosions, decals, etc, this is R_DrawSpriteModel
         add_geo_sprite(ent, m, vtx, idx, ext);
-        assert(ext.size() == idx.size() / 3);
-        assert(vtx.size() % 3 == 0);
+        prev_vtx = vtx;
     }
+
+    assert(ext.size() == idx.size() / 3);
+    assert(vtx.size() % 3 == 0);
+    assert(vtx.size() == prev_vtx.size());
 }
 
 // If the supplied buffer is not nullptr and is large enough, it is returned and an upload is
@@ -760,13 +794,15 @@ ensure_buffer(const merian::ResourceAllocatorHandle& allocator,
 // If the supplied buffers are not nullptr and are large enough, they are returned and an upload is
 // recorded. Returns (vertex_buffer, index_buffer).
 // Appropriate barriers are inserted.
-std::tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
+std::tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
 ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
                                const vk::CommandBuffer& cmd,
                                const std::vector<float>& vtx,
+                               const std::vector<float>& prev_vtx,
                                const std::vector<uint32_t>& idx,
                                const std::vector<QuakeNode::VertexExtraData>& ext,
                                const merian::BufferHandle optional_vtx_buffer,
+                               const merian::BufferHandle optional_prev_vtx_buffer,
                                const merian::BufferHandle optional_idx_buffer,
                                const merian::BufferHandle optional_ext_buffer) {
     auto usage_rt = vk::BufferUsageFlagBits::eShaderDeviceAddress |
@@ -776,16 +812,23 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
 
     merian::BufferHandle vertex_buffer =
         ensure_buffer(allocator, usage_rt, cmd, vtx, optional_vtx_buffer);
+    merian::BufferHandle prev_vertex_buffer =
+        ensure_buffer(allocator, usage_rt, cmd, prev_vtx, optional_prev_vtx_buffer);
     merian::BufferHandle index_buffer =
         ensure_buffer(allocator, usage_rt, cmd, idx, optional_idx_buffer);
     merian::BufferHandle ext_buffer =
         ensure_buffer(allocator, usage_storage, cmd, ext, optional_ext_buffer);
 
-    const std::array<vk::BufferMemoryBarrier2, 3> barriers = {
+    const std::array<vk::BufferMemoryBarrier2, 4> barriers = {
         vertex_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
                                        vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
                                        vk::AccessFlagBits2::eTransferWrite,
                                        vk::AccessFlagBits2::eAccelerationStructureReadKHR),
+        prev_vertex_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR),
         index_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
                                       vk::AccessFlagBits2::eTransferWrite,
@@ -798,7 +841,7 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
     vk::DependencyInfo dep_info{{}, {}, barriers, {}};
     cmd.pipelineBarrier2(dep_info);
 
-    return std::make_tuple(vertex_buffer, index_buffer, ext_buffer);
+    return std::make_tuple(vertex_buffer, prev_vertex_buffer, index_buffer, ext_buffer);
 }
 
 // QuakeNode
@@ -835,6 +878,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
             .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
             .add_binding_acceleration_structure()
+            .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
             .build_layout(context);
     quake_pool = std::make_shared<merian::DescriptorPool>(quake_desc_set_layout, frames_in_flight);
     for (auto& frame : frames) {
@@ -1240,6 +1284,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         for (uint32_t geometry = 0; geometry < MAX_GEOMETRIES; geometry++) {
             update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
                                            geometry);
+            update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, binding_dummy_buffer, 0,
+                                           VK_WHOLE_SIZE, geometry);
             update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
                                            geometry);
             update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
@@ -1254,6 +1300,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     cmd.fillBuffer(*buffer_outputs[0][1], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][2], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][3], 0, VK_WHOLE_SIZE, 0);
+
+    old_cl_time = cl.time;
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -1428,6 +1476,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         dump_mc = false;
     }
 
+    old_cl_time = cl.time;
     frame++;
 }
 
@@ -1457,6 +1506,7 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd) {
 QuakeNode::RTGeometry
 QuakeNode::get_rt_geometry(const vk::CommandBuffer& cmd,
                            const std::vector<float>& vtx,
+                           const std::vector<float>& prev_vtx,
                            const std::vector<uint32_t>& idx,
                            const std::vector<QuakeNode::VertexExtraData>& ext,
                            const std::unique_ptr<merian::BLASBuilder>& blas_builder,
@@ -1464,6 +1514,7 @@ QuakeNode::get_rt_geometry(const vk::CommandBuffer& cmd,
                            const bool force_rebuild,
                            const vk::BuildAccelerationStructureFlagsKHR flags) {
     assert(!vtx.empty());
+    assert(!prev_vtx.empty());
     assert(!idx.empty());
     assert(!ext.empty());
 
@@ -1472,8 +1523,10 @@ QuakeNode::get_rt_geometry(const vk::CommandBuffer& cmd,
     geo.vtx_count = vtx.size() / 3;
     geo.primitive_count = idx.size() / 3;
 
-    std::tie(geo.vtx_buffer, geo.idx_buffer, geo.ext_buffer) = ensure_vertex_index_ext_buffer(
-        allocator, cmd, vtx, idx, ext, old_geo.vtx_buffer, old_geo.idx_buffer, old_geo.ext_buffer);
+    std::tie(geo.vtx_buffer, geo.prev_vtx_buffer, geo.idx_buffer, geo.ext_buffer) =
+        ensure_vertex_index_ext_buffer(allocator, cmd, vtx, prev_vtx, idx, ext,
+                                       old_geo.prev_vtx_buffer, old_geo.vtx_buffer,
+                                       old_geo.idx_buffer, old_geo.ext_buffer);
 
     vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
         vk::Format::eR32G32B32Sfloat,
@@ -1515,26 +1568,30 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
 
         // clang-format off
         static_vtx.clear();
+        static_prev_vtx.clear();
         static_idx.clear();
         static_ext.clear();
 
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 1);
+        static_prev_vtx = static_vtx;
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise
             | vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
         }
         SPDLOG_DEBUG("static opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
 
         static_vtx.clear();
+        static_prev_vtx.clear();
         static_idx.clear();
         static_ext.clear();
 
         add_geo_brush(cl_entities, cl_entities->model, static_vtx, static_idx, static_ext, 2);
+        static_prev_vtx = static_vtx;
         if (!static_idx.empty()) {
             RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
-            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+            current_static_geo.emplace_back(get_rt_geometry(cmd, static_vtx, static_prev_vtx, static_idx, static_ext, cur_frame.blas_builder, old_geo, true, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
             current_static_geo.back().instance_flags = vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
         SPDLOG_DEBUG("static non-opaque geo: vtx size: {} idx size: {} ext size: {}", static_vtx.size(), static_idx.size(), static_ext.size());
@@ -1547,23 +1604,26 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd, const bool refre
 
 void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     dynamic_vtx.clear();
+    dynamic_prev_vtx.clear();
     dynamic_idx.clear();
     dynamic_ext.clear();
 
     std::thread particle_viewent([&]() {
         if (playermodel == 1) {
-            add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
+            add_geo(&cl.viewent, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext);
         } else if (playermodel == 2) {
-            add_geo(&cl.viewent, dynamic_vtx, dynamic_idx, dynamic_ext);
-            add_geo(&cl_entities[cl.viewentity], dynamic_vtx, dynamic_idx, dynamic_ext);
+            add_geo(&cl.viewent, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext);
+            add_geo(&cl_entities[cl.viewentity], dynamic_vtx, dynamic_prev_vtx, dynamic_idx,
+                    dynamic_ext);
         }
-        add_particles(dynamic_vtx, dynamic_idx, dynamic_ext, texnum_blood, texnum_explosion,
-                      reproducible_renders);
+        add_particles(dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext, texnum_blood,
+                      texnum_explosion, reproducible_renders);
     });
 
     const uint32_t concurrency = std::thread::hardware_concurrency();
 
     std::vector<std::vector<float>> thread_dynamic_vtx(concurrency);
+    std::vector<std::vector<float>> thread_dynamic_prev_vtx(concurrency);
     std::vector<std::vector<uint32_t>> thread_dynamic_idx(concurrency);
     std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(concurrency);
 
@@ -1572,10 +1632,12 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         [&](uint32_t index, uint32_t thread_index) {
             if (index < (uint32_t)cl_numvisedicts)
                 add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
-                        thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+                        thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
+                        thread_dynamic_ext[thread_index]);
             if (index < (uint32_t)cl.num_statics)
                 add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
-                        thread_dynamic_idx[thread_index], thread_dynamic_ext[thread_index]);
+                        thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
+                        thread_dynamic_ext[thread_index]);
         },
         concurrency);
 
@@ -1585,6 +1647,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         uint32_t old_vtx_count = dynamic_vtx.size() / 3;
 
         merian::raw_copy_back(dynamic_vtx, thread_dynamic_vtx[i]);
+        merian::raw_copy_back(dynamic_prev_vtx, thread_dynamic_prev_vtx[i]);
         merian::raw_copy_back(dynamic_ext, thread_dynamic_ext[i]);
 
         uint32_t old_idx_size = dynamic_idx.size();
@@ -1633,8 +1696,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
 
         bool force_rebuild = frame - old_geo.last_rebuild > 1000;
         cur_frame.dynamic_geometries.emplace_back(
-            get_rt_geometry(cmd, dynamic_vtx, dynamic_idx, dynamic_ext, cur_frame.blas_builder,
-                            old_geo, force_rebuild,
+            get_rt_geometry(cmd, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext,
+                            cur_frame.blas_builder, old_geo, force_rebuild,
                             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                                 vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate));
         cur_frame.dynamic_geometries.back().instance_flags =
@@ -1679,12 +1742,16 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
         });
 
         update.write_descriptor_buffer(BINDING_VTX_BUF, geo.vtx_buffer, 0, VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, geo.prev_vtx_buffer, 0, VK_WHOLE_SIZE,
+                                       i);
         update.write_descriptor_buffer(BINDING_IDX_BUF, geo.idx_buffer, 0, VK_WHOLE_SIZE, i);
         update.write_descriptor_buffer(BINDING_EXT_BUF, geo.ext_buffer, 0, VK_WHOLE_SIZE, i);
     }
 
     for (uint32_t i = all_geometries.size(); i < MAX_GEOMETRIES; i++) {
         update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
+                                       i);
         update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
         update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
     }
