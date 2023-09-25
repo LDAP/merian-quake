@@ -50,7 +50,8 @@ void main() {
                                   first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
                                   first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
 
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), dot(params.cam_x.xyz - params.prev_cam_x.xyz, first_hit.wi)};
+        const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
+        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
 
         // Calculate depth gradient
         const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
