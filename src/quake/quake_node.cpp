@@ -453,14 +453,11 @@ void add_geo_brush(entity_t* ent,
                    int geo_selector = 0) {
     assert(m->type == mod_brush);
 
-    // fprintf(stderr, "brush origin and angles %g %g %g -- %g %g %g with %d surfs\n",
-    //     ent->origin[0], ent->origin[1], ent->origin[2],
-    //     ent->angles[0], ent->angles[1], ent->angles[2],
-    //     m->nummodelsurfaces);
-    float angles[3] = {-ent->angles[0], ent->angles[1], ent->angles[2]};
-    glm::mat3 mat_model;
-    AngleVectors(angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
+    std::array<float, 3> angles = {-ent->angles[0], ent->angles[1], ent->angles[2]};
+    glm::mat4 mat_model = glm::identity<glm::mat4>();
+    AngleVectors(angles.data(), &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
     mat_model[1] *= -1;
+    VectorCopy(ent->origin, &mat_model[3].x);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
@@ -484,8 +481,7 @@ void add_geo_brush(entity_t* ent,
         while (p) {
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
-                glm::vec3 coord =
-                    mat_model * (*merian::as_vec3(p->verts[k])) + (*merian::as_vec3(ent->origin));
+                glm::vec3 coord = mat_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
 
                 for (int l = 0; l < 3; l++) {
                     vtx.emplace_back(coord[l]);
