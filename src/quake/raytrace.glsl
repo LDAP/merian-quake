@@ -130,11 +130,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                                     buf_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.y],
                                     buf_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.z]);
             hit.pos = verts * barycentrics(ray_query);
-            hit.normal = normalize(cross(verts[2] - verts[0], verts[1] - verts[0]));
-            hit.enc_geonormal = geo_encode_normal(hit.normal);
-
             du = verts[2] - verts[0];
             dv = verts[1] - verts[0];
+            hit.normal = normalize(cross(du, dv));
+            hit.enc_geonormal = geo_encode_normal(hit.normal);
         }
 
         if (extra_data.n1_brush == 0xffffffff) {
