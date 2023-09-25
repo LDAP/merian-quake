@@ -56,7 +56,8 @@ void main() {
         const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         // use geo normal?
-        gbuf.grad_z = dot(first_hit.normal, first_hit.pos - params.cam_x.xyz) / vec2(dot(first_hit.normal, r_x), dot(first_hit.normal, r_y)) - gbuf.linear_z;
+        const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
+        gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
 
         // Store motion vector
         const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
