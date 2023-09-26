@@ -1205,7 +1205,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
-                               volume_spp, mu_t, mu_s, volume_use_light_cache, draine_g, draine_a);
+                               volume_spp, volume_use_light_cache, draine_g, draine_a);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1357,12 +1357,12 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.player = {0, 0, 0, 0};
     }
     pc.cl_time = cl.time;
-    pc.prev_cam_x = pc.cam_x;
-    pc.prev_cam_w = pc.cam_w;
-    pc.prev_cam_u = pc.cam_u;
+    pc.prev_cam_x_mu_sx = pc.cam_x_mu_t;
+    pc.prev_cam_w_mu_sy = pc.cam_w;
+    pc.prev_cam_u_mu_sz = pc.cam_u;
     float rgt[3];
     AngleVectors(r_refdef.viewangles, &pc.cam_w.x, rgt, &pc.cam_u.x);
-    pc.cam_x = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
+    pc.cam_x_mu_t = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
     pc.sky.fill(0);
     if (skybox_name[0]) {
         for (int i = 0; i < 6; i++)
@@ -1371,6 +1371,22 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.sky[0] = solidskytexture->texnum;
         pc.sky[1] = alphaskytexture->texnum;
         pc.sky[2] = static_cast<uint16_t>(-1u);
+    }
+
+    if (mu_t_s_overwrite) {
+        pc.cam_x_mu_t.a = mu_t;
+        pc.prev_cam_x_mu_sx.a = mu_s_div_mu_t.r * mu_t;
+        pc.prev_cam_w_mu_sy.a = mu_s_div_mu_t.g * mu_t;
+        pc.prev_cam_u_mu_sz.a = mu_s_div_mu_t.b * mu_t;
+    } else {
+        pc.cam_x_mu_t.a = Fog_GetDensity();
+        pc.cam_x_mu_t.a *= pc.cam_x_mu_t.a;
+        pc.cam_x_mu_t.a *= 0.1;
+
+        const float* fog_color = Fog_GetColor();
+        pc.prev_cam_x_mu_sx.a = fog_color[0] * pc.cam_x_mu_t.a;
+        pc.prev_cam_w_mu_sy.a = fog_color[1] * pc.cam_x_mu_t.a;
+        pc.prev_cam_u_mu_sz.a = fog_color[2] * pc.cam_x_mu_t.a;
     }
 
     // BIND PIPELINE
@@ -1755,8 +1771,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_volume_spp = volume_spp;
     const int32_t old_volume_use_light_cache = volume_use_light_cache;
     const float old_volume_particle_size_um = volume_particle_size_um;
-    const float old_mu_t = mu_t;
-    const float old_mu_s = mu_s;
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
     float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
@@ -1770,8 +1784,15 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
 
     config.st_separate();
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
-    config.config_float("mu_t", mu_t, "", 0.00001);
-    config.config_float("mu_s", mu_s, "", 0.00001);
+    config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
+    if (mu_t_s_overwrite) {
+        config.config_float("mu_t", mu_t, "", 0.000001);
+        config.config_float3("mu_s / mu_t", &mu_s_div_mu_t.x);
+    } else {
+        config.output_text(fmt::format("mu_t: {}\nmu_s: ({}, {}, {})", pc.cam_x_mu_t.a,
+                                       pc.prev_cam_x_mu_sx.a, pc.prev_cam_w_mu_sy.a,
+                                       pc.prev_cam_u_mu_sz.a));
+    }
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_bool("use light cache", volume_use_light_cache);
@@ -1784,7 +1805,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
         old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
-        old_mu_t != mu_t || old_mu_s != mu_s ||
         old_volume_use_light_cache != volume_use_light_cache ||
         old_volume_particle_size_um != volume_particle_size_um) {
         needs_rebuild = true;

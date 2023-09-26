@@ -65,13 +65,13 @@ class QuakeNode : public merian::Node {
     };
 
     struct PushConstant {
-        glm::vec4 cam_x; // pos
-        glm::vec4 cam_w; // forward
-        glm::vec4 cam_u; // up
+        glm::vec4 cam_x_mu_t;   // pos, and fog mu_t
+        glm::vec4 cam_w;        // forward
+        glm::vec4 cam_u;        // up
 
-        glm::vec4 prev_cam_x;
-        glm::vec4 prev_cam_w;
-        glm::vec4 prev_cam_u;
+        glm::vec4 prev_cam_x_mu_sx;
+        glm::vec4 prev_cam_w_mu_sy;
+        glm::vec4 prev_cam_u_mu_sz;
 
         // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
         std::array<uint16_t, 6> sky;
@@ -338,8 +338,9 @@ class QuakeNode : public merian::Node {
     int32_t max_path_length = 3;
     int32_t use_light_cache_tail = 0;
     int32_t adaptive_sampling = 0;
+    bool mu_t_s_overwrite = false;
     float mu_t = 0.;
-    float mu_s = 0.;
+    glm::vec3 mu_s_div_mu_t = glm::vec3(1);
     int32_t volume_use_light_cache = 0;
     float volume_particle_size_um = 25.0;
 

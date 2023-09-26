@@ -19,19 +19,17 @@ layout (constant_id = 10) const float SUN_COLOR_G = 0;
 layout (constant_id = 11) const float SUN_COLOR_B = 0;
 layout (constant_id = 12) const int ADAPTIVE_SAMPLING = 0;
 layout (constant_id = 13) const int VOLUME_SPP = 0;
-layout (constant_id = 14) const float MU_T = 0.;
-layout (constant_id = 15) const float MU_S = 0.;
-layout (constant_id = 16) const int VOLUME_USE_LIGHT_CACHE = 0;
-layout (constant_id = 17) const float DRAINE_G = 0.65;
-layout (constant_id = 18) const float DRAINE_A = 32.0;
+layout (constant_id = 14) const int VOLUME_USE_LIGHT_CACHE = 0;
+layout (constant_id = 15) const float DRAINE_G = 0.65;
+layout (constant_id = 16) const float DRAINE_A = 32.0;
 
 layout(push_constant) uniform PushConstant { 
-    vec4 cam_x;
+    vec4 cam_x; // contains mu_t in alpha
     vec4 cam_w;
     vec4 cam_u;
-    vec4 prev_cam_x;
-    vec4 prev_cam_w;
-    vec4 prev_cam_u;
+    vec4 prev_cam_x; // contains mu_s.r in alpha
+    vec4 prev_cam_w; // contains mu_s.g in alpha
+    vec4 prev_cam_u; // contains mu_s.b in alpha
 
     uint sky_rt_bk, sky_lf_ft, sky_up_dn;
 
@@ -45,6 +43,8 @@ layout(push_constant) uniform PushConstant {
 #define bsdf_p() (((params.rt_config >> 16) & 0xff) / 255.)
 #define ml_prior() (((params.rt_config >> 24) & 0xff) / 255.)
 #define distance_guide_p() (((params.rt_config >> 8) & 0xff) / 255.)
+#define MU_T params.cam_x.a
+#define MU_S vec3(params.prev_cam_x.a, params.prev_cam_w.a, params.prev_cam_u.a)
 
 // GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
