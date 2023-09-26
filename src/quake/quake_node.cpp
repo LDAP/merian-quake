@@ -363,17 +363,18 @@ void add_geo_alias(entity_t* ent,
     if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
 
-
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x, &mat_prev_model[2].x);
+    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
+                 &mat_prev_model[2].x);
     mat_prev_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
     mat_prev_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_prev_model = mat_prev_model * glm::translate(glm::identity<glm::mat4>(),
-                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
     mat_prev_model =
-        mat_prev_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
+        mat_prev_model *
+        glm::translate(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale_origin) * fovscale);
+    mat_prev_model = mat_prev_model * glm::scale(glm::identity<glm::mat4>(),
+                                                 *merian::as_vec3(hdr->scale) * fovscale);
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -493,7 +494,8 @@ void add_geo_brush(entity_t* ent,
     VectorCopy(ent->origin, &mat_model[3].x);
 
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x, &mat_prev_model[2].x);
+    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
+                 &mat_prev_model[2].x);
     mat_prev_model[1] *= -1;
     VectorCopy(ent->prev_lerp_origin, &mat_prev_model[3].x);
 
@@ -523,7 +525,8 @@ void add_geo_brush(entity_t* ent,
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
                 const glm::vec3 coord = mat_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
-                const glm::vec3 prev_coord = mat_prev_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
+                const glm::vec3 prev_coord =
+                    mat_prev_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
 
                 for (int l = 0; l < 3; l++) {
                     vtx.emplace_back(coord[l]);
