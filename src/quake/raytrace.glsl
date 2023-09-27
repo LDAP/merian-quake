@@ -26,7 +26,7 @@ struct Hit {
 
 f16vec3 ldr_to_hdr(f16vec3 color) {
     const float16_t sum = color.x + color.y + color.z;
-    return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.5hf * sum) - 1.0hf) : f16vec3(0);
+    return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.hf * sum) - 1.0hf) : f16vec3(0);
 }
 
 // adapted from gl_warp.c
