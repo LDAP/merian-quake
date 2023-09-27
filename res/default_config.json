@@ -1,0 +1,154 @@
+{
+    "accum": {
+        "alpha": 0.9010000228881836,
+        "depth threshold": 0.020587999373674393,
+        "extended search": true,
+        "filter mode": "nearest",
+        "firefly clamp": "inf",
+        "max history": "inf",
+        "normal threshold": 0.5235987901687622,
+        "reuse border": true,
+        "subgroup maxmin adaption": 0.3097110092639923
+    },
+    "add": null,
+    "beauty image write": {
+        "enable": false,
+        "filename": "fog_gif/image",
+        "format": "JPG",
+        "iteration": 473,
+        "iteration offset": 1,
+        "iteration power": 1,
+        "rebuild after capture": false,
+        "rebuild on record": false,
+        "run trigger": -1
+    },
+    "bloom": {
+        "brightness threshold": 10.0,
+        "mode": "bloom off",
+        "strengh": 0.0010000000474974513
+    },
+    "blue_noise": null,
+    "connections": null,
+    "denoiser": {
+        "SVGF iterations": 5,
+        "TAA alpha": 0.7009999752044678,
+        "clamping": "min-max",
+        "debug": "none",
+        "depth accept": 40.0,
+        "filter": "none",
+        "filter depth": 40.0,
+        "filter luminance": 3.0,
+        "filter normals": 0.5235987901687622,
+        "filter type": "subsampled",
+        "filter variance": false,
+        "mv sampling": "center",
+        "normal reject": 0.5235987901687622,
+        "spatial bias": 8.0,
+        "spatial falloff": 3.0,
+        "z-bias depth": 0.0,
+        "z-bias normals": 3000.0
+    },
+    "exposure": {
+        "ISO": 50.0,
+        "K": 8.0,
+        "aperature": 1.1200000047683716,
+        "autoexposure": true,
+        "max exposure": 101187.0,
+        "max log luminance": 10.0,
+        "metering": "center-weighted",
+        "min exposure": 1.0,
+        "min log luminance": -15.0,
+        "q": 0.6499999761581421,
+        "shutter time (ms)": 768.0,
+        "speed down": 5.099999904632568,
+        "speed up": 3.0999999046325684
+    },
+    "firefly filter": {
+        "IPR factor": 50.0,
+        "bias": 0.20000000298023224,
+        "enable": true,
+        "percentile lower": 0.25,
+        "percentile upper": 0.907480001449585
+    },
+    "hud": null,
+    "image writer": {
+        "enable": false,
+        "filename": "image",
+        "format": "HDR",
+        "iteration": 8192,
+        "iteration offset": 0,
+        "iteration power": 2,
+        "rebuild after capture": false,
+        "rebuild on record": false,
+        "run trigger": -1
+    },
+    "median variance": {
+        "max": 100.0,
+        "min": 0.0
+    },
+    "one": {
+        "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ]
+    },
+    "output": {
+        "mode": "windowed"
+    },
+    "quake": {
+        "BSDF Prob": 0.10196078568696976,
+        "ML Prior": 0.10588235408067703,
+        "adaptive sampling": false,
+        "dist guide p": 0.95686274766922,
+        "force timediff (ms)": -43.0,
+        "gamestate update": true,
+        "light cache tail": false,
+        "max path length": 3,
+        "overwrite mu_t/s": false,
+        "particle size": 25.0,
+        "player model": "gun only",
+        "reproducible renders": false,
+        "sound": true,
+        "spp": 2,
+        "startup commands": "# game ad\n#map e1m1\n# map ad_tears\n# map ad_azad\n#playdemo ref_tears_0\n#playdemo ref_azad_1\n# map e1m1",
+        "stop and rebuild after worldspawn": -40,
+        "use light cache": false,
+        "volume spp": 2
+    },
+    "tonemap": {
+        "max white": 4.949999809265137,
+        "tonemap": "Reinhard Extended"
+    },
+    "volume accum": {
+        "alpha": 0.7990000247955322,
+        "depth threshold": 0.29402101039886475,
+        "extended search": true,
+        "filter mode": "nearest",
+        "firefly clamp": "inf",
+        "max history": "inf",
+        "normal threshold": 3.1415927410125732,
+        "reuse border": false,
+        "subgroup maxmin adaption": 0.1138790026307106
+    },
+    "volume denoiser": {
+        "SVGF iterations": 5,
+        "TAA alpha": 0.8109999895095825,
+        "clamping": "min-max",
+        "debug": "none",
+        "depth accept": 10.0,
+        "filter": "none",
+        "filter depth": 3968.0,
+        "filter luminance": 2.0,
+        "filter normals": 3.1415927410125732,
+        "filter type": "subsampled",
+        "filter variance": false,
+        "mv sampling": "center",
+        "normal reject": 0.6435011029243469,
+        "spatial bias": 8.0,
+        "spatial falloff": 3.0,
+        "z-bias depth": 0.0,
+        "z-bias normals": 0.0
+    }
+}

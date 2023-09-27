@@ -37,6 +37,9 @@
 #include "quake/quake_node.hpp"
 #include <merian/vk/window/imgui_context.hpp>
 
+static const char* DEFAULT_CONFIG_NAME = "default_config.json";
+static const char* CONFIG_NAME = "merian-quake.json";
+
 extern "C" {
 
 // centerstring
@@ -262,7 +265,18 @@ int main(const int argc, const char** argv) {
     bool clear_profiler = false;
     merian::Stopwatch report_intervall;
     merian::Stopwatch frametime;
-    auto load = merian::JSONLoadConfiguration("config.json");
+
+    std::string config_path;
+    if (std::filesystem::exists(CONFIG_NAME)) {
+        config_path = CONFIG_NAME;
+        SPDLOG_INFO("loading config {}", CONFIG_NAME);
+    } else {
+        auto default_config = loader.find_file(DEFAULT_CONFIG_NAME);
+        assert(default_config.has_value());
+        config_path = default_config.value();
+        SPDLOG_DEBUG("loading default config {}", DEFAULT_CONFIG_NAME);
+    }
+    auto load = merian::JSONLoadConfiguration(config_path);
     graph.get_configuration(load);
 
     while (!glfwWindowShouldClose(*window)) {
@@ -321,6 +335,6 @@ int main(const int argc, const char** argv) {
         run.execute_callbacks(queue);
     }
 
-    auto dump = merian::JSONDumpConfiguration("config.json");
+    auto dump = merian::JSONDumpConfiguration(CONFIG_NAME);
     graph.get_configuration(dump);
 }
