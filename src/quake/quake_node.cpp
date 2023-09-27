@@ -364,9 +364,9 @@ void add_geo_alias(entity_t* ent,
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
 
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
+    AngleVectors(ent->mv_prev_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
-    mat_prev_model[3] = glm::vec4(*merian::as_vec3(ent->prev_lerp_origin), 1);
+    mat_prev_model[3] = glm::vec4(*merian::as_vec3(ent->mv_prev_origin), 1);
     mat_prev_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
@@ -413,14 +413,14 @@ void add_geo_alias(entity_t* ent,
             vtx.emplace_back(world_pos[k]);
 
         const glm::vec3 old_world_pos =
-            mat_prev_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->prev_lerp_blend), 1.0);
+            mat_prev_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->mv_prev_blend), 1.0);
         for (int k = 0; k < 3; k++)
             prev_vtx.emplace_back(old_world_pos[k]);
     }
 
-    ent->prev_lerp_blend = lerpdata.blend;
-    VectorCopy(lerpdata.angles, ent->prev_lerp_angles);
-    VectorCopy(lerpdata.origin, ent->prev_lerp_origin);
+    ent->mv_prev_blend = lerpdata.blend;
+    VectorCopy(lerpdata.angles, ent->mv_prev_angles);
+    VectorCopy(lerpdata.origin, ent->mv_prev_origin);
 
     for (int i = 0; i < hdr->numindexes; i++)
         idx.emplace_back(vtx_cnt + indexes[i]);
@@ -494,13 +494,13 @@ void add_geo_brush(entity_t* ent,
     VectorCopy(ent->origin, &mat_model[3].x);
 
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->prev_lerp_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
+    AngleVectors(ent->mv_prev_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
     mat_prev_model[1] *= -1;
-    VectorCopy(ent->prev_lerp_origin, &mat_prev_model[3].x);
+    VectorCopy(ent->mv_prev_origin, &mat_prev_model[3].x);
 
-    VectorCopy(ent->origin, ent->prev_lerp_origin);
-    VectorCopy(ent->angles, ent->prev_lerp_angles);
+    VectorCopy(ent->origin, ent->mv_prev_origin);
+    VectorCopy(ent->angles, ent->mv_prev_angles);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
