@@ -273,7 +273,7 @@ int main(const int argc, const char** argv) {
     } else {
         auto default_config = loader.find_file(DEFAULT_CONFIG_NAME);
         assert(default_config.has_value());
-        config_path = default_config.value();
+        config_path = default_config.value().string();
         SPDLOG_DEBUG("loading default config {}", DEFAULT_CONFIG_NAME);
     }
     auto load = merian::JSONLoadConfiguration(config_path);
