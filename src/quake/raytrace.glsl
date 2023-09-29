@@ -178,10 +178,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         const f16vec4 albedo_texture = f16vec4(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st));
 
         // MATERIAL
-        if (flags == MAT_FLAGS_WATER) {
-            hit.albedo = albedo_texture.rgb;
-            hit.roughness = 0.001hf;
-        } else if (flags == MAT_FLAGS_WATERFALL) {
+        if (flags == MAT_FLAGS_WATERFALL) {
             contribution += throughput * albedo_texture.rgb;
             hit.albedo = albedo_texture.rgb;
         } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
