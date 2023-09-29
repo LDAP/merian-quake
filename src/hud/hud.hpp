@@ -14,6 +14,7 @@ class QuakeHud : public ComputeNode {
         glm::vec4 blend;
         float armor;
         float health;
+        int32_t effect;
     };
 
   public:

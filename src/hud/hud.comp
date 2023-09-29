@@ -1,15 +1,25 @@
 #version 460
-#extension GL_GOOGLE_include_directive              : enable
+#extension GL_GOOGLE_include_directive  : enable
+#extension GL_EXT_scalar_block_layout   : require
+
+#include "common/gbuffer.glsl.h"
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D img_in;
-layout(set = 0, binding = 1) uniform writeonly image2D img_out;
+
+layout(set = 0, binding = 1, scalar) buffer buf_gbuf {
+    GBuffer gbuffer[];
+};
+
+layout(set = 0, binding = 2) uniform writeonly image2D img_out;
+
 
 layout(push_constant) uniform PushConstant { 
     vec4 blend;
     float armor;
     float health;
+    int effect;
 } pc;
 
 void main() {
@@ -43,6 +53,20 @@ void main() {
     }
 
     color = mix(color, pc.blend.rgb, pc.blend.a);
+
+    if (pc.effect > 0) {
+        const float z = gbuffer[gbuffer_index(pixel, imageSize(img_out))].linear_z;
+        const float mu_t = 0.001;
+        const float T = exp(-min(z, 1000.0) * mu_t);
+        vec3 mixcolor;
+        switch (pc.effect) {
+            case 1: mixcolor = vec3(0.1, 0.1, 0.15); break;
+            case 2: mixcolor = vec3(0.23, 0.2, 0.15); break;
+            case 3: mixcolor = vec3(0.1, 0.4, 0.2); break;
+        }
+
+        color = mix(mixcolor, color, T);
+    }
 
     imageStore(img_out, pixel, vec4(color, 1));
 }
