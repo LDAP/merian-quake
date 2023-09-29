@@ -8,7 +8,6 @@
 #include "merian-nodes/bloom/bloom.hpp"
 #include "merian-nodes/color_output/color_output.hpp"
 #include "merian-nodes/exposure/exposure.hpp"
-#include "merian-nodes/firefly/firefly_filter.hpp"
 #include "merian-nodes/image/image.hpp"
 #include "merian-nodes/image_write/image_write.hpp"
 #include "merian-nodes/median_approx/median.hpp"
@@ -164,7 +163,6 @@ int main(const int argc, const char** argv) {
     auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
     auto add = std::make_shared<merian::AddNode>(context, alloc);
     auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
-    auto firefly_filter = std::make_shared<merian::FireflyFilterNode>(context, alloc);
 
     image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
 
@@ -184,19 +182,17 @@ int main(const int argc, const char** argv) {
     graph.add_node("volume accum", volume_accum);
     graph.add_node("add", add);
     graph.add_node("beauty image write", beauty_image_write);
-    graph.add_node("firefly filter", firefly_filter);
 
     graph.connect_image(blue_noise, quake, 0, 0);
 
     // Solid
-    graph.connect_image(quake, firefly_filter, 0, 0); // irr
-    graph.connect_image(quake, firefly_filter, 4, 1); // moments
+    graph.connect_image(quake, accum, 0, 2); // irr
+    graph.connect_image(quake, accum, 4, 4); // moments
 
     graph.connect_image(accum, accum, 0, 0); // feedback
     graph.connect_image(accum, accum, 1, 1);
-    graph.connect_image(firefly_filter, accum, 0, 2); // irr
+
     graph.connect_image(quake, accum, 2, 3);          // mv
-    graph.connect_image(firefly_filter, accum, 1, 4); // moments
     graph.connect_buffer(quake, accum, 2, 0);         // gbuffer
     graph.connect_buffer(quake, accum, 2, 1);
 
