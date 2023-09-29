@@ -1278,8 +1278,6 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         }
 
         Host_Frame(timediff);
-        // init some left/right vectors also used for sound
-        R_SetupView();
         old_time = newtime;
     }
 
