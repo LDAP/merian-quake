@@ -1103,6 +1103,8 @@ void QuakeNode::parse_worldspawn() {
         sun_col = glm::vec3(1.1, 1.0, 0.9);
         sun_col *= 6.0;
     }
+
+    sun_dir = glm::normalize(sun_dir);
 }
 
 std::tuple<std::vector<merian::NodeInputDescriptorImage>,
