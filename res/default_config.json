@@ -65,7 +65,7 @@
         "max log luminance": 10.0,
         "metering": "center-weighted",
         "min exposure": 1.0,
-        "min log luminance": -15.0,
+        "min log luminance": -16.0,
         "q": 0.6499999761581421,
         "shutter time (ms)": 768.0,
         "speed down": 5.099999904632568,
