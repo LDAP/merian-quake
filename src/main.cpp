@@ -39,6 +39,9 @@
 static const char* DEFAULT_CONFIG_NAME = "default_config.json";
 static const char* CONFIG_NAME = "merian-quake.json";
 
+ImFont* quake_font_sm;
+ImFont* quake_font_lg;
+
 extern "C" {
 
 // centerstring
@@ -66,6 +69,7 @@ static void QuakeMessageOverlay() {
     const ImVec2 window_pos(center.x, (center.y + 0) / 2);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 
+    ImGui::PushFont(quake_font_sm);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     if (ImGui::Begin("CenterString", NULL, window_flags)) {
@@ -109,6 +113,20 @@ static void QuakeMessageOverlay() {
         ImGui::Text("%s", s.c_str());
     }
     ImGui::End();
+    ImGui::PopFont();
+
+    ImGui::PushFont(quake_font_lg);
+    if (cl.intermission == 1 && key_dest == key_game) {
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
+        if (ImGui::Begin("Intermission", NULL, window_flags)) {
+            ImGui::Text("Time: %d:%02d", cl.completed_time / 60, cl.completed_time % 60);
+            ImGui::Text("Secrets: %d/%2d", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
+            ImGui::Text("Monsters: %d/%2d", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+        }
+        ImGui::End();
+    }
+    ImGui::PopFont();
 
     ImGui::PopStyleVar(1);
 }
@@ -192,8 +210,8 @@ int main(const int argc, const char** argv) {
     graph.connect_image(accum, accum, 0, 0); // feedback
     graph.connect_image(accum, accum, 1, 1);
 
-    graph.connect_image(quake, accum, 2, 3);          // mv
-    graph.connect_buffer(quake, accum, 2, 0);         // gbuffer
+    graph.connect_image(quake, accum, 2, 3);  // mv
+    graph.connect_buffer(quake, accum, 2, 0); // gbuffer
     graph.connect_buffer(quake, accum, 2, 1);
 
     graph.connect_buffer(quake, quake, 2, 1); // gbuf
@@ -254,8 +272,10 @@ int main(const int argc, const char** argv) {
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
-    ImFont* quake_font =
+    quake_font_sm =
         io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 26);
+    quake_font_lg =
+        io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 46);
 
     merian::Profiler::Report report;
     bool clear_profiler = false;
@@ -312,12 +332,9 @@ int main(const int argc, const char** argv) {
 
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
-
             ImGui::End();
 
-            ImGui::PushFont(quake_font);
             QuakeMessageOverlay();
-            ImGui::PopFont();
 
             imgui.render(cmd);
             controller->set_active(
