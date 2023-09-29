@@ -4,6 +4,11 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "quake/quake_node.hpp"
 
+extern "C" {
+// from gl_rmain.c
+extern mleaf_t* r_viewleaf;
+}
+
 namespace merian {
 
 QuakeHud::QuakeHud(const SharedContext context, const ResourceAllocatorHandle allocator)
@@ -24,7 +29,9 @@ QuakeHud::describe_inputs() {
         {
             NodeInputDescriptorImage::compute_read("src"),
         },
-        {},
+        {
+            NodeInputDescriptorBuffer::compute_read("gbuf"),
+        },
     };
 }
 
@@ -34,7 +41,8 @@ QuakeHud::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connect
     extent = connected_image_outputs[0].create_info.extent;
     return {
         {
-            NodeOutputDescriptorImage::compute_write("output", vk::Format::eR16G16B16A16Sfloat, extent),
+            NodeOutputDescriptorImage::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
+                                                     extent),
         },
         {},
     };
@@ -52,9 +60,21 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] GraphRun& run) {
         pc.health = sv_player->v.health;
         pc.armor = sv_player->v.armorvalue;
         pc.blend = *merian::as_vec4(v_blend);
+        
+        pc.effect = 0;
+        if (r_viewleaf) {
+            if (r_viewleaf->contents == CONTENTS_WATER) {
+                pc.effect = 1;
+            } else if (r_viewleaf->contents == CONTENTS_LAVA) {
+                pc.effect = 2;
+            } else if (r_viewleaf->contents == CONTENTS_SLIME) {
+                pc.effect = 3;
+            }
+        }
     } else {
         pc.health = 0;
         pc.armor = 0;
+        pc.effect = 0;
     }
 
     return &pc;

@@ -258,6 +258,7 @@ int main(const int argc, const char** argv) {
     graph.connect_image(add, bloom, 0, 0);
     graph.connect_image(bloom, exposure, 0, 0);
     graph.connect_image(exposure, tonemap, 0, 0);
+    graph.connect_buffer(quake, hud, 2, 0);
     graph.connect_image(tonemap, hud, 0, 0);
     graph.connect_image(hud, output, 0, 0);
 
