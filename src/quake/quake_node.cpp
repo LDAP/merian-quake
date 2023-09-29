@@ -1397,10 +1397,9 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
-    auto bar =
-        vk::MemoryBarrier{vk::AccessFlagBits::eMemoryWrite, vk::AccessFlagBits::eMemoryWrite};
+    auto bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite, vk::AccessFlagBits::eMemoryRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, bar, {}, {});
+                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {bar}, {});
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume");
         volume_pipe->bind(cmd);
