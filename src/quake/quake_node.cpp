@@ -189,7 +189,8 @@ void add_particles(std::vector<float>& vtx,
                    std::vector<QuakeNode::VertexExtraData>& ext,
                    const uint32_t texnum_blood,
                    const uint32_t texnum_explosion,
-                   const bool no_random) {
+                   const bool no_random,
+                   const double prev_cl_time) {
 
     static const glm::vec3 voff[4] = {
         {0.0, 1.0, 0.0},
@@ -243,38 +244,56 @@ void add_particles(std::vector<float>& vtx,
         }
 
         glm::vec3 vert[4];
+        glm::vec3 prev_vert[4];
         for (int l = 0; l < 3; l++) {
             const float particle_offset = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
+            const double rand_angle = xrand.get();
+            const glm::vec3 rand_v =
+                glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get()));
+
             const glm::mat4 rotation = glm::rotate<float>(
                 glm::identity<glm::mat4>(),
-                (xrand.get() + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
-                glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get())));
+                (rand_angle + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
+                rand_v);
+            const glm::mat4 prev_rotation = glm::rotate<float>(
+                glm::identity<glm::mat4>(),
+                (rand_angle + prev_cl_time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 *
+                    M_PI,
+                rand_v);
             for (int k = 0; k < 4; k++) {
                 const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
-                vert[k] =
-                    *merian::as_vec3(p->org) + particle_offset +
+                const float rand_offset_scale = (float)xrand.get();
+
+                vert[k] = *merian::as_vec3(p->org) + particle_offset +
+                          glm::vec3(rotation * glm::vec4(scale * voff[k] * (1 + rand_offset_scale) +
+                                                             vertex_offset,
+                                                         1));
+                prev_vert[k] =
+                    *merian::as_vec3(p->prev_org) + particle_offset +
                     glm::vec3(
-                        rotation *
-                        glm::vec4(scale * voff[k] * (1 + (float)xrand.get()) + vertex_offset, 1));
+                        prev_rotation *
+                        glm::vec4(scale * voff[k] * (1 + rand_offset_scale) + vertex_offset, 1));
             }
         }
+
+        VectorCopy(p->org, p->prev_org);
 
         const uint32_t vtx_cnt = vtx.size() / 3;
         for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[0][l]);
-            prev_vtx.emplace_back(vert[0][l]);
+            prev_vtx.emplace_back(prev_vert[0][l]);
         }
         for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[1][l]);
-            prev_vtx.emplace_back(vert[1][l]);
+            prev_vtx.emplace_back(prev_vert[1][l]);
         }
         for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[2][l]);
-            prev_vtx.emplace_back(vert[2][l]);
+            prev_vtx.emplace_back(prev_vert[2][l]);
         }
         for (int l = 0; l < 3; l++) {
             vtx.emplace_back(vert[3][l]);
-            prev_vtx.emplace_back(vert[3][l]);
+            prev_vtx.emplace_back(prev_vert[3][l]);
         }
 
         const uint32_t idx_size = idx.size();
@@ -1311,7 +1330,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     cmd.fillBuffer(*buffer_outputs[0][2], 0, VK_WHOLE_SIZE, 0);
     cmd.fillBuffer(*buffer_outputs[0][3], 0, VK_WHOLE_SIZE, 0);
 
-    old_cl_time = cl.time;
+    prev_cl_time = cl.time;
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -1459,7 +1478,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
-    auto bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite, vk::AccessFlagBits::eMemoryRead);
+    auto bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
+                                                 vk::AccessFlagBits::eMemoryRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, {bar}, {});
     {
@@ -1499,7 +1519,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         dump_mc = false;
     }
 
-    old_cl_time = cl.time;
+    prev_cl_time = cl.time;
     frame++;
 }
 
@@ -1638,7 +1658,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
                     dynamic_ext);
         }
         add_particles(dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext, texnum_blood,
-                      texnum_explosion, reproducible_renders);
+                      texnum_explosion, reproducible_renders, prev_cl_time);
     });
 
     const uint32_t concurrency = std::thread::hardware_concurrency();
