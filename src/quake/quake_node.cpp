@@ -269,14 +269,14 @@ void add_particles(std::vector<float>& vtx,
                                                              vertex_offset,
                                                          1));
                 prev_vert[k] =
-                    *merian::as_vec3(p->prev_org) + particle_offset +
+                    *merian::as_vec3(p->mv_prev_origin) + particle_offset +
                     glm::vec3(
                         prev_rotation *
                         glm::vec4(scale * voff[k] * (1 + rand_offset_scale) + vertex_offset, 1));
             }
         }
 
-        VectorCopy(p->org, p->prev_org);
+        VectorCopy(p->org, p->mv_prev_origin);
 
         const uint32_t vtx_cnt = vtx.size() / 3;
         for (int l = 0; l < 3; l++) {
@@ -607,6 +607,7 @@ void add_geo_brush(entity_t* ent,
 void add_geo_sprite(entity_t* ent,
                     qmodel_t* m,
                     std::vector<float>& vtx,
+                    std::vector<float>& prev_vtx,
                     std::vector<uint32_t>& idx,
                     std::vector<QuakeNode::VertexExtraData>& ext) {
     assert(m->type == mod_sprite);
@@ -695,26 +696,26 @@ void add_geo_sprite(entity_t* ent,
         // clang-format off
         switch (k) {
         case 0: {
-            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * s_up + frame->left * s_right);
-            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * s_up + frame->left * s_right);
-            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * s_up + frame->right * s_right);
-            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * s_up + frame->right * s_right);
+            v0 = scale * (frame->down * s_up + frame->left * s_right);
+            v1 = scale * (frame->up * s_up + frame->left * s_right);
+            v2 = scale * (frame->up * s_up + frame->right * s_right);
+            v3 = scale * (frame->down * s_up + frame->right * s_right);
             break;
         }
         case 1: {
             glm::vec3 front = glm::cross(s_up, s_right);
-            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->left * s_right);
-            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->left * s_right);
-            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->right * s_right);
-            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->right * s_right);
+            v0 = scale * (frame->down * front + frame->left * s_right);
+            v1 = scale * (frame->up * front + frame->left * s_right);
+            v2 = scale * (frame->up * front + frame->right * s_right);
+            v3 = scale * (frame->down * front + frame->right * s_right);
             break;
         }
         case 2: {
             glm::vec3 front = glm::cross(s_up, s_right);
-            v0 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->left * front);
-            v1 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->left * front);
-            v2 = *merian::as_vec3(ent->origin) + scale * (frame->up * front + frame->right * front);
-            v3 = *merian::as_vec3(ent->origin) + scale * (frame->down * front + frame->right * front);
+            v0 = scale * (frame->down * front + frame->left * front);
+            v1 = scale * (frame->up * front + frame->left * front);
+            v2 = scale * (frame->up * front + frame->right * front);
+            v3 = scale * (frame->down * front + frame->right * front);
             break;
         }
 
@@ -725,14 +726,22 @@ void add_geo_sprite(entity_t* ent,
 
         // add vertices - triangle fan
         uint32_t vtx_cnt = vtx.size() / 3;
-        for (int l = 0; l < 3; l++)
-            vtx.emplace_back(v0[l]);
-        for (int l = 0; l < 3; l++)
-            vtx.emplace_back(v1[l]);
-        for (int l = 0; l < 3; l++)
-            vtx.emplace_back(v2[l]);
-        for (int l = 0; l < 3; l++)
-            vtx.emplace_back(v3[l]);
+        for (int l = 0; l < 3; l++) {
+            vtx.emplace_back(v0[l] + ent->origin[l]);
+            prev_vtx.emplace_back(v0[l] + ent->mv_prev_origin[l]);
+        }
+        for (int l = 0; l < 3; l++) {
+            vtx.emplace_back(v1[l] + ent->origin[l]);
+            prev_vtx.emplace_back(v1[l] + ent->mv_prev_origin[l]);
+        }
+        for (int l = 0; l < 3; l++) {
+            vtx.emplace_back(v2[l] + ent->origin[l]);
+            prev_vtx.emplace_back(v2[l] + ent->mv_prev_origin[l]);
+        }
+        for (int l = 0; l < 3; l++) {
+            vtx.emplace_back(v3[l] + ent->origin[l]);
+            prev_vtx.emplace_back(v3[l] + ent->mv_prev_origin[l]);
+        }
 
         // add index - tiangle fan
         idx.emplace_back(vtx_cnt + 0);
@@ -744,11 +753,11 @@ void add_geo_sprite(entity_t* ent,
         idx.emplace_back(vtx_cnt + 3);
 
         // add extra data
-        glm::vec3 e0(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
-        glm::vec3 e1(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
-        uint32_t n_enc = merian::encode_normal(glm::normalize(glm::cross(e0, e1)));
+        const glm::vec3 e0(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
+        const glm::vec3 e1(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
+        const uint32_t n_enc = merian::encode_normal(glm::normalize(glm::cross(e0, e1)));
 
-        uint16_t texnum = make_texnum_alpha(frame->gltexture);
+        const uint16_t texnum = make_texnum_alpha(frame->gltexture);
 
         // clang-format off
         ext.emplace_back(texnum,
@@ -766,6 +775,8 @@ void add_geo_sprite(entity_t* ent,
         // clang-format on
 
     } // end three axes
+
+    VectorCopy(ent->origin, ent->mv_prev_origin);
 }
 
 // Adds the geo from entity into the vectors.
@@ -786,8 +797,7 @@ void add_geo(entity_t* ent,
         add_geo_brush(ent, m, vtx, prev_vtx, idx, ext);
     } else if (m->type == mod_sprite) {
         // explosions, decals, etc, this is R_DrawSpriteModel
-        add_geo_sprite(ent, m, vtx, idx, ext);
-        prev_vtx = vtx;
+        add_geo_sprite(ent, m, vtx, prev_vtx, idx, ext);
     }
 
     assert(ext.size() == idx.size() / 3);
