@@ -513,7 +513,8 @@ void add_geo_brush(entity_t* ent,
     VectorCopy(ent->origin, &mat_model[3].x);
 
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    AngleVectors(ent->mv_prev_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
+    std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1], ent->mv_prev_angles[2]};
+    AngleVectors(prev_angles.data(), &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
     mat_prev_model[1] *= -1;
     VectorCopy(ent->mv_prev_origin, &mat_prev_model[3].x);
