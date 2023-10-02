@@ -10,6 +10,9 @@ struct MCState {
     uint N;
     float sum_len;
 
+    vec3 mv;
+    uint frame;
+
     uint hash; // grid_idx and level
 };
 

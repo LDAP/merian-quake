@@ -16,7 +16,7 @@
 // GENERAL
 
 MCState mc_state_new(const vec3 pos, const vec3 normal) {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, 0};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0, 0};
     return r;
 }
 
@@ -41,13 +41,16 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
                          const float w,          // goodness
-                         const vec3 target) {    // ray hit point
+                         const vec3 target, const vec3 target_mv) {    // ray hit point
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
 
     mc_state.sum_w   = mix(mc_state.sum_w,   w,          alpha);
     mc_state.sum_tgt = mix(mc_state.sum_tgt, w * target, alpha);
     mc_state.sum_len = mix(mc_state.sum_len, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha);
+
+    mc_state.mv = target_mv;
+    mc_state.frame = params.frame;
 }
 
 #define mc_state_valid(mc_state) (mc_state.sum_w > 0.0)
@@ -78,6 +81,7 @@ void mc_adaptive_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
 
     mc_state = mc_states[buf_idx];
     mc_state.sum_w *= float(hash2_grid_level(grid_idx, level) == mc_state.hash);
+    mc_state.sum_tgt += mc_state.sum_w * (params.frame - mc_state.frame) * mc_state.mv;
 }
 
 void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
@@ -101,6 +105,7 @@ void mc_static_load(out MCState mc_state, const vec3 pos) {
     
     mc_state = mc_states[buf_idx];
     mc_state.sum_w *= float(hash2_grid(grid_idx) == mc_state.hash);
+    mc_state.sum_tgt += mc_state.sum_w * (params.frame - mc_state.frame) * mc_state.mv;
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos, const vec3 normal) {

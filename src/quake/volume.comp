@@ -178,7 +178,7 @@ void main() {
 
             // UPDATE MC FOR OUTGOING DIRECTIONS
             const float mc_f = yuv_luminance(incident / wo_p);
-            mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos);
+            mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
             if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
                 mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                 mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
