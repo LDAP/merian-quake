@@ -2,6 +2,7 @@
 
 struct Hit {
     vec3 pos;
+    vec3 prev_pos;
     vec3 wi;
     vec3 normal;
     uint enc_geonormal;
@@ -94,7 +95,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             contribution = throughput * sky;
             hit.albedo = sky;
 
-            hit.pos = hit.pos + hit.wi * T_MAX;
+            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
             hit.enc_geonormal = geo_encode_normal(-hit.wi);
             hit.normal = -hit.wi;
             break;
@@ -109,7 +110,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             contribution += throughput * sky;
             hit.albedo = sky;
 
-            hit.pos = hit.pos + hit.wi * T_MAX;
+            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
             hit.enc_geonormal = geo_encode_normal(-hit.wi);
             hit.normal = -hit.wi;
             break;
@@ -134,6 +135,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             dv = verts[1] - verts[0];
             hit.normal = normalize(cross(du, dv));
             hit.enc_geonormal = geo_encode_normal(hit.normal);
+
+            const mat3 prev_verts = mat3(buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.x],
+                                         buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.y],
+                                         buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.z]);
+            hit.prev_pos = prev_verts * barycentrics(ray_query);
         }
 
         if (extra_data.n1_brush == 0xffffffff) {

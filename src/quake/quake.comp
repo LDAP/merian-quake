@@ -52,7 +52,8 @@ void main() {
         const float l = yuv_luminance(irr);
         moments = vec2(l, l * l);
 
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), dot(params.cam_x.xyz - params.prev_cam_x.xyz, first_hit.wi)};
+        const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
+        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
 
         // Calculate depth gradient
         const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
@@ -62,7 +63,7 @@ void main() {
         gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
 
         // Store motion vector
-        const vec3 old_dir = first_hit.pos - params.prev_cam_x.xyz;
+        const vec3 old_dir = first_hit.prev_pos - params.prev_cam_x.xyz;
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
         
         if (all(lessThan(pixel, resolution))) {
@@ -99,9 +100,9 @@ void main() {
                         for (int i = 0; i < MC_SAMPLES; i++) {
                             MCState state;
                             if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
-                                mc_adaptive_load(state, current_hit.pos, current_hit.normal);
+                                mc_adaptive_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
                             } else {
-                                mc_static_load(state, current_hit.pos, current_hit.normal);
+                                mc_static_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
                             }
 
                             scores[i] = state.sum_w;

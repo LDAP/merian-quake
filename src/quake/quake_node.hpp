@@ -23,7 +23,6 @@ extern "C" {
 
 class QuakeNode : public merian::Node {
   public:
-
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
             : width(glt->width), height(glt->height), flags(glt->flags) {
@@ -112,6 +111,7 @@ class QuakeNode : public merian::Node {
 
     struct RTGeometry {
         merian::BufferHandle vtx_buffer{nullptr};
+        merian::BufferHandle prev_vtx_buffer{nullptr};
         merian::BufferHandle idx_buffer{nullptr};
         merian::BufferHandle ext_buffer{nullptr};
         merian::AccelerationStructureHandle blas{nullptr};
@@ -193,6 +193,7 @@ class QuakeNode : public merian::Node {
     // If force_rebuild is false and an update is possible an update is queued instead if a rebuild.
     QuakeNode::RTGeometry get_rt_geometry(const vk::CommandBuffer& cmd,
                                           const std::vector<float>& vtx,
+                                          const std::vector<float>& prev_vtx,
                                           const std::vector<uint32_t>& idx,
                                           const std::vector<QuakeNode::VertexExtraData>& ext,
                                           const std::unique_ptr<merian::BLASBuilder>& blas_builder,
@@ -277,6 +278,7 @@ class QuakeNode : public merian::Node {
     // Access using frame % frames.size()
     std::vector<FrameData> frames;
     uint64_t frame = 0;
+    double prev_cl_time = 0;
 
     std::array<char, 512> startup_commands_buffer = {0};
 
@@ -295,10 +297,12 @@ class QuakeNode : public merian::Node {
 
     // Keep to avoid reallocation
     std::vector<float> dynamic_vtx;
+    std::vector<float> dynamic_prev_vtx;
     std::vector<uint32_t> dynamic_idx;
     std::vector<QuakeNode::VertexExtraData> dynamic_ext;
 
     std::vector<float> static_vtx;
+    std::vector<float> static_prev_vtx;
     std::vector<uint32_t> static_idx;
     std::vector<QuakeNode::VertexExtraData> static_ext;
 
