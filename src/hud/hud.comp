@@ -56,15 +56,17 @@ void main() {
 
     if (pc.effect > 0) {
         const float z = gbuffer[gbuffer_index(pixel, imageSize(img_out))].linear_z;
-        const float mu_t = 0.001;
-        const float T = exp(-min(z, 1000.0) * mu_t);
+        float mu_t;
         vec3 mixcolor;
+
         switch (pc.effect) {
-            case 1: mixcolor = vec3(0.1, 0.1, 0.15); break;
-            case 2: mixcolor = vec3(0.23, 0.2, 0.15); break;
-            case 3: mixcolor = vec3(0.1, 0.4, 0.2); break;
+            // from view.c cshift_*
+            case 1: {mixcolor = vec3(130, 80, 50) / 255.;  mu_t = 0.001; break;}
+            case 2: {mixcolor = vec3(255,80,0) / 255.;     mu_t = 0.02; break;}
+            case 3: {mixcolor = vec3(0,25,5) / 255.;       mu_t = 0.02; break;}
         }
 
+        const float T = exp(-min(z, 1000.0) * mu_t);
         color = mix(mixcolor, color, T);
     }
 
