@@ -68,6 +68,7 @@ void main() {
         
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
+            imageStore(img_volume_mv, pixel, vec4(old_pixel - pixel, 0, 0));
             imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
             gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
         }

@@ -2,7 +2,8 @@ shaders = [
     'quake.comp',
     'clear.comp',
     'gbuf.comp',
-    'volume.comp'
+    'volume.comp',
+    'volume_forward_project.comp'
 ]
 included_files = files(
     'quake_water.glsl',

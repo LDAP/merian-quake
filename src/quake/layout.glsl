@@ -49,35 +49,38 @@ layout(push_constant) uniform PushConstant {
 // GRAPH image in
 layout(set = 0, binding = 0) uniform sampler2D img_blue;
 layout(set = 0, binding = 1) uniform sampler2D img_prev_filtered;
+layout(set = 0, binding = 2) uniform sampler2D img_prev_volume_depth;
 
 // GRAPH buffer in
-layout(set = 0, binding = 2, scalar) buffer buf_filtered_image {
+layout(set = 0, binding = 3, scalar) buffer buf_filtered_image {
     float mean_variance[];
 };
-layout(set = 0, binding = 3, scalar) buffer buf_prev_gbuf {
+layout(set = 0, binding = 4, scalar) buffer buf_prev_gbuf {
     GBuffer prev_gbuffer[];
 };
 
 // GRAPH image out
-layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
-layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
-layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
-layout(set = 0, binding = 9) uniform writeonly image2D img_volume;
-layout(set = 0, binding = 10) uniform writeonly image2D img_volume_moments;
+layout(set = 0, binding = 5) uniform writeonly image2D img_irradiance;
+layout(set = 0, binding = 6) uniform writeonly image2D img_albedo;
+layout(set = 0, binding = 7) uniform writeonly image2D img_mv;
+layout(set = 0, binding = 8) uniform writeonly image2D img_debug;
+layout(set = 0, binding = 9) uniform writeonly image2D img_moments;
+layout(set = 0, binding = 10) uniform writeonly image2D img_volume;
+layout(set = 0, binding = 11) uniform writeonly image2D img_volume_moments;
+layout(set = 0, binding = 12) uniform writeonly image2D img_volume_depth;
+layout(set = 0, binding = 13, rg16f) uniform image2D img_volume_mv;
 
 // GRAPH buffer out
-layout(set = 0, binding = 11, scalar) buffer buf_mc_states {
+layout(set = 0, binding = 14, scalar) buffer buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 12, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 15, scalar) buffer buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 13, scalar) buffer buf_gbuf {
+layout(set = 0, binding = 16, scalar) buffer buf_gbuf {
     GBuffer gbuffer[];
 };
-layout(set = 0, binding = 14, scalar) buffer buf_dist_mc_states {
+layout(set = 0, binding = 17, scalar) buffer buf_dist_mc_states {
     DistanceMCVertex distance_mc_states[];
 };
 

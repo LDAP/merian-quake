@@ -22,6 +22,7 @@
 #include "merian/vk/utils/math.hpp"
 #include "quake.comp.spv.h"
 #include "volume.comp.spv.h"
+#include "volume_forward_project.comp.spv.h"
 
 struct QuakeData {
     // The first quake node sets this
@@ -513,7 +514,8 @@ void add_geo_brush(entity_t* ent,
     VectorCopy(ent->origin, &mat_model[3].x);
 
     glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
-    std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1], ent->mv_prev_angles[2]};
+    std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1],
+                                        ent->mv_prev_angles[2]};
     AngleVectors(prev_angles.data(), &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
     mat_prev_model[1] *= -1;
@@ -908,6 +910,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                                                           merian_clear_comp_spv());
     volume_shader = std::make_shared<merian::ShaderModule>(context, merian_volume_comp_spv_size(),
                                                            merian_volume_comp_spv());
+    volume_forward_project_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_volume_forward_project_comp_spv_size(),
+        merian_volume_forward_project_comp_spv());
 
     quake_desc_set_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -1200,6 +1205,7 @@ QuakeNode::describe_inputs() {
         {
             merian::NodeInputDescriptorImage::compute_read("blue_noise", 0),
             merian::NodeInputDescriptorImage::compute_read("prev_filtered", 1),
+            merian::NodeInputDescriptorImage::compute_read("prev_volume_depth", 1),
         },
         {
             merian::NodeInputDescriptorBuffer::compute_read("mean_filtered", 1),
@@ -1229,6 +1235,10 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "volume", vk::Format::eR16G16B16A16Sfloat, width, height),
             merian::NodeOutputDescriptorImage::compute_write(
                 "volume_moments", vk::Format::eR32G32Sfloat, width, height),
+            merian::NodeOutputDescriptorImage::compute_write("volume_depth", vk::Format::eR32Sfloat,
+                                                             width, height),
+            merian::NodeOutputDescriptorImage::compute_write("volume_mv", vk::Format::eR16G16Sfloat,
+                                                             width, height),
         },
         {
             merian::NodeOutputDescriptorBuffer(
@@ -1300,6 +1310,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                                                spec_builder.build());
         volume_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, volume_shader,
                                                                 spec_builder.build());
+        volume_forward_project_pipe = std::make_shared<merian::ComputePipeline>(
+            pipe_layout, volume_forward_project_shader, spec_builder.build());
     }
 
     // DUMMY IMAGE as placeholder
@@ -1481,6 +1493,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
 
     // BIND PIPELINE
     {
+        // Surfaces and GBuffer
+
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
         pipe->bind(cmd);
         pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
@@ -1489,11 +1503,28 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         cmd.dispatch((width + local_size_x - 1) / local_size_x,
                      (height + local_size_y - 1) / local_size_y, 1);
     }
-    auto bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
-                                                 vk::AccessFlagBits::eMemoryRead);
+
+    if (volume_spp > 0) {
+        // Forward project motion vectors for volumes
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
+        volume_forward_project_pipe->bind(cmd);
+        volume_forward_project_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
+        volume_forward_project_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
+        volume_forward_project_pipe->push_constant(cmd, pc);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
+    }
+
+    auto volume_mv_bar =
+        image_outputs[8]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                  vk::AccessFlagBits::eShaderRead);
+    auto gbuf_bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
+                                                      vk::AccessFlagBits::eMemoryRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {bar}, {});
+                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, gbuf_bar, volume_mv_bar);
     {
+        // Volumes
+
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume");
         volume_pipe->bind(cmd);
         volume_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);

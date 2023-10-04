@@ -233,10 +233,11 @@ int main(const int argc, const char** argv) {
     // graph.connect_image(quake, output, 3, 0);
 
     // Volume
+    graph.connect_image(quake, quake, 7, 2); // volume depth
     graph.connect_image(volume_accum, volume_accum, 0, 0); // feedback
     graph.connect_image(volume_accum, volume_accum, 1, 1);
     graph.connect_image(quake, volume_accum, 5, 2);  // irr
-    graph.connect_image(quake, volume_accum, 2, 3);  // mv
+    graph.connect_image(quake, volume_accum, 8, 3);  // mv
     graph.connect_image(quake, volume_accum, 6, 4);  // moments
     graph.connect_buffer(quake, volume_accum, 2, 0); // gbuffer
     graph.connect_buffer(quake, volume_accum, 2, 1);
@@ -245,7 +246,7 @@ int main(const int argc, const char** argv) {
     graph.connect_image(volume_accum, volume_svgf, 0, 1); // irr
     graph.connect_image(volume_accum, volume_svgf, 1, 2); // moments
     graph.connect_image(one, volume_svgf, 0, 3);          // albedo
-    graph.connect_image(quake, volume_svgf, 2, 4);        // mv
+    graph.connect_image(quake, volume_svgf, 8, 4);        // mv
     graph.connect_buffer(quake, volume_svgf, 2, 0);       // gbuffer
     graph.connect_buffer(quake, volume_svgf, 2, 1);
 

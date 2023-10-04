@@ -47,6 +47,8 @@ void main() {
     moments = vec2(0);
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
+    const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+    const vec2 mv = imageLoad(img_volume_mv, pixel).rg;
 
     for (int s = 0; s < VOLUME_SPP; s++) {
         float f = 0.0;
@@ -65,9 +67,17 @@ void main() {
             [[unroll]]
             for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 DistanceMCState state;
-                distance_mc_load(state, pixel, grid_max_x);
+                if (s == 0) {
+                    // access using motion vector
+                    distance_mc_load(state, clamp(pixel + mv, vec2(0), imageSize(img_volume_mv) - 1), grid_max_x);
+                    // correct distance with camera velocity
+                    normal_dists[i] = distance_mc_state_get_normal_dist(state);
+                    normal_dists[i].x -= dot(params.cam_x.xyz - params.prev_cam_x.xyz, first_wi);
+                } else {
+                    distance_mc_load(state, pixel, grid_max_x);
+                    normal_dists[i] = distance_mc_state_get_normal_dist(state);
+                }
 
-                normal_dists[i] = distance_mc_state_get_normal_dist(state);
                 scores[i] = state.sum_w * float(normal_dists[i].x < gbuf.linear_z);
                 dist_score_sum += scores[i];
                 if (XorShift32(rng_state) < scores[i] / dist_score_sum) {
@@ -97,7 +107,7 @@ void main() {
 
         // must equal first hit in quake.comp (make sure random state is the same)
         Hit current_hit;
-        current_hit.wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        current_hit.wi = first_wi;
         current_hit.pos = params.cam_x.xyz + t * current_hit.wi;
         // Adaptive MC grid for surfaces is normal-biased currently. We use the gbuffer normal here. 
         current_hit.normal = geo_decode_normal(gbuf.enc_normal);
@@ -172,6 +182,16 @@ void main() {
             
             // UPDATE MC FOR CAMERA DISTANCE
             distance_mc_state_add_sample(dist_mc_state, t, l);
+            if (s == VOLUME_SPP - 1) {
+                // last sample
+                float dist;
+                if (dist_mc_state.sum_w > 0) {
+                    dist = dist_mc_state.moments.x / (dist_mc_state.sum_w > 0.0 ? dist_mc_state.sum_w : 1.0);
+                } else {
+                    dist = gbuf.linear_z;
+                }
+                imageStore(img_volume_depth, pixel, vec4(dist, 0, 0, 0));
+            }
             if (XorShift32(rng_state) < l / (dist_score_sum / DISTANCE_MC_SAMPLES)) {
                 distance_mc_save(dist_mc_state, pixel, grid_max_x);
             }
