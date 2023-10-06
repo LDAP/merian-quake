@@ -297,7 +297,12 @@ int main(const int argc, const char** argv) {
     auto load = merian::JSONLoadConfiguration(config_path);
     graph.get_configuration(load);
 
-    while (!glfwWindowShouldClose(*window)) {
+    // For evaluation purposes
+    const char* max_frames_c = std::getenv("MERIAN_MAX_FRAMES");
+    uint64_t max_frames = max_frames_c ? std::atol(max_frames_c) : std::numeric_limits<uint64_t>::max();
+
+    uint64_t frame = 0;
+    while (!glfwWindowShouldClose(*window) && frame++ < max_frames) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
 
         if (!frame_data.user_data.profiler) {
