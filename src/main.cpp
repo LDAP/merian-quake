@@ -296,13 +296,11 @@ int main(const int argc, const char** argv) {
     }
     auto load = merian::JSONLoadConfiguration(config_path);
     graph.get_configuration(load);
+    int max_frames = -1;  // For evaluation purposes
+    load.config_int("max frames", max_frames, "Quit the application after a certain number of frames (for evaluation purposes)");
 
-    // For evaluation purposes
-    const char* max_frames_c = std::getenv("MERIAN_MAX_FRAMES");
-    uint64_t max_frames = max_frames_c ? std::atol(max_frames_c) : std::numeric_limits<uint64_t>::max();
-
-    uint64_t frame = 0;
-    while (!glfwWindowShouldClose(*window) && frame++ < max_frames) {
+    int frame = 0;
+    while (!glfwWindowShouldClose(*window) && (max_frames < 0 || frame++ < max_frames)) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
 
         if (!frame_data.user_data.profiler) {
@@ -339,6 +337,7 @@ int main(const int argc, const char** argv) {
 
             frame_data.user_data.profiler->get_report_imgui(report);
             graph.get_configuration(config);
+            config.config_int("max frames", max_frames, "");
             ImGui::End();
 
             QuakeMessageOverlay();
@@ -356,5 +355,6 @@ int main(const int argc, const char** argv) {
     }
 
     auto dump = merian::JSONDumpConfiguration(CONFIG_NAME);
+    dump.config_int("max frames", max_frames, "");
     graph.get_configuration(dump);
 }
