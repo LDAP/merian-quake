@@ -36,8 +36,10 @@
 #include "quake/quake_node.hpp"
 #include <merian/vk/window/imgui_context.hpp>
 
-static const char* DEFAULT_CONFIG_NAME = "default_config.json";
 static const char* CONFIG_NAME = "merian-quake.json";
+static const char* FALLBACK_CONFIG_NAME = "default_config.json";
+
+static const char* CONFIG_PATH_ENV_VAR = "MERIAN_QUAKE_CONFIG_PATH";
 
 ImFont* quake_font_sm;
 ImFont* quake_font_lg;
@@ -233,7 +235,7 @@ int main(const int argc, const char** argv) {
     // graph.connect_image(quake, output, 3, 0);
 
     // Volume
-    graph.connect_image(quake, quake, 7, 2); // volume depth
+    graph.connect_image(quake, quake, 7, 2);               // volume depth
     graph.connect_image(volume_accum, volume_accum, 0, 0); // feedback
     graph.connect_image(volume_accum, volume_accum, 1, 1);
     graph.connect_image(quake, volume_accum, 5, 2);  // irr
@@ -284,20 +286,22 @@ int main(const int argc, const char** argv) {
     merian::Stopwatch report_intervall;
     merian::Stopwatch frametime;
 
-    std::string config_path;
-    if (std::filesystem::exists(CONFIG_NAME)) {
-        config_path = CONFIG_NAME;
-        SPDLOG_INFO("loading config {}", CONFIG_NAME);
+    std::string config_path =
+        std::getenv(CONFIG_PATH_ENV_VAR) ? std::getenv(CONFIG_PATH_ENV_VAR) : CONFIG_NAME;
+    if (std::filesystem::exists(config_path)) {
+        SPDLOG_INFO("loading config {}", config_path);
     } else {
-        auto default_config = loader.find_file(DEFAULT_CONFIG_NAME);
+        auto default_config = loader.find_file(FALLBACK_CONFIG_NAME);
         assert(default_config.has_value());
         config_path = default_config.value().string();
-        SPDLOG_DEBUG("loading default config {}", DEFAULT_CONFIG_NAME);
+        SPDLOG_DEBUG("loading default config {}", FALLBACK_CONFIG_NAME);
     }
     auto load = merian::JSONLoadConfiguration(config_path);
     graph.get_configuration(load);
-    int max_frames = -1;  // For evaluation purposes
-    load.config_int("max frames", max_frames, "Quit the application after a certain number of frames (for evaluation purposes)");
+    int max_frames = -1; // For evaluation purposes
+    load.config_int(
+        "max frames", max_frames,
+        "Quit the application after a certain number of frames (for evaluation purposes)");
 
     int frame = 0;
     while (!glfwWindowShouldClose(*window) && (max_frames < 0 || frame++ < max_frames)) {
