@@ -52,3 +52,8 @@ meson install -C build
 meson devenv -C build
 ./build/merian-quake [-basedir /path/to/quakedir]
 ```
+
+
+## Scripts: Helpers and Experiments
+
+The `pyproject.toml` defines the dependencies required to run the experiments and helper scripts.
