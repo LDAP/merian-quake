@@ -351,12 +351,13 @@ void add_particles(std::vector<float>& vtx,
 }
 
 void add_geo_alias(entity_t* ent,
-                   qmodel_t* m,
+                   [[maybe_unused]] qmodel_t* m,
                    std::vector<float>& vtx,
                    std::vector<float>& prev_vtx,
                    std::vector<uint32_t>& idx,
                    std::vector<QuakeNode::VertexExtraData>& ext) {
     assert(m->type == mod_alias);
+
     static std::mutex quake_mutex;
     // An internal cache shifts the hdr pointer... :/
     std::lock_guard<std::mutex> lock(quake_mutex);
@@ -608,7 +609,7 @@ void add_geo_brush(entity_t* ent,
 }
 
 void add_geo_sprite(entity_t* ent,
-                    qmodel_t* m,
+                    [[maybe_unused]] qmodel_t* m,
                     std::vector<float>& vtx,
                     std::vector<float>& prev_vtx,
                     std::vector<uint32_t>& idx,
@@ -933,7 +934,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
 
     // clang-format off
-    controller->set_key_event_callback([&](merian::InputController& controller, int key, int scancode, merian::InputController::KeyStatus action, int){
+    controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
         static const std::map<int, int> keymap = {
             {GLFW_KEY_TAB, K_TAB},
             {GLFW_KEY_ENTER, K_ENTER},
@@ -1359,8 +1360,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             merian::GraphRun& run,
                             const uint32_t graph_set_index,
-                            const std::vector<merian::ImageHandle>& image_inputs,
-                            const std::vector<merian::BufferHandle>& buffer_inputs,
+                            [[maybe_unused]] const std::vector<merian::ImageHandle>& image_inputs,
+                            [[maybe_unused]] const std::vector<merian::BufferHandle>& buffer_inputs,
                             const std::vector<merian::ImageHandle>& image_outputs,
                             const std::vector<merian::BufferHandle>& buffer_outputs) {
     FrameData& cur_frame = current_frame();
