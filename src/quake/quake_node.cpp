@@ -1385,7 +1385,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         old_time = newtime;
     }
 
-    if (key_dest == key_game) {
+    if (update_gamestate && key_dest == key_game) {
         controller->request_raw_mouse_input(true);
     } else {
         controller->request_raw_mouse_input(false);
