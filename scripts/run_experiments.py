@@ -77,7 +77,10 @@ def get_args():
         "--stop", help="when to stop the experiments", type=int, required=True
     )
     parser.add_argument(
-        "--gui", help="do not use the headless version of merian", action="store_true"
+        "--gui",
+        help="do not use the headless version of merian",
+        action=argparse.BooleanOptionalAction,
+        default=False
     )
     return parser.parse_args()
 
