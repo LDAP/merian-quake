@@ -11,10 +11,10 @@ class QuakeHud : public ComputeNode {
     static constexpr uint32_t local_size_y = 16;
 
     struct PushConstant {
-        glm::vec4 blend;
-        float armor;
-        float health;
-        int32_t effect;
+        glm::vec4 blend = glm::vec4(0);
+        float armor = 0;
+        float health = 0;
+        int32_t effect = 0;
     };
 
   public:
