@@ -35,12 +35,14 @@
 #include "merian/vk/window/glfw_imgui.hpp"
 #include "quake/quake_node.hpp"
 #include <merian/vk/window/imgui_context.hpp>
+#include <csignal>
 
 static const char* CONFIG_NAME = "merian-quake.json";
 static const char* FALLBACK_CONFIG_NAME = "default_config.json";
 
 static const char* CONFIG_PATH_ENV_VAR = "MERIAN_QUAKE_CONFIG_PATH";
 
+std::weak_ptr<merian::GLFWWindow> weak_window;
 ImFont* quake_font_sm;
 ImFont* quake_font_lg;
 
@@ -133,6 +135,13 @@ static void QuakeMessageOverlay() {
     ImGui::PopStyleVar(1);
 }
 
+static void signal_handler(int signal) {
+    SPDLOG_INFO("SIGINT/TERM ({}) caught. Shutting down", signal);
+    if (weak_window.expired())
+        return;
+    glfwSetWindowShouldClose(*weak_window.lock(), GLFW_TRUE);
+}
+
 struct FrameData {
     merian::StagingMemoryManager::SetID staging_set_id{};
     merian::ProfilerHandle profiler{};
@@ -154,6 +163,7 @@ int main(const int argc, const char** argv) {
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
     auto [window, surface] = extGLFW->get();
+    weak_window = window;
 
     std::shared_ptr<merian::InputController> controller =
         std::make_shared<merian::GLFWInputController>(window);
@@ -302,6 +312,9 @@ int main(const int argc, const char** argv) {
     load.config_int(
         "max frames", max_frames,
         "Quit the application after a certain number of frames (for evaluation purposes)");
+
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
     int frame = 0;
     while (!glfwWindowShouldClose(*window) && (max_frames < 0 || frame++ < max_frames)) {
