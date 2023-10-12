@@ -76,6 +76,9 @@ def get_args():
     parser.add_argument(
         "--stop", help="when to stop the experiments", type=int, required=True
     )
+    parser.add_argument(
+        "--gui", help="do not use the headless version of merian", action="store_true"
+    )
     return parser.parse_args()
 
 
@@ -172,6 +175,11 @@ def main():
     template_config_name = Path(f"exp_{args.config}").stem
     output_path = Path(args.output_path) / template_config_name
 
+    if (args.gui):
+        merian = "./bin/merian-quake"
+    else:
+        merian = "./bin/merian-quake-headless"
+
     if output_path.exists():
         logging.warning(f"output path {output_path} exists.")
         ans = input(f"Output path {output_path} exists. Continue anyway? y/[n]: ")
@@ -245,7 +253,7 @@ def main():
                 logging.info(f"run experiment {name}")
                 with open(iter_path / "merian-quake-log.txt", "w") as f:
                     p = subprocess.Popen(
-                        ["./bin/merian-quake"], cwd=installdir, stdout=f, stderr=f
+                        [merian], cwd=installdir, stdout=f, stderr=f
                     )
 
                     images_found = set()

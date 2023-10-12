@@ -47,7 +47,18 @@ subdir('src')
 
 exe = executable(
     'merian-quake',
-    src_files,
+    [src_files, 'src/merian-quake.cpp'],
+    dependencies: [
+        merian,
+        quake,
+    ],
+    include_directories: inc_dirs,
+    install : true,
+)
+
+exe_headless = executable(
+    'merian-quake-headless',
+    [src_files, 'src/merian-quake-headless.cpp'],
     dependencies: [
         merian,
         quake,
