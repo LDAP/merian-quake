@@ -20,8 +20,8 @@ from typing import List
 
 import imageio
 import numpy as np
-
-logging.basicConfig(level=logging.INFO)
+from tqdm import tqdm, trange
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 # Groups: name, iteration, counter
 IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)"
@@ -218,14 +218,14 @@ def main():
                 subprocess.run(["meson", "install"], cwd=builddir, stdout=f, stderr=f)
 
         results_path = output_path / "results"
-        for name, config in generate_configs(args.config, template_config_name):
+        for name, config in tqdm(list(generate_configs(args.config, template_config_name)), desc="config"):
             run_path = results_path / name
             os.makedirs(run_path)
             run_config = run_path / "merian-quake.json"
             with open(run_config, "w") as f:
                 json.dump(config, f, indent=4)
 
-            for iteration in range(args.iterations):
+            for iteration in trange(args.iterations, desc="iteration"):
                 logging.info(f"--- iteration {iteration+1:02d} ---")
                 iter_path = run_path / f"{iteration:02d}"
                 os.makedirs(iter_path)
@@ -279,7 +279,6 @@ def main():
                             logging.info(f"- copy {file}")
                             shutil.copy(file, iter_path)
 
-
                         images_found = images_found.union(new_images)
 
                         all_images_are_there = False
@@ -301,4 +300,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    with logging_redirect_tqdm():
+        main()
