@@ -60,7 +60,7 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] GraphRun& run) {
         pc.health = sv_player->v.health;
         pc.armor = sv_player->v.armorvalue;
         pc.blend = *merian::as_vec4(v_blend);
-        
+
         pc.effect = 0;
         if (r_viewleaf) {
             if (r_viewleaf->contents == CONTENTS_WATER) {
@@ -89,6 +89,9 @@ ShaderModuleHandle QuakeHud::get_shader_module() {
     return shader;
 }
 
-void QuakeHud::get_configuration(Configuration&, bool&) {}
+void QuakeHud::get_configuration(Configuration& config, bool&) {
+    config.output_text(
+        fmt::format("blend: ({}, {}, {}, {})", pc.blend.r, pc.blend.g, pc.blend.b, pc.blend.a));
+}
 
 } // namespace merian
