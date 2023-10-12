@@ -26,6 +26,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 # Groups: name, iteration, counter
 IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)"
 
+
 def imread(path):
     return imageio.v2.imread(path, format="HDR-FI")
 
@@ -66,15 +67,14 @@ def get_args():
         type=int,
         default=5,
     )
-    parser.add_argument("--stop-criterion",
-                        help="criterion to stop experiments",
-                        choices=["images", "iterations"],
-                        default="iterations"
+    parser.add_argument(
+        "--stop-criterion",
+        help="criterion to stop experiments",
+        choices=["images", "iterations"],
+        default="iterations",
     )
-    parser.add_argument("--stop",
-                        help="when to stop the experiments",
-                        type=int,
-                        required=True
+    parser.add_argument(
+        "--stop", help="when to stop the experiments", type=int, required=True
     )
     return parser.parse_args()
 
@@ -218,7 +218,9 @@ def main():
                 subprocess.run(["meson", "install"], cwd=builddir, stdout=f, stderr=f)
 
         results_path = output_path / "results"
-        for name, config in tqdm(list(generate_configs(args.config, template_config_name)), desc="config"):
+        for name, config in tqdm(
+            list(generate_configs(args.config, template_config_name)), desc="config"
+        ):
             run_path = results_path / name
             os.makedirs(run_path)
             run_config = run_path / "merian-quake.json"
@@ -252,22 +254,34 @@ def main():
                         r = p.poll()
 
                         # Check for new images
-                        images = set((i for i in image_dir.iterdir() if i.suffix == ".hdr") if image_dir.exists() else [])
+                        images = set(
+                            (i for i in image_dir.iterdir() if i.suffix == ".hdr")
+                            if image_dir.exists()
+                            else []
+                        )
                         new_images = images - images_found
 
                         for i, file in enumerate(sorted(new_images)):
                             match = re.match(IMAGE_OUTPUT_PATTERN, file.stem)
                             if not match:
-                                logging.warning(f"image output {file.stem} does not match expected pattern")
+                                logging.warning(
+                                    f"image output {file.stem} does not match expected pattern"
+                                )
                                 continue
                             iteration = int(match.group(2))
                             max_iteration = max(max_iteration, iteration)
 
                             # Make sure we only check and copy images that meet the stop criterion
                             # since this process is asynchronous.
-                            if args.stop_criterion == "iterations" and iteration > args.stop:
+                            if (
+                                args.stop_criterion == "iterations"
+                                and iteration > args.stop
+                            ):
                                 continue
-                            if args.stop_criterion == "images" and len(images_found) + i >= args.stop:
+                            if (
+                                args.stop_criterion == "images"
+                                and len(images_found) + i >= args.stop
+                            ):
                                 break
 
                             logging.info(f"- check {file}")
@@ -282,18 +296,28 @@ def main():
                         images_found = images_found.union(new_images)
 
                         all_images_are_there = False
-                        all_images_are_there |= args.stop_criterion == "images" and len(images_found) >= args.stop
-                        all_images_are_there |= args.stop_criterion == "iterations" and max_iteration >= args.stop
+                        all_images_are_there |= (
+                            args.stop_criterion == "images"
+                            and len(images_found) >= args.stop
+                        )
+                        all_images_are_there |= (
+                            args.stop_criterion == "iterations"
+                            and max_iteration >= args.stop
+                        )
 
                         if all_images_are_there:
                             p.terminate()
                             r = p.wait()
                             if r != 0:
-                                logging.warning(f"merian quit with non-zero exitcode {r}")
+                                logging.warning(
+                                    f"merian quit with non-zero exitcode {r}"
+                                )
                             break
 
                         if r is not None and not all_images_are_there:
-                            logging.error(f"merian-quake has quit prematurely with exitcode {r}.")
+                            logging.error(
+                                f"merian-quake has quit prematurely with exitcode {r}."
+                            )
                             break
 
                         time.sleep(1)
