@@ -10,9 +10,11 @@ import itertools
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import List
 
@@ -21,6 +23,8 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 
+# Groups: name, iteration, counter
+IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)"
 
 def imread(path):
     return imageio.v2.imread(path, format="HDR-FI")
@@ -59,9 +63,19 @@ def get_args():
     parser.add_argument(
         "--iterations",
         help="Number of iterations a configuration is run (to generate variance estimates)",
+        type=int,
         default=5,
     )
-
+    parser.add_argument("--stop-criterion",
+                        help="criterion to stop experiments",
+                        choices=["images", "iterations"],
+                        default="iterations"
+    )
+    parser.add_argument("--stop",
+                        help="when to stop the experiments",
+                        type=int,
+                        required=True
+    )
     return parser.parse_args()
 
 
@@ -212,7 +226,7 @@ def main():
                 json.dump(config, f, indent=4)
 
             for iteration in range(args.iterations):
-                logging.info(f"--- iteration {iteration:02d} ---")
+                logging.info(f"--- iteration {iteration+1:02d} ---")
                 iter_path = run_path / f"{iteration:02d}"
                 os.makedirs(iter_path)
                 config_path = Path(installdir) / "merian-quake.json"
@@ -228,25 +242,62 @@ def main():
 
                 logging.info(f"run experiment {name}")
                 with open(iter_path / "merian-quake-log.txt", "w") as f:
-                    subprocess.run(
+                    p = subprocess.Popen(
                         ["./bin/merian-quake"], cwd=installdir, stdout=f, stderr=f
                     )
 
-                if image_dir.exists():
-                    logging.info("check and copy output images")
-                    for file in image_dir.iterdir():
-                        if file.suffix != ".hdr":
-                            continue
-                        logging.info(f"- check {file}")
-                        image = imread(file.absolute())
-                        if np.any(np.isnan(image)):
-                            logging.warning(f"NaN values found in {file}")
-                        if np.any(np.isinf(image)):
-                            logging.warning(f"Inf values found in {file}")
-                        logging.info(f"- copy {file}")
-                        shutil.copy(file, iter_path)
-                else:
-                    logging.warning("image dir is empty")
+                    images_found = set()
+                    max_iteration = 0
+                    while True:
+                        r = p.poll()
+
+                        # Check for new images
+                        images = set((i for i in image_dir.iterdir() if i.suffix == ".hdr") if image_dir.exists() else [])
+                        new_images = images - images_found
+
+                        for i, file in enumerate(sorted(new_images)):
+                            match = re.match(IMAGE_OUTPUT_PATTERN, file.stem)
+                            if not match:
+                                logging.warning(f"image output {file.stem} does not match expected pattern")
+                                continue
+                            iteration = int(match.group(2))
+                            max_iteration = max(max_iteration, iteration)
+
+                            # Make sure we only check and copy images that meet the stop criterion
+                            # since this process is asynchronous.
+                            if args.stop_criterion == "iterations" and iteration > args.stop:
+                                continue
+                            if args.stop_criterion == "images" and len(images_found) + i >= args.stop:
+                                break
+
+                            logging.info(f"- check {file}")
+                            image = imread(file.absolute())
+                            if np.any(np.isnan(image)):
+                                logging.warning(f"NaN values found in {file}")
+                            if np.any(np.isinf(image)):
+                                logging.warning(f"Inf values found in {file}")
+                            logging.info(f"- copy {file}")
+                            shutil.copy(file, iter_path)
+
+
+                        images_found = images_found.union(new_images)
+
+                        all_images_are_there = False
+                        all_images_are_there |= args.stop_criterion == "images" and len(images_found) >= args.stop
+                        all_images_are_there |= args.stop_criterion == "iterations" and max_iteration >= args.stop
+
+                        if all_images_are_there:
+                            p.terminate()
+                            r = p.wait()
+                            if r != 0:
+                                logging.warning(f"merian quit with non-zero exitcode {r}")
+                            break
+
+                        if r is not None and not all_images_are_there:
+                            logging.error(f"merian-quake has quit prematurely with exitcode {r}.")
+                            break
+
+                        time.sleep(1)
 
 
 if __name__ == "__main__":
