@@ -1246,7 +1246,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     (MC_ADAPTIVE_BUFFER_SIZE + MC_STATIC_BUFFER_SIZE) *
+                                     (mc_adaptive_buffer_size + mc_static_buffer_size) *
                                          sizeof(MCState),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
@@ -1254,7 +1254,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     LIGHT_CACHE_BUFFER_SIZE * sizeof(LightCacheVertex),
+                                     light_cache_buffer_size * sizeof(LightCacheVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
             merian::NodeOutputDescriptorBuffer(
@@ -1313,12 +1313,14 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         auto spec_builder = merian::SpecializationInfoBuilder();
         const float draine_g = std::exp(-2.20679 / (volume_particle_size_um + 3.91029) - 0.428934);
         const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
-        spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
-                               use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
-                               sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
-                               volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
-                               mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery,
-                               light_cache_levels, light_cache_tan_alpha_half);
+        spec_builder.add_entry(
+            local_size_x, local_size_y, spp, max_path_length, use_light_cache_tail,
+            fov_tan_alpha_half, sun_dir.x, sun_dir.y, sun_dir.z, sun_col.r, sun_col.g, sun_col.b,
+            adaptive_sampling, volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
+            mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
+            light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
+            mc_static_buffer_size);
+
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1551,10 +1553,10 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
 
     if (dump_mc) {
         const std::size_t count =
-            std::min(128 * 1024 * 1024 / sizeof(MCState), (std::size_t)MC_ADAPTIVE_BUFFER_SIZE);
+            std::min(128 * 1024 * 1024 / sizeof(MCState), (std::size_t)mc_adaptive_buffer_size);
         const MCState* buf = static_cast<const MCState*>(allocator->getStaging()->cmdFromBuffer(
             cmd, *buffer_outputs[0], 0, sizeof(MCState) * count));
-        run.add_submit_callback([buf](const merian::QueueHandle& queue) {
+        run.add_submit_callback([count, buf](const merian::QueueHandle& queue) {
             queue->wait_idle();
             nlohmann::json j;
 
@@ -1903,6 +1905,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
     const float old_light_cache_levels = light_cache_levels;
     const float old_light_cache_tan_alpha_half = light_cache_tan_alpha_half;
+    const uint32_t old_mc_adaptive_buffer_size = mc_adaptive_buffer_size;
+    const uint32_t old_mc_static_buffer_size = mc_static_buffer_size;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1943,6 +1947,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_percent("ML Prior", ml_prior);
     config.config_int("mc samples", mc_samples, 0, 30);
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
+    config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
+                       "buffer size backing the hash grid");
+    config.config_uint("static grid buf size", mc_static_buffer_size,
+                       "buffer size backing the hash grid");
 
     config.st_separate("RT Surface");
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -2020,7 +2028,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_overwrite_sun_dir != overwrite_sun_dir || old_overwrite_sun_col != overwrite_sun_col ||
         old_render_width != render_width || old_render_height != render_height ||
         old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
-        old_light_cache_tan_alpha_half != light_cache_tan_alpha_half) {
+        old_light_cache_tan_alpha_half != light_cache_tan_alpha_half ||
+        old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
+        old_mc_static_buffer_size != mc_static_buffer_size) {
         needs_rebuild = true;
     }
 }

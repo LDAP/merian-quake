@@ -367,4 +367,8 @@ class QuakeNode : public merian::Node {
 
     float light_cache_levels = 32.0;
     float light_cache_tan_alpha_half = 0.002;
+    uint32_t light_cache_buffer_size = 4000000;
+
+    uint32_t mc_adaptive_buffer_size = 32777259;
+    uint32_t mc_static_buffer_size = 800009;
 };

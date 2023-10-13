@@ -28,6 +28,9 @@ layout (constant_id = 19) const int DISTANCE_MC_SAMPLES = 3;
 layout (constant_id = 20) const int MC_FAST_RECOVERY = 1;
 layout (constant_id = 21) const float LIGHT_CACHE_LEVELS = 32.;
 layout (constant_id = 22) const float LIGHT_CACHE_TAN_ALPHA_HALF = 0.002;
+layout (constant_id = 23) const uint LIGHT_CACHE_BUFFER_SIZE = 4000000;
+layout (constant_id = 24) const uint MC_ADAPTIVE_BUFFER_SIZE = 32777259;
+layout (constant_id = 25) const uint MC_STATIC_BUFFER_SIZE = 800009;
 
 
 layout(push_constant) uniform PushConstant { 
