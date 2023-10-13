@@ -47,10 +47,4 @@
 #define PLAYER_FLAGS_TORCH 1
 #define PLAYER_FLAGS_UNDERWATER 2
 
-// MC config
-#define MC_SAMPLES 5
-#define MC_SAMPLES_ADAPTIVE_PROB .7
-
-#define DISTANCE_MC_SAMPLES 3
-
 #endif

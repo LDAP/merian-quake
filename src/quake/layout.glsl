@@ -22,6 +22,10 @@ layout (constant_id = 13) const int VOLUME_SPP = 0;
 layout (constant_id = 14) const int VOLUME_USE_LIGHT_CACHE = 0;
 layout (constant_id = 15) const float DRAINE_G = 0.65;
 layout (constant_id = 16) const float DRAINE_A = 32.0;
+layout (constant_id = 17) const int MC_SAMPLES = 5;
+layout (constant_id = 18) const float MC_SAMPLES_ADAPTIVE_PROB = 0.7;
+layout (constant_id = 19) const int DISTANCE_MC_SAMPLES = 3;
+
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x; // contains mu_t in alpha

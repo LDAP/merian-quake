@@ -1155,7 +1155,7 @@ void QuakeNode::parse_worldspawn() {
         worldspawn_props[key] = value;
     }
 
-    sun_col = glm::vec3(0);
+    quake_sun_col = glm::vec3(0);
     for (const std::string k : {"sunlight", "sunlight2", "sunlight3"}) {
         if (worldspawn_props.contains(k)) {
             glm::vec3 col(0);
@@ -1170,8 +1170,8 @@ void QuakeNode::parse_worldspawn() {
             col *= intensity;
             col /= 4000.;
 
-            if (merian::yuv_luminance(col) > merian::yuv_luminance(sun_col)) {
-                sun_col = col;
+            if (merian::yuv_luminance(col) > merian::yuv_luminance(quake_sun_col)) {
+                quake_sun_col = col;
             }
         }
     }
@@ -1183,20 +1183,20 @@ void QuakeNode::parse_worldspawn() {
         // This seems wrong.. But works on ad_azad
         float right[3], up[3];
         angles[1] -= 180;
-        AngleVectors(angles, &sun_dir.x, right, up);
+        AngleVectors(angles, &quake_sun_dir.x, right, up);
     } else {
-        sun_dir = glm::vec3(1, 1, 1);
+        quake_sun_dir = glm::vec3(1, 1, 1);
     }
 
     // Some patches for maps
     if (worldspawn_props.contains("sky") && worldspawn_props["sky"] == "stormydays_") {
         // ad_tears
-        sun_dir = glm::vec3(1, -1, 1);
-        sun_col = glm::vec3(1.1, 1.0, 0.9);
-        sun_col *= 6.0;
+        quake_sun_dir = glm::vec3(1, -1, 1);
+        quake_sun_col = glm::vec3(1.1, 1.0, 0.9);
+        quake_sun_col *= 6.0;
     }
 
-    sun_dir = glm::normalize(sun_dir);
+    quake_sun_dir = glm::normalize(quake_sun_dir);
 }
 
 std::tuple<std::vector<merian::NodeInputDescriptorImage>,
@@ -1223,23 +1223,23 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
     return {
         {
             merian::NodeOutputDescriptorImage::compute_write(
-                "irradiance", vk::Format::eR32G32B32A32Sfloat, width, height),
+                "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write(
-                "albedo", vk::Format::eR16G16B16A16Sfloat, width, height),
-            merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16Sfloat, width,
-                                                             height),
+                "albedo", vk::Format::eR16G16B16A16Sfloat, render_width, render_height),
+            merian::NodeOutputDescriptorImage::compute_write("mv", vk::Format::eR16G16Sfloat,
+                                                             render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write(
-                "debug", vk::Format::eR16G16B16A16Sfloat, width, height),
+                "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write("moments", vk::Format::eR32G32Sfloat,
-                                                             width, height),
+                                                             render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write(
-                "volume", vk::Format::eR16G16B16A16Sfloat, width, height),
+                "volume", vk::Format::eR16G16B16A16Sfloat, render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write(
-                "volume_moments", vk::Format::eR32G32Sfloat, width, height),
+                "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write("volume_depth", vk::Format::eR32Sfloat,
-                                                             width, height),
+                                                             render_width, render_height),
             merian::NodeOutputDescriptorImage::compute_write("volume_mv", vk::Format::eR16G16Sfloat,
-                                                             width, height),
+                                                             render_width, render_height),
         },
         {
             merian::NodeOutputDescriptorBuffer(
@@ -1261,15 +1261,15 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 "gbuffer", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     width * height * sizeof(merian::GBuffer),
+                                     render_width * render_height * sizeof(merian::GBuffer),
                                      vk::BufferUsageFlagBits::eStorageBuffer}),
             merian::NodeOutputDescriptorBuffer(
                 "volume_distancemc",
                 vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     (width / DISTANCE_MC_GRID_WIDTH + 2) *
-                                         (height / DISTANCE_MC_GRID_WIDTH + 2) *
+                                     (render_width / DISTANCE_MC_GRID_WIDTH + 2) *
+                                         (render_height / DISTANCE_MC_GRID_WIDTH + 2) *
                                          sizeof(DistanceMCVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
@@ -1284,9 +1284,21 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                           const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
 
     // Quake sets fov assuming a 4x3 screen :D
-    vid.width = width;
-    vid.height = height;
+    vid.width = render_width;
+    vid.height = render_height;
     fov_tan_alpha_half = glm::tan(glm::radians(r_refdef.fov_x) / 2);
+
+    glm::vec3 sun_dir;
+    glm::vec3 sun_col;
+    if (overwrite_sun) {
+        sun_dir = overwrite_sun_dir;
+        sun_col = overwrite_sun_col;
+    } else {
+        sun_dir = quake_sun_dir;
+        sun_col = quake_sun_col;
+    }
+    if (glm::length(sun_dir) > 0)
+        sun_dir = glm::normalize(sun_dir);
 
     // GRAPH DESC SETS
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
@@ -1304,7 +1316,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
         spec_builder.add_entry(local_size_x, local_size_y, spp, max_path_length,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
-                               volume_spp, volume_use_light_cache, draine_g, draine_a);
+                               volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
+                               mc_samples_adaptive_prob, distance_mc_samples);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1443,8 +1456,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         clear_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         clear_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
         clear_pipe->push_constant(cmd, pc);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
+        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                     (render_height + local_size_y - 1) / local_size_y, 1);
         frame++;
         return;
     }
@@ -1501,8 +1514,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
         pipe->push_constant(cmd, pc);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
+        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                     (render_height + local_size_y - 1) / local_size_y, 1);
     }
 
     if (volume_spp > 0) {
@@ -1512,8 +1525,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         volume_forward_project_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         volume_forward_project_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
         volume_forward_project_pipe->push_constant(cmd, pc);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
+        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                     (render_height + local_size_y - 1) / local_size_y, 1);
     }
 
     auto volume_mv_bar =
@@ -1531,8 +1544,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         volume_pipe->bind_descriptor_set(cmd, graph_sets[graph_set_index]);
         volume_pipe->bind_descriptor_set(cmd, cur_frame.quake_sets, 1);
         volume_pipe->push_constant(cmd, pc);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
+        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                     (render_height + local_size_y - 1) / local_size_y, 1);
     }
 
     if (dump_mc) {
@@ -1902,7 +1915,12 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
 
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
-    config.st_separate("Raytrace");
+    const int32_t old_render_width = render_width;
+    const int32_t old_render_height = render_height;
+    config.config_int("render width", render_width, "The resolution for the raytracer");
+    config.config_int("render height", render_height, "The resolution for the raytracer");
+
+    config.st_separate("RT Surface");
     const int32_t old_spp = spp;
     const int32_t old_max_path_lenght = max_path_length;
     const int32_t old_use_light_cache_tail = use_light_cache_tail;
@@ -1910,6 +1928,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_volume_spp = volume_spp;
     const int32_t old_volume_use_light_cache = volume_use_light_cache;
     const float old_volume_particle_size_um = volume_particle_size_um;
+    const int32_t old_mc_samples = mc_samples;
+    const int32_t old_distance_mc_samples = distance_mc_samples;
+    const float old_mc_samples_adaptive_prob = mc_samples_adaptive_prob;
+
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
     float ml_prior = pc.rt_config.ml_prior / 255.;
     float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
@@ -1918,10 +1940,12 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
     config.config_percent("BSDF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
+    config.config_int("mc samples", mc_samples, 0, 30);
+    config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
     config.config_bool("light cache tail", use_light_cache_tail,
                        "use the light cache for the path tail");
 
-    config.st_separate();
+    config.st_separate("RT Volume");
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
     config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
     if (mu_t_s_overwrite) {
@@ -1932,6 +1956,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                                        pc.prev_cam_x_mu_sx.a, pc.prev_cam_w_mu_sy.a,
                                        pc.prev_cam_u_mu_sz.a));
     }
+    config.config_int("dist mc samples", distance_mc_samples, 0, 30);
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_bool("use light cache", volume_use_light_cache);
@@ -1940,14 +1965,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
     pc.rt_config.dist_guide_p = static_cast<unsigned char>(std::round(dist_guide_p * 255.));
     pc.rt_config.flags = 0;
-
-    if (old_spp != spp || old_max_path_lenght != max_path_length ||
-        old_use_light_cache_tail != use_light_cache_tail ||
-        old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
-        old_volume_use_light_cache != volume_use_light_cache ||
-        old_volume_particle_size_um != volume_particle_size_um) {
-        needs_rebuild = true;
-    }
 
     config.st_separate("Reproducibility");
     config.config_bool("reproducible renders", reproducible_renders,
@@ -1958,10 +1975,35 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                         "For reference renders and video outputs.");
 
     config.st_separate("Debug");
+    const bool old_overwrite_sun = overwrite_sun;
+    const glm::vec3 old_overwrite_sun_dir = overwrite_sun_dir;
+    const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
+    config.config_bool("overwrite sun", overwrite_sun);
+    if (overwrite_sun) {
+        config.config_float3("sun dir", &overwrite_sun_dir.x);
+        config.config_float3("sun col", &overwrite_sun_col.x);
+    } else {
+        config.output_text(fmt::format("sun direction: ({}, {}, {})\nsun color: ({}, {}, {})",
+                                       quake_sun_dir.x, quake_sun_dir.y, quake_sun_dir.z,
+                                       quake_sun_col.r, quake_sun_col.g, quake_sun_col.b));
+    }
+
     std::string debug_text = "";
     debug_text += fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                               r_refdef.viewangles[1], r_refdef.viewangles[2]);
     config.output_text(debug_text);
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
+
+    if (old_spp != spp || old_max_path_lenght != max_path_length ||
+        old_use_light_cache_tail != use_light_cache_tail ||
+        old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
+        old_volume_use_light_cache != volume_use_light_cache ||
+        old_volume_particle_size_um != volume_particle_size_um || old_mc_samples != mc_samples ||
+        old_mc_samples_adaptive_prob != mc_samples_adaptive_prob ||
+        old_distance_mc_samples != distance_mc_samples || old_overwrite_sun != overwrite_sun ||
+        old_overwrite_sun_dir != overwrite_sun_dir || old_overwrite_sun_col != overwrite_sun_col ||
+        old_render_width != render_width || old_render_height != render_height) {
+        needs_rebuild = true;
+    }
 }

@@ -245,9 +245,6 @@ class QuakeNode : public merian::Node {
     // ----------------------------------------------------
     // Params
 
-    static constexpr uint32_t width = 1920;
-    static constexpr uint32_t height = 1080;
-
     PushConstant pc;
 
     // Store some textures for custom patches
@@ -327,13 +324,21 @@ class QuakeNode : public merian::Node {
     double mouse_x = 0;
     double mouse_y = 0;
 
+    int32_t render_width = 1920;
+    int32_t render_height = 1080;
+
     // 0 None, 1 Gun, 2 Full
     int playermodel = 1;
 
     float fov = glm::radians(90.);
     float fov_tan_alpha_half = glm::tan(fov / 2);
-    glm::vec3 sun_dir{0};
-    glm::vec3 sun_col{0};
+
+    glm::vec3 quake_sun_dir{0};
+    glm::vec3 quake_sun_col{0};
+
+    bool overwrite_sun = false;
+    glm::vec3 overwrite_sun_dir{0,0,1};
+    glm::vec3 overwrite_sun_col{0};
 
     // Spec constants
     // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
@@ -353,4 +358,8 @@ class QuakeNode : public merian::Node {
     bool dump_mc = false;
 
     bool reproducible_renders = false;
+
+    int32_t mc_samples = 5;
+    float mc_samples_adaptive_prob = 0.7;
+    int32_t distance_mc_samples = 3;
 };
