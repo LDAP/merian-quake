@@ -1317,7 +1317,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
                                volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
-                               mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery);
+                               mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery,
+                               light_cache_levels, light_cache_tan_alpha_half);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1884,6 +1885,25 @@ void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHa
 }
 
 void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_rebuild) {
+    const int32_t old_render_width = render_width;
+    const int32_t old_render_height = render_height;
+    const int32_t old_spp = spp;
+    const int32_t old_max_path_lenght = max_path_length;
+    const int32_t old_use_light_cache_tail = use_light_cache_tail;
+    const int32_t old_adaptive_sampling = adaptive_sampling;
+    const int32_t old_volume_spp = volume_spp;
+    const int32_t old_volume_use_light_cache = volume_use_light_cache;
+    const float old_volume_particle_size_um = volume_particle_size_um;
+    const int32_t old_mc_samples = mc_samples;
+    const int32_t old_distance_mc_samples = distance_mc_samples;
+    const float old_mc_samples_adaptive_prob = mc_samples_adaptive_prob;
+    const int32_t old_mc_fast_recovery = mc_fast_recovery;
+    const bool old_overwrite_sun = overwrite_sun;
+    const glm::vec3 old_overwrite_sun_dir = overwrite_sun_dir;
+    const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
+    const float old_light_cache_levels = light_cache_levels;
+    const float old_light_cache_tan_alpha_half = light_cache_tan_alpha_half;
+
     config.st_separate("General");
     bool old_sound = sound;
     config.config_bool("sound", sound);
@@ -1915,35 +1935,22 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
 
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
-    const int32_t old_render_width = render_width;
-    const int32_t old_render_height = render_height;
     config.config_int("render width", render_width, "The resolution for the raytracer");
     config.config_int("render height", render_height, "The resolution for the raytracer");
 
-    config.st_separate("RT Surface");
-    const int32_t old_spp = spp;
-    const int32_t old_max_path_lenght = max_path_length;
-    const int32_t old_use_light_cache_tail = use_light_cache_tail;
-    const int32_t old_adaptive_sampling = adaptive_sampling;
-    const int32_t old_volume_spp = volume_spp;
-    const int32_t old_volume_use_light_cache = volume_use_light_cache;
-    const float old_volume_particle_size_um = volume_particle_size_um;
-    const int32_t old_mc_samples = mc_samples;
-    const int32_t old_distance_mc_samples = distance_mc_samples;
-    const float old_mc_samples_adaptive_prob = mc_samples_adaptive_prob;
-
-    float bsdp_p = pc.rt_config.bsdp_p / 255.;
+    config.st_separate("Guiding Markov chain");
     float ml_prior = pc.rt_config.ml_prior / 255.;
-    float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
-    config.config_int("spp", spp, 0, 15, "samples per pixel");
-    config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
-    config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
-    config.config_percent("BSDF Prob", bsdp_p, "the probability to use BSDF sampling");
     config.config_percent("ML Prior", ml_prior);
     config.config_int("mc samples", mc_samples, 0, 30);
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
-    config.config_bool("light cache tail", use_light_cache_tail,
-                       "use the light cache for the path tail");
+
+    config.st_separate("RT Surface");
+    float bsdp_p = pc.rt_config.bsdp_p / 255.;
+    float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
+    config.config_int("spp", spp, 0, 15, "samples per pixel");
+    // config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
+    config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
+    config.config_percent("BSDF Prob", bsdp_p, "the probability to use BSDF sampling");
 
     config.st_separate("RT Volume");
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
@@ -1959,7 +1966,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("dist mc samples", distance_mc_samples, 0, 30);
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
-    config.config_bool("use light cache", volume_use_light_cache);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
@@ -1975,13 +1981,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                         "For reference renders and video outputs.");
 
     config.st_separate("Debug");
-    const int32_t old_mc_fast_recovery = mc_fast_recovery;
     config.config_bool("mc fast recovery", mc_fast_recovery,
                        "When enabled, markov chains are flooded with invalidated states when no "
                        "light is detected.");
-    const bool old_overwrite_sun = overwrite_sun;
-    const glm::vec3 old_overwrite_sun_dir = overwrite_sun_dir;
-    const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
     config.config_bool("overwrite sun", overwrite_sun);
     if (overwrite_sun) {
         config.config_float3("sun dir", &overwrite_sun_dir.x);
@@ -1999,6 +2001,15 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
 
+    config.st_separate("Light cache");
+    config.config_bool("surf: use LC", use_light_cache_tail,
+                       "use the light cache for the path tail");
+    config.config_bool("volume: use LC", volume_use_light_cache,
+                       "query light cache for non-emitting surfaces");
+    config.config_float("LC levels", light_cache_levels);
+    config.config_float("LC tan(alpha/2)", light_cache_tan_alpha_half,
+                        "the light cache resolution, lower means higher resolution.", 0.0001);
+
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
         old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
@@ -2008,7 +2019,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_distance_mc_samples != distance_mc_samples || old_overwrite_sun != overwrite_sun ||
         old_overwrite_sun_dir != overwrite_sun_dir || old_overwrite_sun_col != overwrite_sun_col ||
         old_render_width != render_width || old_render_height != render_height ||
-        old_mc_fast_recovery != mc_fast_recovery) {
+        old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
+        old_light_cache_tan_alpha_half != light_cache_tan_alpha_half) {
         needs_rebuild = true;
     }
 }

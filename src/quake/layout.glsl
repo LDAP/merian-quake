@@ -26,6 +26,8 @@ layout (constant_id = 17) const int MC_SAMPLES = 5;
 layout (constant_id = 18) const float MC_SAMPLES_ADAPTIVE_PROB = 0.7;
 layout (constant_id = 19) const int DISTANCE_MC_SAMPLES = 3;
 layout (constant_id = 20) const int MC_FAST_RECOVERY = 1;
+layout (constant_id = 21) const float LIGHT_CACHE_LEVELS = 32.;
+layout (constant_id = 22) const float LIGHT_CACHE_TAN_ALPHA_HALF = 0.002;
 
 
 layout(push_constant) uniform PushConstant { 

@@ -364,4 +364,7 @@ class QuakeNode : public merian::Node {
     int32_t distance_mc_samples = 3;
 
     int32_t mc_fast_recovery = 1;
+
+    float light_cache_levels = 32.0;
+    float light_cache_tan_alpha_half = 0.002;
 };
