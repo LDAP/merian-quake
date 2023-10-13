@@ -362,4 +362,6 @@ class QuakeNode : public merian::Node {
     int32_t mc_samples = 5;
     float mc_samples_adaptive_prob = 0.7;
     int32_t distance_mc_samples = 3;
+
+    int32_t mc_fast_recovery = 1;
 };

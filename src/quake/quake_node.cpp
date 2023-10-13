@@ -1317,7 +1317,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
                                use_light_cache_tail, fov_tan_alpha_half, sun_dir.x, sun_dir.y,
                                sun_dir.z, sun_col.r, sun_col.g, sun_col.b, adaptive_sampling,
                                volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
-                               mc_samples_adaptive_prob, distance_mc_samples);
+                               mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery);
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
@@ -1975,6 +1975,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                         "For reference renders and video outputs.");
 
     config.st_separate("Debug");
+    const int32_t old_mc_fast_recovery = mc_fast_recovery;
+    config.config_bool("mc fast recovery", mc_fast_recovery,
+                       "When enabled, markov chains are flooded with invalidated states when no "
+                       "light is detected.");
     const bool old_overwrite_sun = overwrite_sun;
     const glm::vec3 old_overwrite_sun_dir = overwrite_sun_dir;
     const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
@@ -2003,7 +2007,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_samples_adaptive_prob != mc_samples_adaptive_prob ||
         old_distance_mc_samples != distance_mc_samples || old_overwrite_sun != overwrite_sun ||
         old_overwrite_sun_dir != overwrite_sun_dir || old_overwrite_sun_col != overwrite_sun_col ||
-        old_render_width != render_width || old_render_height != render_height) {
+        old_render_width != render_width || old_render_height != render_height ||
+        old_mc_fast_recovery != mc_fast_recovery) {
         needs_rebuild = true;
     }
 }

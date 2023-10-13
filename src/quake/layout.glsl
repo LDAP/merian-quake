@@ -25,6 +25,7 @@ layout (constant_id = 16) const float DRAINE_A = 32.0;
 layout (constant_id = 17) const int MC_SAMPLES = 5;
 layout (constant_id = 18) const float MC_SAMPLES_ADAPTIVE_PROB = 0.7;
 layout (constant_id = 19) const int DISTANCE_MC_SAMPLES = 3;
+layout (constant_id = 20) const int MC_FAST_RECOVERY = 1;
 
 
 layout(push_constant) uniform PushConstant { 
