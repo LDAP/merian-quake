@@ -1,7 +1,6 @@
 shaders = [
     'quake.comp',
     'clear.comp',
-    'gbuf.comp',
     'volume.comp',
     'volume_forward_project.comp'
 ]
