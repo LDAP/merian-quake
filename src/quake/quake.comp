@@ -24,7 +24,6 @@ vec3 irr;
 
 #include "config.h"
 #include "layout.glsl"
-#include "shading.glsl"
 #include "light_cache.glsl"
 #include "mc.glsl"
 #include "raytrace.glsl"

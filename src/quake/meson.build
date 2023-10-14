@@ -9,7 +9,6 @@ included_files = files(
     'config.h',
     'layout.glsl',
     'grid.h',
-    'shading.glsl',
     'mc.glsl',
     'mc_distance.glsl',
     'light_cache.glsl',
