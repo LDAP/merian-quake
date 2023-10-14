@@ -50,6 +50,8 @@ class ProcessingGraph {
         volume_svgf = std::make_shared<merian::SVGFNode>(context, alloc);
         auto tonemap = std::make_shared<merian::TonemapNode>(context, alloc);
         auto image_writer = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
+        auto image_writer_volume =
+            std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
         auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
         auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
         hud = std::make_shared<merian::QuakeHud>(context, alloc);
@@ -58,6 +60,8 @@ class ProcessingGraph {
         auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
 
         image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
+        image_writer_volume->set_on_record_callback(
+            [volume_accum]() { volume_accum->request_clear(); });
 
         graph.add_node("one", one);
         graph.add_node("blue_noise", blue_noise);
@@ -67,6 +71,7 @@ class ProcessingGraph {
         graph.add_node("volume denoiser", volume_svgf);
         graph.add_node("tonemap", tonemap);
         graph.add_node("image writer", image_writer);
+        graph.add_node("volume image writer", image_writer_volume);
         graph.add_node("exposure", exposure);
         graph.add_node("median variance", median);
         graph.add_node("hud", hud);
@@ -127,6 +132,7 @@ class ProcessingGraph {
         // Composite
         graph.connect_image(svgf, add, 0, 1);
         graph.connect_image(volume_svgf, add, 0, 0);
+        graph.connect_image(volume_svgf, image_writer_volume, 0, 0);
 
         graph.connect_image(add, bloom, 0, 0);
         graph.connect_image(bloom, exposure, 0, 0);
