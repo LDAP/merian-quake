@@ -28,8 +28,6 @@ struct DistanceMCState {
 };
 
 #define DISTANCE_MC_VERTEX_STATE_COUNT 10
-// in pixel
-#define DISTANCE_MC_GRID_WIDTH 25
 
 struct DistanceMCVertex {
     DistanceMCState states[DISTANCE_MC_VERTEX_STATE_COUNT];

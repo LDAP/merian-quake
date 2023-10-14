@@ -1,13 +1,7 @@
 // ADAPTIVE GRID (sclaes with distance to camera)
-#define MC_ADAPTIVE_GRID_MAX_WIDTH 50
-#define MC_ADAPTIVE_GRID_MIN_WIDTH .1
+#define MC_ADAPTIVE_GRID_MAX_WIDTH 100
+#define MC_ADAPTIVE_GRID_MIN_WIDTH .01
 #define MC_ADAPTIVE_GRID_POWER 4.
-#define MC_ADAPTIVE_GRID_LEVELS 10
-// Set the target for light cache resolution
-#define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.003
-
-// STATIC GRID (does not scale, for state exchange)
-#define MC_STATIC_GRID_WIDTH 25.3
 
 // Configure ML
 #define ML_MAX_N 1024

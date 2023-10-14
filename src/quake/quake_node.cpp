@@ -1268,8 +1268,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo{{},
-                                     (render_width / DISTANCE_MC_GRID_WIDTH + 2) *
-                                         (render_height / DISTANCE_MC_GRID_WIDTH + 2) *
+                                     (render_width / distance_mc_grid_width + 2) *
+                                         (render_height / distance_mc_grid_width + 2) *
                                          sizeof(DistanceMCVertex),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
@@ -1319,7 +1319,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             adaptive_sampling, volume_spp, volume_use_light_cache, draine_g, draine_a, mc_samples,
             mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
-            mc_static_buffer_size);
+            mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
+            mc_adaptive_grid_levels, distance_mc_grid_width);
 
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
@@ -1907,6 +1908,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_light_cache_tan_alpha_half = light_cache_tan_alpha_half;
     const uint32_t old_mc_adaptive_buffer_size = mc_adaptive_buffer_size;
     const uint32_t old_mc_static_buffer_size = mc_static_buffer_size;
+    const float old_mc_adaptive_grid_tan_alpha_half = mc_adaptive_grid_tan_alpha_half;
+    const int32_t old_mc_adaptive_grid_levels = mc_adaptive_grid_levels;
+    const float old_mc_static_grid_width = mc_static_grid_width;
+    const float old_distance_mc_grid_width = distance_mc_grid_width;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1951,6 +1956,13 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                        "buffer size backing the hash grid");
     config.config_uint("static grid buf size", mc_static_buffer_size,
                        "buffer size backing the hash grid");
+    config.config_float("mc adaptive tan(alpha/2)", mc_adaptive_grid_tan_alpha_half,
+                        "the adaptive grid resolution, lower means higher resolution.", 0.0001);
+    config.config_int("mc adaptive levels", mc_adaptive_grid_levels,
+                      "number of quantization steps of the hash grid resolution");
+    config.config_float("mc static width", mc_static_grid_width,
+                        "the static grid width in worldspace units, lower means higher resolution",
+                        0.1);
 
     config.st_separate("RT Surface");
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -1972,6 +1984,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                                        pc.prev_cam_u_mu_sz.a));
     }
     config.config_int("dist mc samples", distance_mc_samples, 0, 30);
+    config.config_int("dist mc grid width", distance_mc_grid_width,
+                      "the markov chain hash grid width in pixels");
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
 
@@ -2030,7 +2044,11 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
         old_light_cache_tan_alpha_half != light_cache_tan_alpha_half ||
         old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
-        old_mc_static_buffer_size != mc_static_buffer_size) {
+        old_mc_static_buffer_size != mc_static_buffer_size ||
+        old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
+        old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
+        old_mc_static_grid_width != mc_static_grid_width ||
+        old_distance_mc_grid_width != distance_mc_grid_width) {
         needs_rebuild = true;
     }
 }

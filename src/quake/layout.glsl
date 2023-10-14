@@ -31,6 +31,10 @@ layout (constant_id = 22) const float LIGHT_CACHE_TAN_ALPHA_HALF = 0.002;
 layout (constant_id = 23) const uint LIGHT_CACHE_BUFFER_SIZE = 4000000;
 layout (constant_id = 24) const uint MC_ADAPTIVE_BUFFER_SIZE = 32777259;
 layout (constant_id = 25) const uint MC_STATIC_BUFFER_SIZE = 800009;
+layout (constant_id = 26) const float MC_ADAPTIVE_GRID_TAN_ALPHA_HALF = 0.003;
+layout (constant_id = 27) const float MC_STATIC_GRID_WIDTH = 25.3;
+layout (constant_id = 28) const int MC_ADAPTIVE_GRID_LEVELS = 10;
+layout (constant_id = 29) const int DISTANCE_MC_GRID_WIDTH = 25;
 
 
 layout(push_constant) uniform PushConstant { 

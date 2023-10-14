@@ -371,4 +371,9 @@ class QuakeNode : public merian::Node {
 
     uint32_t mc_adaptive_buffer_size = 32777259;
     uint32_t mc_static_buffer_size = 800009;
+    float mc_adaptive_grid_tan_alpha_half = 0.003;
+    float mc_static_grid_width = 25.3;
+    int32_t mc_adaptive_grid_levels = 10;
+
+    int32_t distance_mc_grid_width = 25;
 };
