@@ -1963,6 +1963,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("mc static width", mc_static_grid_width,
                         "the static grid width in worldspace units, lower means higher resolution",
                         0.1);
+    config.config_bool("mc fast recovery", mc_fast_recovery,
+                       "When enabled, markov chains are flooded with invalidated states when no "
+                       "light is detected.");
 
     config.st_separate("RT Surface");
     float bsdp_p = pc.rt_config.bsdp_p / 255.;
@@ -1974,15 +1977,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
 
     config.st_separate("RT Volume");
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
-    config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
-    if (mu_t_s_overwrite) {
-        config.config_float("mu_t", mu_t, "", 0.000001);
-        config.config_float3("mu_s / mu_t", &mu_s_div_mu_t.x);
-    } else {
-        config.output_text(fmt::format("mu_t: {}\nmu_s: ({}, {}, {})", pc.cam_x_mu_t.a,
-                                       pc.prev_cam_x_mu_sx.a, pc.prev_cam_w_mu_sy.a,
-                                       pc.prev_cam_u_mu_sz.a));
-    }
     config.config_int("dist mc samples", distance_mc_samples, 0, 30);
     config.config_int("dist mc grid width", distance_mc_grid_width,
                       "the markov chain hash grid width in pixels");
@@ -2002,10 +1996,16 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("force timediff (ms)", force_timediff,
                         "For reference renders and video outputs.");
 
+    config.st_separate("Light cache");
+    config.config_bool("surf: use LC", use_light_cache_tail,
+                       "use the light cache for the path tail");
+    config.config_bool("volume: use LC", volume_use_light_cache,
+                       "query light cache for non-emitting surfaces");
+    config.config_float("LC levels", light_cache_levels);
+    config.config_float("LC tan(alpha/2)", light_cache_tan_alpha_half,
+                        "the light cache resolution, lower means higher resolution.", 0.0001);
+
     config.st_separate("Debug");
-    config.config_bool("mc fast recovery", mc_fast_recovery,
-                       "When enabled, markov chains are flooded with invalidated states when no "
-                       "light is detected.");
     config.config_bool("overwrite sun", overwrite_sun);
     if (overwrite_sun) {
         config.config_float3("sun dir", &overwrite_sun_dir.x);
@@ -2015,6 +2015,15 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                                        quake_sun_dir.x, quake_sun_dir.y, quake_sun_dir.z,
                                        quake_sun_col.r, quake_sun_col.g, quake_sun_col.b));
     }
+    config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
+    if (mu_t_s_overwrite) {
+        config.config_float("mu_t", mu_t, "", 0.000001);
+        config.config_float3("mu_s / mu_t", &mu_s_div_mu_t.x);
+    } else {
+        config.output_text(fmt::format("mu_t: {}\nmu_s: ({}, {}, {})", pc.cam_x_mu_t.a,
+                                       pc.prev_cam_x_mu_sx.a, pc.prev_cam_w_mu_sy.a,
+                                       pc.prev_cam_u_mu_sz.a));
+    }
 
     std::string debug_text = "";
     debug_text += fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
@@ -2022,15 +2031,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.output_text(debug_text);
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
-
-    config.st_separate("Light cache");
-    config.config_bool("surf: use LC", use_light_cache_tail,
-                       "use the light cache for the path tail");
-    config.config_bool("volume: use LC", volume_use_light_cache,
-                       "query light cache for non-emitting surfaces");
-    config.config_float("LC levels", light_cache_levels);
-    config.config_float("LC tan(alpha/2)", light_cache_tan_alpha_half,
-                        "the light cache resolution, lower means higher resolution.", 0.0001);
 
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
