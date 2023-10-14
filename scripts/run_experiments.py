@@ -23,8 +23,8 @@ import numpy as np
 from tqdm import tqdm, trange
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-# Groups: name, iteration, counter
-IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)"
+# Groups: name, iteration, counter, run-iteration
+IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)_(\d+)"
 
 
 def imread(path):

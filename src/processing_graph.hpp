@@ -59,8 +59,8 @@ class ProcessingGraph {
         auto add = std::make_shared<merian::AddNode>(context, alloc);
         auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
 
-        image_writer->set_on_record_callback([accum]() { accum->request_clear(); });
-        image_writer_volume->set_on_record_callback(
+        image_writer->set_callback([accum]() { accum->request_clear(); });
+        image_writer_volume->set_callback(
             [volume_accum]() { volume_accum->request_clear(); });
 
         graph.add_node("one", one);
