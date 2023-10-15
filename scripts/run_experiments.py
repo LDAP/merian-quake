@@ -158,7 +158,7 @@ def generate_configs(config_path: str, template_config_name: str):
         name = []
         for k, v in template.items():
             if isinstance(v, list) and v and isinstance(v[0], list):
-                i, *indices = indices
+                i = indices.pop(0)
                 d[k] = v[0][i]
                 name.append(f"{k}-{d[k]}")
             elif isinstance(v, dict):
@@ -169,7 +169,7 @@ def generate_configs(config_path: str, template_config_name: str):
         return name, d
 
     for p in prod:
-        name, config = make_config(templated_config, p)
+        name, config = make_config(templated_config, list(p))
         yield "_".join(name), config
 
 
@@ -230,9 +230,9 @@ def main():
                 subprocess.run(["meson", "install"], cwd=builddir, stdout=f, stderr=f)
 
         results_path = output_path / "results"
-        for name, config in tqdm(
-            list(generate_configs(args.config, template_config_name)), desc="config"
-        ):
+        configs = list(generate_configs(args.config, template_config_name))
+        logging.info(f"configs: {list(config[0] for config in configs)}")
+        for name, config in tqdm(configs, desc="config"):
             run_path = results_path / name
             os.makedirs(run_path)
             run_config = run_path / "merian-quake.json"
