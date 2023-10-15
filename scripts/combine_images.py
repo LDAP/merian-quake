@@ -12,7 +12,7 @@ def imread(path):
     return imageio.v2.imread(path, format="HDR-FI")
 
 
-combined = np.array([imread(r) for r in Path(sys.argv[1]).iterdir()]).mean(axis=0)
+combined = np.array([imread(r) for r in Path(sys.argv[1]).iterdir() if r.suffix == ".hdr"]).mean(axis=0)
 
 output = sys.argv[2]
 
