@@ -80,7 +80,7 @@ def get_args():
         "--gui",
         help="do not use the headless version of merian",
         action=argparse.BooleanOptionalAction,
-        default=False
+        default=False,
     )
     return parser.parse_args()
 
@@ -177,8 +177,9 @@ def main():
     args = get_args()
     template_config_name = Path(f"exp_{args.config}").stem
     output_path = Path(args.output_path) / template_config_name
+    report = {}
 
-    if (args.gui):
+    if args.gui:
         merian = "./bin/merian-quake"
     else:
         merian = "./bin/merian-quake-headless"
@@ -254,10 +255,10 @@ def main():
                             file.unlink()
 
                 logging.info(f"run experiment {name}")
-                with open(iter_path / "merian-quake-log.txt", "w") as f:
-                    p = subprocess.Popen(
-                        [merian], cwd=installdir, stdout=f, stderr=f
-                    )
+                with open(iter_path / "merian-quake-log.txt", "w") as f, tqdm(
+                    desc=args.stop_criterion, total=args.stop
+                ) as progress:
+                    p = subprocess.Popen([merian], cwd=installdir, stdout=f, stderr=f)
 
                     images_found = set()
                     max_iteration = 0
@@ -296,25 +297,31 @@ def main():
                                 break
 
                             logging.info(f"- check {file}")
-                            image = imread(file.absolute())
-                            if np.any(np.isnan(image)):
-                                logging.warning(f"NaN values found in {file}")
-                            if np.any(np.isinf(image)):
-                                logging.warning(f"Inf values found in {file}")
+                            copy_dst = iter_path / file.name
+                            try:
+                                image = imread(file.absolute())
+                                if np.any(np.isnan(image)):
+                                    logging.warning(f"{file}: NaN values found")
+                                    report[str(copy_dst)] = "nan found"
+                                if np.any(np.isinf(image)):
+                                    logging.warning(f"{file}: Inf values found")
+                                    report[str(copy_dst)] = "inf found"
+                            except ValueError:
+                                # Image could not be loaded
+                                report[str(copy_dst)] = "could not be loaded"
+                                logging.warning(f"{file}: could not be loaded")
                             logging.info(f"- copy {file}")
                             shutil.copy(file, iter_path)
 
                         images_found = images_found.union(new_images)
 
                         all_images_are_there = False
-                        all_images_are_there |= (
-                            args.stop_criterion == "images"
-                            and len(images_found) >= args.stop
-                        )
-                        all_images_are_there |= (
-                            args.stop_criterion == "iterations"
-                            and max_iteration >= args.stop
-                        )
+                        if args.stop_criterion == "images":
+                            all_images_are_there |= len(images_found) >= args.stop
+                            progress.update(len(images_found) - progress.n)
+                        if args.stop_criterion == "iterations":
+                            progress.update(max_iteration - progress.n)
+                            all_images_are_there |= max_iteration >= args.stop
 
                         if all_images_are_there:
                             p.terminate()
@@ -331,7 +338,11 @@ def main():
                             )
                             break
 
-                        time.sleep(1)
+                        time.sleep(.2)
+
+    logging.info(f"Report:\n{report}")
+    with open(output_path / "report.json", "w") as f:
+        json.dump(report, f)
 
 
 if __name__ == "__main__":
