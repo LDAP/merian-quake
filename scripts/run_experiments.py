@@ -155,22 +155,22 @@ def generate_configs(config_path: str, template_config_name: str):
 
     def make_config(template, indices):
         d = {}
-        name = []
+        info = {}
         for k, v in template.items():
             if isinstance(v, list) and v and isinstance(v[0], list):
                 i = indices.pop(0)
                 d[k] = v[0][i]
-                name.append(f"{k}-{d[k]}")
+                info[k] = d[k]
             elif isinstance(v, dict):
-                subname, d[k] = make_config(v, indices)
-                name.extend(subname)
+                subinfo, d[k] = make_config(v, indices)
+                info.update(subinfo)
             else:
                 d[k] = v
-        return name, d
+        return info, d
 
     for p in prod:
-        name, config = make_config(templated_config, list(p))
-        yield "_".join(name), config
+        info, config = make_config(templated_config, list(p))
+        yield info, config
 
 
 def main():
@@ -178,6 +178,7 @@ def main():
     template_config_name = Path(f"exp_{args.config}").stem
     output_path = Path(args.output_path) / template_config_name
     report = {}
+    run_info = {}
 
     if args.gui:
         merian = "./bin/merian-quake"
@@ -229,11 +230,15 @@ def main():
             with open(output_path / "installlog.txt", "w") as f:
                 subprocess.run(["meson", "install"], cwd=builddir, stdout=f, stderr=f)
 
-        results_path = output_path / "results"
+        runs_path = output_path / "runs"
         configs = list(generate_configs(args.config, template_config_name))
         logging.info(f"configs: {list(config[0] for config in configs)}")
-        for name, config in tqdm(configs, desc="config"):
-            run_path = results_path / name
+        for run, (info, config) in tqdm(list(enumerate(configs)), desc="config"):
+            run_path = runs_path / f"{run:02d}"
+            run_info[f"{run:02d}"] = info
+            # Write every run to prevent loosing data if experiment crashes
+            with open(output_path / "run_info.json", "w") as f:
+                json.dump(run_info, f, indent=4)
             os.makedirs(run_path)
             run_config = run_path / "merian-quake.json"
             with open(run_config, "w") as f:
@@ -254,7 +259,7 @@ def main():
                         if file.suffix == ".hdr":
                             file.unlink()
 
-                logging.info(f"run experiment {name}")
+                logging.info(f"starting run {info}")
                 with open(iter_path / "merian-quake-log.txt", "w") as f, tqdm(
                     desc=args.stop_criterion, total=args.stop
                 ) as progress:
@@ -342,7 +347,7 @@ def main():
 
     logging.info(f"Report:\n{report}")
     with open(output_path / "report.json", "w") as f:
-        json.dump(report, f)
+        json.dump(report, f, indent=4)
 
 
 if __name__ == "__main__":

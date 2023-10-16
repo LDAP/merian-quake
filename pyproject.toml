@@ -11,6 +11,8 @@ imageio = "^2.31.5"
 numpy = "^1.26.0"
 pandas = "^2.1.1"
 tqdm = "^4.66.1"
+matplotlib = "^3.8.0"
+seaborn = "^0.13.0"
 
 
 [build-system]
