@@ -19,12 +19,18 @@ def imread(path):
     return imageio.v2.imread(path, format="HDR-FI")
 
 
-def rmse(a, b):
-    return np.sqrt(np.mean((a - b) ** 2))
+def rmse_9999(ref, image, iqr_factor=1.0):
+    sq = (ref - image) ** 2
+    perc_99 = np.percentile(sq, [99.99])
+    return np.sqrt(np.mean(sq[sq <= perc_99]))
 
 
-def mae(a, b):
-    return np.mean(np.abs(a - b))
+def rmse(ref, image):
+    return np.sqrt(np.mean((ref - image) ** 2))
+
+
+def mae(ref, image):
+    return np.mean(np.abs(ref - image))
 
 
 def load_run(multiprocessing_args):
@@ -42,7 +48,7 @@ def load_run(multiprocessing_args):
             match = re.match(IMAGE_OUTPUT_PATTERN, image_file.stem)
             assert(match)
             frame = int(match.group(2))
-            df.loc[len(df.index)] = [settings[s] for s in run_settings] + [iteration, frame, int(match.group(4)), frame * args.spp, rmse(reference, image), mae(reference, image)]
+            df.loc[len(df.index)] = [settings[s] for s in run_settings] + [iteration, frame, int(match.group(4)), frame * args.spp, rmse(reference, image), mae(reference, image), rmse_9999(reference, image)]
     return df
 
 def main():
@@ -67,12 +73,14 @@ def main():
         run_info: Dict = json.load(f)
     run_settings = list(next(iter(run_info.values())).keys())
 
-    df = pd.DataFrame(columns=run_settings + ["iteration", "frame", "graph run", "samples", "rmse", "mae"])
+    df = pd.DataFrame(columns=run_settings + ["iteration", "frame", "graph run", "samples", "rmse", "mae", "rmse_9999"])
     with multiprocessing.Pool() as pool:
         dfs = pool.map(load_run, [(args, df, run_settings, reference, run, settings) for run, settings in run_info.items()])
         df = pd.concat(dfs)
     if (args.filter):
         df = df[eval(args.filter, {"df": df})]
+
+    print(df)
 
     split = args.split or run_settings
     sns.lineplot(df, x=args.x, y=args.y, hue=df[split].apply(tuple, axis=1), err_style=args.err_style)
