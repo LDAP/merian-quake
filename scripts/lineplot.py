@@ -54,6 +54,7 @@ def main():
     parser.add_argument("-y", default="rmse")
     parser.add_argument("--err-style", default="bars", choices=["bars", "band"])
     parser.add_argument("--filter", help="a python expression to use to filter the dataframe 'df'. Example: \"df['rebuild on record'] == True\"", required=False)
+    parser.add_argument("--split", help="Defines splits for data (inverse of group). Defaults to all run settings", required=False, action="append")
 
     args = parser.parse_args()
 
@@ -71,10 +72,11 @@ def main():
     if (args.filter):
         df = df[eval(args.filter, {"df": df})]
 
-    sns.lineplot(df, x=args.x, y=args.y, hue=df[run_settings].apply(tuple, axis=1), err_style=args.err_style)
+    split = args.split or run_settings
+    sns.lineplot(df, x=args.x, y=args.y, hue=df[split].apply(tuple, axis=1), err_style=args.err_style)
     plt.xscale("log")
     plt.yscale("log")
-    plt.legend(title=f"Config {tuple(run_settings)}")
+    plt.legend(title=f"Config {tuple(split)}")
     plt.tight_layout()
     plt.show()
 
