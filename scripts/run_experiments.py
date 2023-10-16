@@ -308,13 +308,16 @@ def main():
                                 if np.any(np.isnan(image)):
                                     logging.warning(f"{file}: NaN values found")
                                     report[str(copy_dst)] = "nan found"
+                                    time.sleep(1)
                                 if np.any(np.isinf(image)):
                                     logging.warning(f"{file}: Inf values found")
                                     report[str(copy_dst)] = "inf found"
+                                    time.sleep(1)
                             except ValueError:
                                 # Image could not be loaded
                                 report[str(copy_dst)] = "could not be loaded"
                                 logging.warning(f"{file}: could not be loaded")
+                                time.sleep(1)
                             logging.info(f"- copy {file}")
                             shutil.copy(file, iter_path)
 
