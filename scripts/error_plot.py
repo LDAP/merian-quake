@@ -38,7 +38,7 @@ for technique in sorted((prefix / "techniques").iterdir()):
     for imgpath in sorted(technique.iterdir()):
         if imgpath.suffix != ".hdr":
             continue
-        frame = int(imgpath.stem.split("_")[-2])
+        frame = int(imgpath.stem.split("_")[2])
         img = imread(imgpath)
         errors.append(rmse(img))
         frames.append(frame + 1) # frames start with 0

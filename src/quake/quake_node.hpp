@@ -14,6 +14,7 @@
 #include "merian/vk/utils/profiler.hpp"
 #include "quake/config.h"
 
+#include <optional>
 #include <queue>
 #include <unordered_set>
 
@@ -64,9 +65,9 @@ class QuakeNode : public merian::Node {
     };
 
     struct PushConstant {
-        glm::vec4 cam_x_mu_t;   // pos, and fog mu_t
-        glm::vec4 cam_w;        // forward
-        glm::vec4 cam_u;        // up
+        glm::vec4 cam_x_mu_t; // pos, and fog mu_t
+        glm::vec4 cam_w;      // forward
+        glm::vec4 cam_u;      // up
 
         glm::vec4 prev_cam_x_mu_sx;
         glm::vec4 prev_cam_w_mu_sy;
@@ -337,7 +338,7 @@ class QuakeNode : public merian::Node {
     glm::vec3 quake_sun_col{0};
 
     bool overwrite_sun = false;
-    glm::vec3 overwrite_sun_dir{0,0,1};
+    glm::vec3 overwrite_sun_dir{0, 0, 1};
     glm::vec3 overwrite_sun_col{0};
 
     // Spec constants
