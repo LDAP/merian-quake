@@ -1320,7 +1320,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
-            mc_adaptive_grid_levels, distance_mc_grid_width);
+            mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count);
 
         pipe =
             std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
@@ -1912,6 +1912,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_mc_adaptive_grid_levels = mc_adaptive_grid_levels;
     const float old_mc_static_grid_width = mc_static_grid_width;
     const float old_distance_mc_grid_width = distance_mc_grid_width;
+    const int32_t old_mc_static_vertex_state_count = mc_static_vertex_state_count;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1963,6 +1964,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("mc static width", mc_static_grid_width,
                         "the static grid width in worldspace units, lower means higher resolution",
                         0.1);
+    config.config_int("mc static states per vertex", mc_static_vertex_state_count,
+                      "number of states that are stored per hash grid vertex");
     config.config_bool("mc fast recovery", mc_fast_recovery,
                        "When enabled, markov chains are flooded with invalidated states when no "
                        "light is detected.");
@@ -2048,7 +2051,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
         old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
         old_mc_static_grid_width != mc_static_grid_width ||
-        old_distance_mc_grid_width != distance_mc_grid_width) {
+        old_distance_mc_grid_width != distance_mc_grid_width ||
+        old_mc_static_vertex_state_count != mc_static_vertex_state_count) {
         needs_rebuild = true;
     }
 }

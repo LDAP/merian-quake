@@ -1,7 +1,5 @@
 #include "merian-nodes/common/types.glsl.h"
 
-#define MC_STATIC_VERTEX_STATE_COUNT 23
-
 struct MCState {
     vec3 sum_tgt;
     float sum_w;

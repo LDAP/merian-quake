@@ -375,6 +375,7 @@ class QuakeNode : public merian::Node {
     float mc_adaptive_grid_tan_alpha_half = 0.003;
     float mc_static_grid_width = 25.3;
     int32_t mc_adaptive_grid_levels = 10;
+    int32_t mc_static_vertex_state_count = 23;
 
     int32_t distance_mc_grid_width = 25;
 };
