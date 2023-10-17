@@ -187,7 +187,7 @@ int main(const int argc, const char** argv) {
         auto& frame_data = ring_fences->next_cycle_wait_and_get();
 
         if (!frame_data.user_data.profiler) {
-            frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context);
+            frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context, queue);
         } else {
             frame_data.user_data.profiler->collect();
             if (report_intervall.millis() > 100) {
