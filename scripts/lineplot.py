@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+sns.set_theme()
+
 # Groups: name, iteration, counter, run-iteration
 IMAGE_OUTPUT_PATTERN = r"(.+)_(\d+)_(\d+)_(\d+)"
 
