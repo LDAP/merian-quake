@@ -63,6 +63,7 @@ def main():
     parser.add_argument("--split", help="Defines splits for data (inverse of group). Defaults to all run settings", required=False, action="append")
     parser.add_argument("--xscale", default="log", choices=["linear", "log"])
     parser.add_argument("--yscale", default="log", choices=["linear", "log"])
+    parser.add_argument("--force-reload", default=False, action="store_true")
 
     args = parser.parse_args()
 
@@ -73,10 +74,17 @@ def main():
         run_info: Dict = json.load(f)
     run_settings = list(next(iter(run_info.values())).keys())
 
-    df = pd.DataFrame(columns=run_settings + ["iteration", "frame", "graph run", "samples", "rmse", "mae", "rmse_9999"])
-    with multiprocessing.Pool() as pool:
-        dfs = pool.map(load_run, [(args, df, run_settings, reference, run, settings) for run, settings in run_info.items()])
+    data_path = args.experiment / "data.json"
+    if not data_path.exists() or args.force_reload:
+        df = pd.DataFrame(columns=run_settings + ["iteration", "frame", "graph run", "samples", "rmse", "mae", "rmse_9999"])
+        with multiprocessing.Pool() as pool:
+            dfs = pool.map(load_run, [(args, df, run_settings, reference, run, settings) for run, settings in run_info.items()])
         df = pd.concat(dfs)
+        df.reset_index(drop=True, inplace=True)
+        df.to_json(data_path)
+    else:
+        df = pd.read_json(data_path)
+
     if (args.filter):
         df = df[eval(args.filter, {"df": df})]
 
