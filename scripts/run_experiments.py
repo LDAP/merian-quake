@@ -223,6 +223,10 @@ def main():
                     stdout=f,
                     stderr=f,
                 )
+            options_json = subprocess.check_output(["meson", "introspect", "--buildoptions"], cwd=builddir).decode()
+            options = json.loads(options_json)
+            libdir = os.path.join(installdir, [s["value"] for s in options if s["name"] == "libdir"][0])
+            logging.info(f"- libdir is {libdir}")
             logging.info("- compile")
             with open(output_path / "compilelog.txt", "w") as f:
                 subprocess.run(["meson", "compile"], cwd=builddir, stdout=f, stderr=f)
@@ -263,7 +267,9 @@ def main():
                 with open(iter_path / "merian-quake-log.txt", "w") as f, tqdm(
                     desc=args.stop_criterion, total=args.stop
                 ) as progress:
-                    p = subprocess.Popen([merian], cwd=installdir, stdout=f, stderr=f)
+                    env = os.environ.copy()
+                    env["LD_LIBRARY_PATH"] = f"{libdir}:{env['LD_LIBRARY_PATH']}" if 'LD_LIBRARY_PATH' in env else libdir
+                    p = subprocess.Popen([merian], cwd=installdir, stdout=f, stderr=f, env=env)
 
                     images_found = set()
                     max_iteration = 0
