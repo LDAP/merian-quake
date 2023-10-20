@@ -1178,6 +1178,10 @@ void QuakeNode::parse_worldspawn() {
         quake_sun_col *= 6.0;
     }
 
+    // prevent float16 overflow
+    const float max_col = std::max(std::max(quake_sun_col.r, quake_sun_col.g), quake_sun_col.b);
+    if (max_col > MAX_SUN_COLOR)
+        quake_sun_col = quake_sun_col / max_col * MAX_SUN_COLOR;
     quake_sun_dir = glm::normalize(quake_sun_dir);
 }
 

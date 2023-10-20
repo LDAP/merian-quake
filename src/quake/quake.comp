@@ -45,9 +45,7 @@ void main() {
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         trace_ray(camera_throughput, incident, first_hit);
-        irr = incident / f16vec3(first_hit.albedo.r > 0.hf ? first_hit.albedo.r : 1.hf,
-                                  first_hit.albedo.g > 0.hf ? first_hit.albedo.g : 1.hf,
-                                  first_hit.albedo.b > 0.hf ? first_hit.albedo.b : 1.hf);
+        irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
         const float l = yuv_luminance(irr);
         moments = vec2(l, l * l);
 

@@ -18,6 +18,9 @@
 // Limits indirectly the maximum absorption
 #define VOLUME_MAX_T 1000.
 
+// Prevent overflows in float_16
+#define MAX_SUN_COLOR 20.f
+
 // BINDINGS
 
 #define BINDING_VTX_BUF 0
