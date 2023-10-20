@@ -1451,7 +1451,8 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     if (stop_after_worldspawn >= 0 &&
         frame - last_worldspawn_frame == (uint64_t)stop_after_worldspawn) {
         update_gamestate = false;
-        run.request_rebuild();
+        if (rebuild_after_stop)
+            run.request_rebuild();
     }
 
     if (!cur_frame.tlas || !cl.worldmodel) {
@@ -1994,8 +1995,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.st_separate("Reproducibility");
     config.config_bool("reproducible renders", reproducible_renders,
                        "e.g. disables random behavior");
-    config.config_int("stop and rebuild after worldspawn", stop_after_worldspawn,
+    config.config_int("stop after worldspawn", stop_after_worldspawn,
                       "Can be used for reference renders.");
+    config.config_bool("rebuild after stop", rebuild_after_stop);
     config.config_float("force timediff (ms)", force_timediff,
                         "For reference renders and video outputs.");
 
