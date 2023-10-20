@@ -685,16 +685,8 @@ void add_geo_sprite(entity_t* ent,
     s_up = glm::normalize(s_up);
     s_right = glm::normalize(s_right);
 
-    // Dirty hack to fix alignment of sprites when only a few pixels are lit.
-    // Since quakespasm normally uses a single fan they do not have this problem
-    const float off = strstr(frame->gltexture->name, "dotmed")
-                          ? 1.5
-                          : (strstr(frame->gltexture->name, "dotsml") ? 1.0 : 0);
-    const float s_off = frame->gltexture->width % 2 == 0 ? -off / frame->gltexture->width : 0;
-    const float t_off = frame->gltexture->height % 2 == 0 ? -off / frame->gltexture->height : 0;
-
-    // add three quads
-    for (int k = 0; k < 3; k++) {
+    // add two quads
+    for (int k = 0; k < 2; k++) {
         glm::vec3 v0, v1, v2, v3;
 
         // clang-format off
@@ -707,22 +699,12 @@ void add_geo_sprite(entity_t* ent,
             break;
         }
         case 1: {
-            glm::vec3 front = glm::cross(s_up, s_right);
-            v0 = scale * (frame->down * front + frame->left * s_right);
-            v1 = scale * (frame->up * front + frame->left * s_right);
-            v2 = scale * (frame->up * front + frame->right * s_right);
-            v3 = scale * (frame->down * front + frame->right * s_right);
+            v0 = scale * (frame->down * s_up - frame->left * s_right);
+            v1 = scale * (frame->up * s_up - frame->left * s_right);
+            v2 = scale * (frame->up * s_up - frame->right * s_right);
+            v3 = scale * (frame->down * s_up - frame->right * s_right);
             break;
         }
-        case 2: {
-            glm::vec3 front = glm::cross(s_up, s_right);
-            v0 = scale * (frame->down * front + frame->left * front);
-            v1 = scale * (frame->up * front + frame->left * front);
-            v2 = scale * (frame->up * front + frame->right * front);
-            v3 = scale * (frame->down * front + frame->right * front);
-            break;
-        }
-
         default:
             assert(0);
         }
@@ -767,15 +749,15 @@ void add_geo_sprite(entity_t* ent,
         ext.emplace_back(texnum,
                          MAT_FLAGS_SPRITE << 12, // sprite allways emits
                          n_enc, n_enc, n_enc,
-                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(frame->tmax + t_off),
-                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(0 + t_off),
-                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(0 + t_off));
+                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(frame->tmax),
+                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(0));
         ext.emplace_back(texnum,
                          MAT_FLAGS_SPRITE << 12, // sprite allways emits
                          n_enc, n_enc, n_enc,
-                         merian::float_to_half_aprox(0 + s_off),            merian::float_to_half_aprox(frame->tmax + t_off),
-                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(0 + t_off),
-                         merian::float_to_half_aprox(frame->smax + s_off),  merian::float_to_half_aprox(frame->tmax + t_off));
+                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(frame->tmax),
+                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(0),
+                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(frame->tmax));
         // clang-format on
 
     } // end three axes
