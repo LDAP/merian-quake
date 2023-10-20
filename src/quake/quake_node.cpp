@@ -1803,8 +1803,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
                             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
                                 vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate));
         cur_frame.dynamic_geometries.back().instance_flags =
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise |
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
+            vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
     } else {
         cur_frame.dynamic_geometries.clear();
     }
