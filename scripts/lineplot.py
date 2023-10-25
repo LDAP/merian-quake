@@ -69,15 +69,14 @@ def main():
 
     args = parser.parse_args()
 
-    reference_path = args.reference if os.path.isabs(args.reference) else args.experiment / args.reference
-    reference = imread(reference_path)
-
     with open(args.experiment / "run_info.json") as f:
         run_info: Dict = json.load(f)
     run_settings = list(next(iter(run_info.values())).keys())
 
     data_path = args.experiment / "data.json"
     if not data_path.exists() or args.force_reload:
+        reference_path = args.reference if os.path.isabs(args.reference) else args.experiment / args.reference
+        reference = imread(reference_path)
         df = pd.DataFrame(columns=run_settings + ["iteration", "frame", "graph run", "samples", "rmse", "mae", "rmse_9999"])
         with multiprocessing.Pool() as pool:
             dfs = pool.map(load_run, [(args, df, run_settings, reference, run, settings) for run, settings in run_info.items()])
