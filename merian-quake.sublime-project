@@ -2,7 +2,7 @@
 	"debugger_tasks": [
 		{
 			"name": "Meson Compile",
-			"cmd": ["meson", "compile", "-C", "build"]
+			"cmd": ["meson", "compile", "-C", "build"],
 		}
 	],
 	"debugger_configurations":
@@ -14,13 +14,23 @@
 			"program": "${folder}/build/merian-quake",
 			"args": ["-basedir", "/home/lucas/repos/Semester_12/master_thesis/quake-basedir"],
 			"cwd": "${folder}",
-			"pre_debug_task": "Meson Compile"
+			"pre_debug_task": "Meson Compile",
 		},
 	],
 	"folders":
 	[
 		{
-			"path": "."
+			"path": ".",
 		}
-	]
+	],
+	"settings":
+	{
+		"LSP":
+		{
+			"formatters":
+			{
+				"source.python": "LSP-ruff"
+			}
+		}
+	},
 }
