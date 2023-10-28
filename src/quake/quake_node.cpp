@@ -1308,14 +1308,13 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
             mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count);
 
-        pipe =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec_builder.build());
-        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader,
-                                                               spec_builder.build());
-        volume_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, volume_shader,
-                                                                spec_builder.build());
+        auto spec = spec_builder.build();
+
+        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec);
+        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader, spec);
+        volume_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, volume_shader, spec);
         volume_forward_project_pipe = std::make_shared<merian::ComputePipeline>(
-            pipe_layout, volume_forward_project_shader, spec_builder.build());
+            pipe_layout, volume_forward_project_shader, spec);
     }
 
     // DUMMY IMAGE as placeholder
