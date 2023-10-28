@@ -42,7 +42,7 @@ void main() {
 
     // must equal quake.comp
     rng_state = pcg3d16(uvec3(pixel, params.frame));
-    irr = f16vec3(0);
+    irr = vec3(0);
     moments = vec2(0);
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
@@ -50,7 +50,6 @@ void main() {
     const vec2 mv = imageLoad(img_volume_mv, pixel).rg;
 
     for (int s = 0; s < VOLUME_SPP; s++) {
-        float f = 0.0;
         float p = 0.0;
         float t;
 
@@ -89,19 +88,14 @@ void main() {
             if (distance_guide_p() < XorShift32(rng_state) || dist_score_sum == 0) {
                 t = transmittance_sample2(MU_T, XorShift32(rng_state), xi_max);
                 dist_mc_state = distance_mc_state_new();
-            }
-
-            if (t >= gbuf.linear_z || t <= 0)
-                continue;
+            } else if (t >= gbuf.linear_z || t <= 0)
+                continue; // TODO: Use transmittance sampling then
 
             [[unroll]]
             for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 p += (scores[i] > 0 ? scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum : 0);
             }
             p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + distance_guide_p() * p;
-
-            // t = sample_t_homogeneous_medium(MU_T, xi_max * XorShift32(rng_state));
-            // p = sample_t_homogeneous_medium_pdf(MU_T, t) / xi_max;
         }
 
         // must equal first hit in quake.comp (make sure random state is the same)
@@ -168,10 +162,10 @@ void main() {
         if (VOLUME_USE_LIGHT_CACHE != 0)
             if (!any(greaterThan(incident, f16vec3(0)))) {
                 incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
-        }
+            }
 
 
-        incident *= f16vec3(phase_draine_eval(dot(current_hit.wi, next_hit.wi), DRAINE_G, DRAINE_A) * MU_S);
+        incident *= f16vec3(phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A) * MU_S);
 
         const vec3 contrib = incident * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
@@ -197,8 +191,8 @@ void main() {
 
             // UPDATE MC FOR OUTGOING DIRECTIONS
             const float mc_f = yuv_luminance(incident / wo_p);
-            mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
             if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
+                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
                 mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                 mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
             } else if (MC_FAST_RECOVERY > 0 && mc_f < 1e-12 * mc_state.sum_w) {
