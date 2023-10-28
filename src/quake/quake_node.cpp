@@ -1509,7 +1509,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                      (render_height + local_size_y - 1) / local_size_y, 1);
     }
 
-    if (volume_spp > 0) {
+    if (volume_forward_project && volume_spp > 0) {
         // Forward project motion vectors for volumes
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
         volume_forward_project_pipe->bind(cmd);
@@ -1971,6 +1971,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                       "the markov chain hash grid width in pixels");
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
+    config.config_bool("volume forward project", volume_forward_project);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
     pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
