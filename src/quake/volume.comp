@@ -179,7 +179,7 @@ void main() {
                 // last sample
                 float dist;
                 if (dist_mc_state.sum_w > 0) {
-                    dist = dist_mc_state.moments.x / (dist_mc_state.sum_w > 0.0 ? dist_mc_state.sum_w : 1.0);
+                    dist = dist_mc_state.moments.x / dist_mc_state.sum_w;
                 } else {
                     dist = gbuf.linear_z;
                 }
