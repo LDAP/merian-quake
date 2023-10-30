@@ -88,14 +88,15 @@ void main() {
             if (distance_guide_p() < XorShift32(rng_state) || dist_score_sum == 0) {
                 t = transmittance_sample2(MU_T, XorShift32(rng_state), xi_max);
                 dist_mc_state = distance_mc_state_new();
-            } else if (t >= gbuf.linear_z || t <= 0)
+            } else if (t >= min(gbuf.linear_z, VOLUME_MAX_T) || t <= 0) {
                 continue; // TODO: Use transmittance sampling then
+            }
 
             [[unroll]]
             for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 p += (scores[i] > 0 ? scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum : 0);
             }
-            p = (dist_score_sum > 0 ? (1 - distance_guide_p()) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + distance_guide_p() * p;
+            p = (dist_score_sum > 0 ? (1.0 - distance_guide_p()) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + distance_guide_p() * p;
         }
 
         // must equal first hit in quake.comp (make sure random state is the same)
