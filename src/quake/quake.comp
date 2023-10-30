@@ -45,9 +45,11 @@ void main() {
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         trace_ray(camera_throughput, incident, first_hit);
-        irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
-        const float l = yuv_luminance(irr);
-        moments = vec2(l, l * l);
+        if (MAX_PATH_LENGTH > 0) {
+            irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
+            const float l = yuv_luminance(irr);
+            moments = vec2(l, l * l);
+        }
 
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
