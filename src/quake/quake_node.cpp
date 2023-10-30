@@ -1306,7 +1306,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
-            mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count);
+            mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
+            volume_max_t);
 
         auto spec = spec_builder.build();
 
@@ -1899,6 +1900,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_distance_mc_grid_width = distance_mc_grid_width;
     const int32_t old_mc_static_vertex_state_count = mc_static_vertex_state_count;
     const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
+    const float old_volume_max_t = volume_max_t;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1971,6 +1973,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                       "the markov chain hash grid width in pixels");
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
+    config.config_float("volume max t", volume_max_t);
     config.config_bool("volume forward project", volume_forward_project);
 
     pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
@@ -2043,7 +2046,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
         old_mc_static_vertex_state_count != mc_static_vertex_state_count ||
-        old_light_cache_buffer_size != light_cache_buffer_size) {
+        old_light_cache_buffer_size != light_cache_buffer_size ||
+        old_volume_max_t != volume_max_t) {
         needs_rebuild = true;
     }
 }

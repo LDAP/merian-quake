@@ -36,6 +36,7 @@ layout (constant_id = 27) const float MC_STATIC_GRID_WIDTH = 25.3;
 layout (constant_id = 28) const int MC_ADAPTIVE_GRID_LEVELS = 10;
 layout (constant_id = 29) const int DISTANCE_MC_GRID_WIDTH = 25;
 layout (constant_id = 30) const int MC_STATIC_VERTEX_STATE_COUNT = 23;
+layout (constant_id = 31) const float VOLUME_MAX_T = 1000.;
 
 
 layout(push_constant) uniform PushConstant { 

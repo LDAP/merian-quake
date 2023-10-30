@@ -356,6 +356,7 @@ class QuakeNode : public merian::Node {
     glm::vec3 mu_s_div_mu_t = glm::vec3(1);
     int32_t volume_use_light_cache = 0;
     float volume_particle_size_um = 25.0;
+    float volume_max_t = 1000.;
 
     bool dump_mc = false;
 

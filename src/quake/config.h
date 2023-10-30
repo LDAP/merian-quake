@@ -15,9 +15,6 @@
 // for example transparent surfaces / water
 #define MAX_INTERSECTIONS 5
 
-// Limits indirectly the maximum absorption
-#define VOLUME_MAX_T 1000.
-
 // Prevent overflows in float_16
 #define MAX_SUN_COLOR 20.f
 
