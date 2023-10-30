@@ -1898,6 +1898,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_mc_static_grid_width = mc_static_grid_width;
     const float old_distance_mc_grid_width = distance_mc_grid_width;
     const int32_t old_mc_static_vertex_state_count = mc_static_vertex_state_count;
+    const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1994,6 +1995,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("LC levels", light_cache_levels);
     config.config_float("LC tan(alpha/2)", light_cache_tan_alpha_half,
                         "the light cache resolution, lower means higher resolution.", 0.0001);
+    config.config_uint("LC buf size", light_cache_buffer_size,
+                       "Size of buffer backing the hash grid");
 
     config.st_separate("Debug");
     config.config_bool("overwrite sun", overwrite_sun);
@@ -2039,7 +2042,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
-        old_mc_static_vertex_state_count != mc_static_vertex_state_count) {
+        old_mc_static_vertex_state_count != mc_static_vertex_state_count ||
+        old_light_cache_buffer_size != light_cache_buffer_size) {
         needs_rebuild = true;
     }
 }
