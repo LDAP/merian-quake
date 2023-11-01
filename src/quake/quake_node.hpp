@@ -59,9 +59,9 @@ class QuakeNode : public merian::Node {
 
     struct RTConfig {
         unsigned char flags = 0;
-        unsigned char dist_guide_p = static_cast<unsigned char>(0.0 * 255);
-        unsigned char bsdp_p = static_cast<unsigned char>(0.1 * 255);
-        unsigned char ml_prior = static_cast<unsigned char>(0.01 * 255);
+        unsigned char padding0;
+        unsigned char padding1;
+        unsigned char padding2;
     };
 
     struct PushConstant {
@@ -382,4 +382,9 @@ class QuakeNode : public merian::Node {
     int32_t distance_mc_grid_width = 25;
 
     bool volume_forward_project = true;
+
+    float surf_bsdf_p = 0.15;
+    float volume_phase_p = 0.3;
+    float dir_guide_prior = 0.2;
+    float dist_guide_p = 0.0;
 };

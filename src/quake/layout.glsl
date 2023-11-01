@@ -37,6 +37,10 @@ layout (constant_id = 28) const int MC_ADAPTIVE_GRID_LEVELS = 10;
 layout (constant_id = 29) const int DISTANCE_MC_GRID_WIDTH = 25;
 layout (constant_id = 30) const int MC_STATIC_VERTEX_STATE_COUNT = 23;
 layout (constant_id = 31) const float VOLUME_MAX_T = 1000.;
+layout (constant_id = 32) const float SURF_BSDF_P = 0.15;
+layout (constant_id = 33) const float VOLUME_PHASE_P = 0.3;
+layout (constant_id = 34) const float DIR_GUIDE_PRIOR = 0.2;
+layout (constant_id = 35) const float DIST_GUIDE_P = 0.0;
 
 
 layout(push_constant) uniform PushConstant { 
@@ -56,9 +60,6 @@ layout(push_constant) uniform PushConstant {
 } params;
 
 #define rt_flags() (params.rt_config & 0xff)
-#define bsdf_p() (((params.rt_config >> 16) & 0xff) / 255.)
-#define ml_prior() (((params.rt_config >> 24) & 0xff) / 255.)
-#define distance_guide_p() (((params.rt_config >> 8) & 0xff) / 255.)
 #define MU_T params.cam_x.a
 #define MU_S vec3(params.prev_cam_x.a, params.prev_cam_w.a, params.prev_cam_u.a)
 

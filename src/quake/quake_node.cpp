@@ -1307,7 +1307,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
             mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
-            volume_max_t);
+            volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p);
 
         auto spec = spec_builder.build();
 
@@ -1901,6 +1901,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_mc_static_vertex_state_count = mc_static_vertex_state_count;
     const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
     const float old_volume_max_t = volume_max_t;
+    const float old_surf_bsdf_p = surf_bsdf_p;
+    const float old_volume_phase_p = volume_phase_p;
+    const float old_dir_guide_prior = dir_guide_prior;
+    const float old_dist_guide_p = dist_guide_p;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1937,8 +1941,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("render height", render_height, "The resolution for the raytracer");
 
     config.st_separate("Guiding Markov chain");
-    float ml_prior = pc.rt_config.ml_prior / 255.;
-    config.config_percent("ML Prior", ml_prior);
+    config.config_percent("ML Prior", dir_guide_prior);
     config.config_int("mc samples", mc_samples, 0, 30);
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
     config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
@@ -1959,12 +1962,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
                        "light is detected.");
 
     config.st_separate("RT Surface");
-    float bsdp_p = pc.rt_config.bsdp_p / 255.;
-    float dist_guide_p = pc.rt_config.dist_guide_p / 255.;
     config.config_int("spp", spp, 0, 15, "samples per pixel");
     // config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
-    config.config_percent("BSDF Prob", bsdp_p, "the probability to use BSDF sampling");
+    config.config_percent("BSDF Prob", surf_bsdf_p, "the probability to use BSDF sampling");
 
     config.st_separate("RT Volume");
     config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
@@ -1974,11 +1975,10 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_float("volume max t", volume_max_t);
+    config.config_percent("Phase Prob", volume_phase_p,
+                          "the probability to use phase function sampling");
     config.config_bool("volume forward project", volume_forward_project);
 
-    pc.rt_config.bsdp_p = static_cast<unsigned char>(std::round(bsdp_p * 255.));
-    pc.rt_config.ml_prior = static_cast<unsigned char>(std::round(ml_prior * 255.));
-    pc.rt_config.dist_guide_p = static_cast<unsigned char>(std::round(dist_guide_p * 255.));
     pc.rt_config.flags = 0;
 
     config.st_separate("Reproducibility");
@@ -2047,7 +2047,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_distance_mc_grid_width != distance_mc_grid_width ||
         old_mc_static_vertex_state_count != mc_static_vertex_state_count ||
         old_light_cache_buffer_size != light_cache_buffer_size ||
-        old_volume_max_t != volume_max_t) {
+        old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
+        old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
+        old_dist_guide_p != dist_guide_p) {
         needs_rebuild = true;
     }
 }

@@ -27,7 +27,7 @@ vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
 
     // r = (mc_state.N * mc_state.N * r + ML_PRIOR_N * rp) / (mc_state.N * mc_state.N + ML_PRIOR_N);
     // Addis
-    const float r = (mc_state.N * mc_state.N * (mc_state.sum_len / mc_state.sum_w)) / (mc_state.N * mc_state.N + ml_prior());
+    const float r = (mc_state.N * mc_state.N * (mc_state.sum_len / mc_state.sum_w)) / (mc_state.N * mc_state.N + DIR_GUIDE_PRIOR);
     return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
 }
 
