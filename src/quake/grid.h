@@ -25,8 +25,8 @@ struct DistanceMCState {
     vec2 moments;
 };
 
-#define DISTANCE_MC_VERTEX_STATE_COUNT 10
-
+#ifndef __cplusplus
 struct DistanceMCVertex {
     DistanceMCState states[DISTANCE_MC_VERTEX_STATE_COUNT];
 };
+#endif

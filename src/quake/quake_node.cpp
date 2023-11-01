@@ -1256,7 +1256,8 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
                 vk::BufferCreateInfo{{},
                                      (render_width / distance_mc_grid_width + 2) *
                                          (render_height / distance_mc_grid_width + 2) *
-                                         sizeof(DistanceMCVertex),
+                                         MAX_DISTANCE_MC_VERTEX_STATE_COUNT *
+                                         sizeof(DistanceMCState),
                                      vk::BufferUsageFlagBits::eStorageBuffer},
                 true),
         },
@@ -1307,7 +1308,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
             mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
-            volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p);
+            volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p,
+            distance_mc_vertex_state_count);
 
         auto spec = spec_builder.build();
 
@@ -1905,6 +1907,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_volume_phase_p = volume_phase_p;
     const float old_dir_guide_prior = dir_guide_prior;
     const float old_dist_guide_p = dist_guide_p;
+    const uint32_t old_distance_mc_vertex_state_count = distance_mc_vertex_state_count;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1972,6 +1975,9 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_int("dist mc samples", distance_mc_samples, 0, 30);
     config.config_int("dist mc grid width", distance_mc_grid_width,
                       "the markov chain hash grid width in pixels");
+    config.config_uint("dist mc states per vertex", distance_mc_vertex_state_count, 1,
+                       MAX_DISTANCE_MC_VERTEX_STATE_COUNT,
+                       "number of markov chain states per vertex");
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_float("volume max t", volume_max_t);
@@ -2049,7 +2055,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_light_cache_buffer_size != light_cache_buffer_size ||
         old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
-        old_dist_guide_p != dist_guide_p) {
+        old_dist_guide_p != dist_guide_p ||
+        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count) {
         needs_rebuild = true;
     }
 }

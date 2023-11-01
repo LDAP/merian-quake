@@ -18,6 +18,9 @@
 // Prevent overflows in float_16
 #define MAX_SUN_COLOR 20.f
 
+// should match DISTANCE_MC_VERTEX_STATE_COUNT (only increase for testing purposes)
+#define MAX_DISTANCE_MC_VERTEX_STATE_COUNT 50
+
 // BINDINGS
 
 #define BINDING_VTX_BUF 0

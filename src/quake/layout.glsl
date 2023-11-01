@@ -1,5 +1,4 @@
 #include "config.h"
-#include "grid.h"
 #include "merian-nodes/common/gbuffer.glsl.h"
 
 #extension GL_EXT_scalar_block_layout       : require
@@ -41,7 +40,9 @@ layout (constant_id = 32) const float SURF_BSDF_P = 0.15;
 layout (constant_id = 33) const float VOLUME_PHASE_P = 0.3;
 layout (constant_id = 34) const float DIR_GUIDE_PRIOR = 0.2;
 layout (constant_id = 35) const float DIST_GUIDE_P = 0.0;
+layout (constant_id = 36) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
 
+#include "grid.h"
 
 layout(push_constant) uniform PushConstant { 
     vec4 cam_x; // contains mu_t in alpha
