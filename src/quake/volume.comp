@@ -87,7 +87,6 @@ void main() {
 
             if (DIST_GUIDE_P < XorShift32(rng_state) || dist_score_sum == 0) {
                 t = transmittance_sample2(MU_T, XorShift32(rng_state), xi_max);
-                dist_mc_state = distance_mc_state_new();
             } else if (t >= min(gbuf.linear_z, VOLUME_MAX_T) || t <= 0) {
                 continue; // TODO: Use transmittance sampling then
             }
