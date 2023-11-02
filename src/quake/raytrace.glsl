@@ -45,6 +45,69 @@ f16vec3 get_sky(const vec3 w) {
     return emm;
 }
 
+
+// Water shader source: https://www.shadertoy.com/view/MdXyzX
+// afl_ext MIT-License
+
+#define DRAG_MULT 0.28 // changes how much waves pull on the water
+#define WATER_DEPTH 1. // how deep is the water
+#define ITERATIONS_NORMAL 25 // waves iterations when calculating normals
+
+// Calculates wave value and its derivative, 
+// for the wave direction, position in space, wave frequency and time
+vec2 wavedx(vec2 position, vec2 direction, float frequency, float timeshift) {
+  float x = dot(direction, position) * frequency + timeshift;
+  float wave = exp(sin(x) - 1.0);
+  float dx = wave * cos(x);
+  return vec2(wave, -dx);
+}
+
+// Calculates waves by summing octaves of various waves with various parameters
+float getwaves(vec2 position, int iterations) {
+  float iter = 0.0; // this will help generating well distributed wave directions
+  float frequency = 1.0; // frequency of the wave, this will change every iteration
+  float timeMultiplier = 1.0; // time multiplier for the wave, this will change every iteration
+  float weight = 1.0;// weight in final sum for the wave, this will change every iteration
+  float sumOfValues = 0.0; // will store final sum of values
+  float sumOfWeights = 0.0; // will store final sum of weights
+  for(int i=0; i < iterations; i++) {
+    // generate some wave direction that looks kind of random
+    vec2 p = vec2(sin(iter), cos(iter));
+    // calculate wave data
+    vec2 res = wavedx(position, p, frequency, params.cl_time * timeMultiplier);
+
+    // shift position around according to wave drag and derivative of the wave
+    position += p * res.y * weight * DRAG_MULT;
+
+    // add the results to sums
+    sumOfValues += res.x * weight;
+    sumOfWeights += weight;
+
+    // modify next octave parameters
+    weight *= 0.82;
+    frequency *= 1.18;
+    timeMultiplier *= 1.07;
+
+    // add some kind of random value to make next wave look random too
+    iter += 1232.399963;
+  }
+  // calculate and return
+  return sumOfValues / sumOfWeights;
+}
+
+// Calculate normal at point by calculating the height at the pos and 2 additional points very close to pos
+vec3 water_normal(vec2 pos, float e, float depth) {
+  vec2 ex = vec2(e, 0);
+  float H = getwaves(pos.xy, ITERATIONS_NORMAL) * depth;
+  vec3 a = vec3(pos.x, H, pos.y);
+  return normalize(
+    cross(
+      a - vec3(pos.x - e, getwaves(pos.xy - ex.xy, ITERATIONS_NORMAL) * depth, pos.y), 
+      a - vec3(pos.x, getwaves(pos.xy + ex.yx, ITERATIONS_NORMAL) * depth, pos.y + e)
+    )
+  );
+}
+
 struct Hit {
     vec3 pos;
     vec3 prev_pos;
@@ -88,7 +151,7 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
 // (allows for volumetric effects)
 void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
     uint16_t intersection = 0s;
-
+    bool was_water = false;
     do {
         rayQueryEXT ray_query;
         VertexExtraData extra_data;
@@ -140,7 +203,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             contribution = throughput * sky;
             hit.albedo = sky;
 
-            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+            if (!was_water)
+                hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
             hit.enc_geonormal = geo_encode_normal(-hit.wi);
             hit.normal = -hit.wi;
             break;
@@ -155,7 +219,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             contribution += throughput * sky;
             hit.albedo = sky;
 
-            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+            if (!was_water)
+                hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
             hit.enc_geonormal = geo_encode_normal(-hit.wi);
             hit.normal = -hit.wi;
             break;
@@ -232,6 +297,31 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         if (flags == MAT_FLAGS_WATERFALL) {
             contribution += throughput * albedo_texture.rgb;
             hit.albedo = albedo_texture.rgb;
+        } else if (flags == MAT_FLAGS_WATER) {
+            hit.albedo = albedo_texture.rgb;
+
+            #define WATER_IOR 1.33
+            #define CRIT_ANGLE 0.02
+            const bool underwater = true;
+            hit.normal = make_frame(hit.normal) * water_normal(hit.pos.xy / 50, 0.1, WATER_DEPTH).xzy;
+            float fresnel;
+            if (underwater) fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(WATER_IOR*WATER_IOR*(1.0 - dot(-hit.wi, hit.normal)*dot(-hit.wi, hit.normal)), 0.0, 1.0), 5.0);
+            else            fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(1.0 - dot(-hit.wi, hit.normal), 0.0, 1.0), 5.0);
+
+            if (fresnel < 1.) {
+                // refract
+                if (underwater) hit.wi = refract(hit.wi, hit.normal, WATER_IOR);
+                else            hit.wi = refract(hit.wi, hit.normal, 1.0 / WATER_IOR);
+
+                //throughput /= uint16_t(1. - fresnel);
+            } else {
+                // reflect
+                hit.wi = reflect(hit.wi, hit.normal);
+                //throughput /= uint16_t(fresnel);
+            }
+            hit.pos += 1e-2 * hit.wi;
+            was_water = true;
+            continue;
         } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
             hit.albedo = ldr_to_hdr(albedo_texture.rgb);
             contribution += throughput * hit.albedo;
