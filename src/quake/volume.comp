@@ -41,7 +41,7 @@ void main() {
     const uint grid_max_x = resolution.x / DISTANCE_MC_GRID_WIDTH + 1;
 
     // must equal quake.comp
-    rng_state = pcg3d16(uvec3(pixel, params.frame));
+    rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     irr = vec3(0);
     moments = vec2(0);
 

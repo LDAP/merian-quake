@@ -41,6 +41,7 @@ layout (constant_id = 33) const float VOLUME_PHASE_P = 0.3;
 layout (constant_id = 34) const float DIR_GUIDE_PRIOR = 0.2;
 layout (constant_id = 35) const float DIST_GUIDE_P = 0.0;
 layout (constant_id = 36) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
+layout (constant_id = 37) const uint SEED = 0;
 
 #include "grid.h"
 

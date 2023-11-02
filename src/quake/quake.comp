@@ -32,7 +32,7 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_irradiance));
 
-    rng_state = pcg3d16(uvec3(pixel, params.frame));
+    rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     moments = vec2(0);
     irr = vec3(0);
     f16vec3 camera_throughput = f16vec3(1);

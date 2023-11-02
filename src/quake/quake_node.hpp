@@ -389,4 +389,7 @@ class QuakeNode : public merian::Node {
     float dist_guide_p = 0.0;
 
     uint32_t distance_mc_vertex_state_count = 10;
+
+    uint32_t seed = 0;
+    bool randomize_seed = true;
 };

@@ -23,6 +23,7 @@
 #include "quake.comp.spv.h"
 #include "volume.comp.spv.h"
 #include "volume_forward_project.comp.spv.h"
+#include <random>
 
 struct QuakeData {
     // The first quake node sets this
@@ -1287,6 +1288,13 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     if (glm::length(sun_dir) > 0)
         sun_dir = glm::normalize(sun_dir);
 
+    if (randomize_seed) {
+        std::random_device dev;
+        std::mt19937 rng(dev());
+        std::uniform_int_distribution<uint32_t> dist;
+        seed = dist(rng);
+    }
+
     // GRAPH DESC SETS
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
         merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
@@ -1309,7 +1317,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
             mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
             volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p,
-            distance_mc_vertex_state_count);
+            distance_mc_vertex_state_count, seed);
 
         auto spec = spec_builder.build();
 
@@ -1908,6 +1916,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const float old_dir_guide_prior = dir_guide_prior;
     const float old_dist_guide_p = dist_guide_p;
     const uint32_t old_distance_mc_vertex_state_count = distance_mc_vertex_state_count;
+    const uint32_t old_seed = seed;
+    const bool old_randomize_seed = randomize_seed;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1919,6 +1929,13 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.st_no_space();
     config.config_bool("gamestate update", update_gamestate);
     update_gamestate |= frame == 0;
+
+    config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
+    if (!randomize_seed)  {
+        config.config_uint("seed", seed, "");
+    } else {
+        config.output_text(fmt::format("seed: {}", seed));
+    }
 
     std::array<char, 128> cmd_buffer = {0};
     if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true)) {
@@ -2056,7 +2073,8 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
         old_dist_guide_p != dist_guide_p ||
-        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count) {
+        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count || old_seed != seed ||
+        old_randomize_seed != randomize_seed) {
         needs_rebuild = true;
     }
 }
