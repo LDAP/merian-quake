@@ -164,10 +164,8 @@ void main() {
                 incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
             }
 
-
-        incident *= f16vec3(phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A) * MU_S);
-
-        const vec3 contrib = incident * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
+        const float phase = phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A);
+        const vec3 contrib = incident * phase * MU_S * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irr += contrib;
             const float l = yuv_luminance(contrib);
@@ -190,7 +188,7 @@ void main() {
             }
 
             // UPDATE MC FOR OUTGOING DIRECTIONS
-            const float mc_f = yuv_luminance(incident / wo_p);
+            const float mc_f = yuv_luminance(phase * incident / wo_p);
             if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
                 mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
                 mc_static_save(mc_state, current_hit.pos, current_hit.normal);
