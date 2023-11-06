@@ -1562,9 +1562,9 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                 nlohmann::json o;
                 o["N"] = v->N;
                 o["hash"] = v->hash;
-                o["sum_len"] = v->sum_len;
+                o["w_cos"] = v->w_cos;
                 o["sum_w"] = v->sum_w;
-                o["sum_tgt"] = fmt::format("{} {} {}", v->sum_tgt.x, v->sum_tgt.y, v->sum_tgt.z);
+                o["w_tgt"] = fmt::format("{} {} {}", v->w_tgt.x, v->w_tgt.y, v->w_tgt.z);
 
                 j.emplace_back(o);
             }
