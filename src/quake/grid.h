@@ -1,10 +1,10 @@
 #include "merian-nodes/common/types.glsl.h"
 
 struct MCState {
-    vec3 sum_tgt;
+    vec3 w_tgt;
     float sum_w;
     uint N;
-    float sum_len;
+    float w_cos;
 
     vec3 mv;
     uint frame;
