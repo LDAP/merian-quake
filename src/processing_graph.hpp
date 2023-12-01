@@ -55,7 +55,6 @@ class ProcessingGraph {
         auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
         auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
         hud = std::make_shared<merian::QuakeHud>(context, alloc);
-        auto bloom = std::make_shared<merian::BloomNode>(context, alloc);
         auto add = std::make_shared<merian::AddNode>(context, alloc);
         auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
 
@@ -75,7 +74,6 @@ class ProcessingGraph {
         graph.add_node("exposure", exposure);
         graph.add_node("median variance", median);
         graph.add_node("hud", hud);
-        graph.add_node("bloom", bloom);
         graph.add_node("volume accum", volume_accum);
         graph.add_node("add", add);
         graph.add_node("beauty image write", beauty_image_write);
@@ -134,8 +132,7 @@ class ProcessingGraph {
         graph.connect_image(volume_svgf, add, 0, 0);
         graph.connect_image(volume_svgf, image_writer_volume, 0, 0);
 
-        graph.connect_image(add, bloom, 0, 0);
-        graph.connect_image(bloom, exposure, 0, 0);
+        graph.connect_image(add, exposure, 0, 0);
         graph.connect_image(exposure, tonemap, 0, 0);
         graph.connect_buffer(quake, hud, 2, 0);
         graph.connect_image(tonemap, hud, 0, 0);
