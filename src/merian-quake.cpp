@@ -1,4 +1,5 @@
 #include "imgui.h"
+#include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
@@ -11,7 +12,6 @@
 #include "merian/vk/extension/extension_vk_ray_query.hpp"
 #include "merian/vk/graph/graph.hpp"
 #include "merian/vk/graph/node.hpp"
-#include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
