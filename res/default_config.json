@@ -158,7 +158,7 @@
         "extended search": false,
         "filter mode": "linear",
         "firefly filter bias": 0.20000000298023224,
-        "firefly filter enable": false,
+        "firefly filter enable": true,
         "firefly percentile lower": 0.25,
         "firefly percentile upper": 0.9594060182571411,
         "hard clamp": "inf",
