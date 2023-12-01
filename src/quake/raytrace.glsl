@@ -308,6 +308,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             if (underwater) fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(WATER_IOR*WATER_IOR*(1.0 - dot(-hit.wi, hit.normal)*dot(-hit.wi, hit.normal)), 0.0, 1.0), 5.0);
             else            fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(1.0 - dot(-hit.wi, hit.normal), 0.0, 1.0), 5.0);
 
+            vec3 w = hit.wi;
             if (fresnel < 1.) {
                 // refract
                 if (underwater) hit.wi = refract(hit.wi, hit.normal, WATER_IOR);
@@ -319,7 +320,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 hit.wi = reflect(hit.wi, hit.normal);
                 //throughput /= uint16_t(fresnel);
             }
-            hit.pos += 1e-2 * hit.wi;
+            hit.pos += w * _get_t(ray_query, true) * abs(dot(-w, hit.normal)/dot(hit.wi, hit.normal)) * 1.0/WATER_IOR;
             was_water = true;
             continue;
         } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
