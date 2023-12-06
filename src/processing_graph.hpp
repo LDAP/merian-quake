@@ -46,7 +46,6 @@ class ProcessingGraph {
         auto image_writer_volume =
             std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
         auto exposure = std::make_shared<merian::ExposureNode>(context, alloc);
-        auto median = std::make_shared<merian::MedianApproxNode>(context, alloc, 3);
         hud = std::make_shared<merian::QuakeHud>(context, alloc);
         auto add = std::make_shared<merian::AddNode>(context, alloc);
         auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
@@ -65,7 +64,6 @@ class ProcessingGraph {
         graph.add_node("image writer", image_writer);
         graph.add_node("volume image writer", image_writer_volume);
         graph.add_node("exposure", exposure);
-        graph.add_node("median variance", median);
         graph.add_node("hud", hud);
         graph.add_node("volume accum", volume_accum);
         graph.add_node("add", add);
@@ -84,17 +82,15 @@ class ProcessingGraph {
         graph.connect_buffer(quake, accum, 2, 0); // gbuffer
         graph.connect_buffer(quake, accum, 2, 1);
 
-        graph.connect_buffer(quake, quake, 2, 1); // gbuf
+        graph.connect_buffer(quake, quake, 2, 0); // gbuf
 
         graph.connect_image(svgf, quake, 0, 1); // prev final image (with variance)
-        graph.connect_buffer(median, quake, 0, 0);
 
         graph.connect_image(svgf, svgf, 0, 0);  // feedback
         graph.connect_image(accum, svgf, 0, 1); // irr
         graph.connect_image(accum, svgf, 1, 2); // moments
         graph.connect_image(quake, svgf, 1, 3); // albedo
         graph.connect_image(quake, svgf, 2, 4); // mv
-        graph.connect_image(svgf, median, 0, 0);
         graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
         graph.connect_buffer(quake, svgf, 2, 1);
         graph.connect_image(svgf, image_writer, 0, 0);

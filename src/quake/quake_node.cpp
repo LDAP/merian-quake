@@ -1196,7 +1196,6 @@ QuakeNode::describe_inputs() {
             merian::NodeInputDescriptorImage::compute_read("prev_volume_depth", 1),
         },
         {
-            merian::NodeInputDescriptorBuffer::compute_read("mean_filtered", 1),
             merian::NodeInputDescriptorBuffer::compute_read("prev_gbuf", 1),
         },
     };
