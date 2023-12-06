@@ -64,7 +64,7 @@
         "aperature": 1.1200000047683716,
         "autoexposure": true,
         "max exposure": 10000.0,
-        "max log luminance": 10.0,
+        "max log luminance": 11.0,
         "metering": "center-weighted",
         "min exposure": 1.0,
         "min log luminance": -16.0,
