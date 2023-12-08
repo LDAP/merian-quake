@@ -10,7 +10,7 @@
 // GENERAL
 
 MCState mc_state_new(const vec3 pos, const vec3 normal) {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0, 0};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0};
     return r;
 }
 
@@ -37,7 +37,7 @@ void mc_state_add_sample(inout MCState mc_state,
     //mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
 
     mc_state.mv = target_mv;
-    mc_state.frame = params.frame;
+    mc_state.T = params.cl_time;
 }
 
 #define mc_state_valid(mc_state) (mc_state.sum_w > 0.0)
@@ -68,7 +68,7 @@ void mc_adaptive_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
 
     mc_state = mc_states[buf_idx];
     mc_state.sum_w *= float(hash2_grid_level(grid_idx, level) == mc_state.hash);
-    mc_state.w_tgt += mc_state.sum_w * (params.frame - mc_state.frame) * mc_state.mv;
+    mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
 void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
@@ -92,7 +92,7 @@ void mc_static_load(out MCState mc_state, const vec3 pos) {
     
     mc_state = mc_states[buf_idx];
     mc_state.sum_w *= float(hash2_grid(grid_idx) == mc_state.hash);
-    mc_state.w_tgt += mc_state.sum_w * (params.frame - mc_state.frame) * mc_state.mv;
+    mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos, const vec3 normal) {

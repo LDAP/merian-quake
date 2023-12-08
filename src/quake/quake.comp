@@ -169,7 +169,7 @@ void main() {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
 
                         if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
-                            mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
+                            mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                             mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                             mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
                         } else if (MC_FAST_RECOVERY > 0 && mc_f < 1e-12 * mc_state.sum_w) {

@@ -1504,6 +1504,14 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.prev_cam_w_mu_sy.a = fog_color[1] * pc.cam_x_mu_t.a;
         pc.prev_cam_u_mu_sz.a = fog_color[2] * pc.cam_x_mu_t.a;
     }
+    {   
+        // motion tracking time diff
+        const float time_diff = pc.cl_time - prev_cl_time;
+        if (time_diff > 0)
+            pc.cam_w.a = time_diff;
+        else
+            pc.cam_w.a = 1.0;
+    }
 
     // BIND PIPELINE
     {
