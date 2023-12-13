@@ -17,7 +17,7 @@ This project introduces a novel real-time path guiding algorithm developed durin
   <img src="images/tears.png" width="400" /> 
 </p>
 
-Maps in Screenshots: start from [Alkaline](https://alkalinequake.wordpress.com/) and ad_azad, ad_sepulcher, ad_tears from [Arcane Dimensions](https://www.moddb.com/mods/arcane-dimensions). 
+Maps in screenshots: start from [Alkaline](https://alkalinequake.wordpress.com/) and ad_azad, ad_sepulcher, ad_tears from [Arcane Dimensions](https://www.moddb.com/mods/arcane-dimensions). 
 
 ## Requirements
 
