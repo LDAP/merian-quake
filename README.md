@@ -1,4 +1,4 @@
-# Merian-Quake RT
+# Merian-Quake
 
 A path-tracer for the original Quake game on top of  [quakespasm](https://github.com/sezero/quakespasm).
 
@@ -9,7 +9,6 @@ This project introduces a novel real-time path guiding algorithm developed durin
 > Lucas Alber. (2024), Markov Chain Path Guiding for Real-Time Global Illumination and Single-Scattering, MSc Thesis, Karlsruhe Institute of Technology.
 
 <hr>
-
 
 <p align="middle">
   <img src="images/alk.png" width="400" />
