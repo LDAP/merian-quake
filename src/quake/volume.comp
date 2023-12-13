@@ -46,7 +46,8 @@ void main() {
     moments = vec2(0);
 
     const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
-    const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+    const vec2 jitter = JITTER_ENABLE == 1 ? pixel_offset_halton(params.frame) : vec2(0);
+    const vec3 first_wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
     const vec2 mv = imageLoad(img_volume_mv, pixel).rg;
 
     for (int s = 0; s < VOLUME_SPP; s++) {

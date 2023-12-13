@@ -392,4 +392,5 @@ class QuakeNode : public merian::Node {
 
     uint32_t seed = 0;
     bool randomize_seed = true;
+    int32_t jitter_enable = 0;
 };

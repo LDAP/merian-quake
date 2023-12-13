@@ -1316,7 +1316,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
             mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
             volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p,
-            distance_mc_vertex_state_count, seed);
+            distance_mc_vertex_state_count, seed, jitter_enable);
 
         auto spec = spec_builder.build();
 
@@ -1504,7 +1504,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.prev_cam_w_mu_sy.a = fog_color[1] * pc.cam_x_mu_t.a;
         pc.prev_cam_u_mu_sz.a = fog_color[2] * pc.cam_x_mu_t.a;
     }
-    {   
+    {
         // motion tracking time diff
         const float time_diff = pc.cl_time - prev_cl_time;
         if (time_diff > 0)
@@ -1925,6 +1925,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const uint32_t old_distance_mc_vertex_state_count = distance_mc_vertex_state_count;
     const uint32_t old_seed = seed;
     const bool old_randomize_seed = randomize_seed;
+    const int32_t old_jitter_enable = jitter_enable;
 
     config.st_separate("General");
     bool old_sound = sound;
@@ -1938,11 +1939,13 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     update_gamestate |= frame == 0;
 
     config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
-    if (!randomize_seed)  {
+    if (!randomize_seed) {
         config.config_uint("seed", seed, "");
     } else {
         config.output_text(fmt::format("seed: {}", seed));
     }
+
+    config.config_bool("jitter", jitter_enable, "Jitters the camera rays. Used for TAA.");
 
     std::array<char, 128> cmd_buffer = {0};
     if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true)) {
@@ -2081,7 +2084,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
         old_dist_guide_p != dist_guide_p ||
         old_distance_mc_vertex_state_count != distance_mc_vertex_state_count || old_seed != seed ||
-        old_randomize_seed != randomize_seed) {
+        old_randomize_seed != randomize_seed || old_jitter_enable != jitter_enable) {
         needs_rebuild = true;
     }
 }

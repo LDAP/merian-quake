@@ -39,7 +39,7 @@ void main() {
 
     Hit first_hit;
     {
-        const vec2 jitter = vec2(0);/* pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/
+        const vec2 jitter = JITTER_ENABLE == 1 ? pixel_offset_halton(params.frame) : vec2(0);
 
         first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         first_hit.pos = params.cam_x.xyz;
