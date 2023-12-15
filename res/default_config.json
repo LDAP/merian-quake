@@ -32,11 +32,6 @@
         "rebuild on record": false,
         "run trigger": -1
     },
-    "bloom": {
-        "brightness threshold": 10.0,
-        "mode": "bloom off",
-        "strengh": 0.0010000000474974513
-    },
     "blue_noise": null,
     "connections": null,
     "denoiser": {
@@ -73,6 +68,9 @@
         "speed down": 5.099999904632568,
         "speed up": 3.0999999046325684
     },
+    "fxaa": {
+        "enable": true
+    },
     "hud": null,
     "image writer": {
         "callback after capture": false,
@@ -86,10 +84,6 @@
         "rebuild after capture": false,
         "rebuild on record": false,
         "run trigger": -1
-    },
-    "median variance": {
-        "max": 100.0,
-        "min": 0.0
     },
     "one": {
         "color": [
@@ -128,6 +122,7 @@
         "overwrite sun": false,
         "particle size": 25.0,
         "player model": "gun only",
+        "randomize seed": true,
         "rebuild after stop": true,
         "render height": 1080,
         "render width": 1920,
@@ -144,7 +139,9 @@
         "volume: use LC": true
     },
     "tonemap": {
+        "alpha mode": "Perceptual luminance (Clamped)",
         "max white": 4.949999809265137,
+        "perceptual exponent": 2.200000047683716,
         "tonemap": "Reinhard Extended"
     },
     "volume accum": {

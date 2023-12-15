@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/fxaa/fxaa.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/vk/graph/graph.hpp"
 
@@ -49,6 +50,7 @@ class ProcessingGraph {
         hud = std::make_shared<merian::QuakeHud>(context, alloc);
         auto add = std::make_shared<merian::AddNode>(context, alloc);
         auto beauty_image_write = std::make_shared<merian::ImageWriteNode>(context, alloc, "image");
+        auto fxaa = std::make_shared<merian::FXAA>(context, alloc);
 
         image_writer->set_callback([accum]() { accum->request_clear(); });
         image_writer_volume->set_callback(
@@ -68,6 +70,7 @@ class ProcessingGraph {
         graph.add_node("volume accum", volume_accum);
         graph.add_node("add", add);
         graph.add_node("beauty image write", beauty_image_write);
+        graph.add_node("fxaa", fxaa);
 
         graph.connect_image(blue_noise, quake, 0, 0);
 
@@ -124,7 +127,8 @@ class ProcessingGraph {
         graph.connect_image(add, exposure, 0, 0);
         graph.connect_image(exposure, tonemap, 0, 0);
         graph.connect_buffer(quake, hud, 2, 0);
-        graph.connect_image(tonemap, hud, 0, 0);
+        graph.connect_image(tonemap, fxaa, 0, 0);
+        graph.connect_image(fxaa, hud, 0, 0);
 
         graph.connect_image(tonemap, beauty_image_write, 0, 0);
     }
