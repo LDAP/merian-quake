@@ -130,7 +130,7 @@ class ProcessingGraph {
         graph.connect_image(tonemap, fxaa, 0, 0);
         graph.connect_image(fxaa, hud, 0, 0);
 
-        graph.connect_image(tonemap, beauty_image_write, 0, 0);
+        graph.connect_image(fxaa, beauty_image_write, 0, 0);
     }
 
     // Outputs the final image
