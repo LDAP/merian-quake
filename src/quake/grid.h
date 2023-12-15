@@ -7,7 +7,7 @@ struct MCState {
     float w_cos;
 
     vec3 mv;
-    uint frame;
+    float T;
 
     uint hash; // grid_idx and level
 };

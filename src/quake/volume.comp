@@ -120,7 +120,7 @@ void main() {
                 for (int i = 0; i < MC_SAMPLES; i++) {
                     MCState state;
                     if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
-                        mc_adaptive_load(state, current_hit.pos, current_hit.normal);
+                        mc_adaptive_load(state, current_hit.pos, -first_wi);
                     } else {
                         mc_static_load(state, current_hit.pos);
                     }
@@ -190,14 +190,15 @@ void main() {
             // UPDATE MC FOR OUTGOING DIRECTIONS
             const float mc_f = yuv_luminance(phase * incident / wo_p);
             if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
-                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, next_hit.pos - next_hit.prev_pos);
-                mc_static_save(mc_state, current_hit.pos, current_hit.normal);
-                mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                const vec3 jittered_normal = make_frame(-first_wi) * sample_cos(XorShift32Vec2(rng_state));
+                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
+                mc_static_save(mc_state, current_hit.pos, jittered_normal);
+                mc_adaptive_save(mc_state, current_hit.pos, jittered_normal);
             } else if (MC_FAST_RECOVERY > 0 && mc_f < 1e-12 * mc_state.sum_w) {
                 // fix slow recovery after light source disappears
-                mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                mc_static_save(mc_state, current_hit.pos, current_hit.normal);
-                mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                mc_state = mc_state_new(current_hit.pos, -first_wi);
+                mc_static_save(mc_state, current_hit.pos, -first_wi);
+                mc_adaptive_save(mc_state, current_hit.pos, -first_wi);
             }
         }
     }
