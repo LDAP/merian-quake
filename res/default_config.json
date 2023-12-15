@@ -139,7 +139,8 @@
         "volume: use LC": true
     },
     "tonemap": {
-        "alpha mode": "Perceptual luminance (Clamped)",
+        "alpha mode": "Perceptual luminance",
+        "clamp output": true,
         "max white": 4.949999809265137,
         "perceptual exponent": 2.200000047683716,
         "tonemap": "Reinhard Extended"
