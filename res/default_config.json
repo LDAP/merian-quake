@@ -128,7 +128,7 @@
         "render width": 1920,
         "reproducible renders": false,
         "sound": true,
-        "spp": 2,
+        "spp": 1,
         "startup commands": "# game ad\n#map e1m1\n# map ad_tears\n# map ad_azad\n#playdemo ref_tears_0\n#playdemo ref_azad_1\n# map e1m1",
         "static grid buf size": 800009,
         "stop after worldspawn": -1,
