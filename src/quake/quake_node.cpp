@@ -1314,7 +1314,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
-            mc_adaptive_grid_levels, distance_mc_grid_width, mc_static_vertex_state_count,
+            mc_adaptive_grid_levels, distance_mc_grid_width,
             volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p,
             distance_mc_vertex_state_count, seed);
 
@@ -1915,7 +1915,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     const int32_t old_mc_adaptive_grid_levels = mc_adaptive_grid_levels;
     const float old_mc_static_grid_width = mc_static_grid_width;
     const float old_distance_mc_grid_width = distance_mc_grid_width;
-    const int32_t old_mc_static_vertex_state_count = mc_static_vertex_state_count;
     const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
     const float old_volume_max_t = volume_max_t;
     const float old_surf_bsdf_p = surf_bsdf_p;
@@ -1982,8 +1981,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     config.config_float("mc static width", mc_static_grid_width,
                         "the static grid width in worldspace units, lower means higher resolution",
                         0.1);
-    config.config_int("mc static states per vertex", mc_static_vertex_state_count,
-                      "number of states that are stored per hash grid vertex");
     config.config_bool("mc fast recovery", mc_fast_recovery,
                        "When enabled, markov chains are flooded with invalidated states when no "
                        "light is detected.");
@@ -2075,7 +2072,6 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
         old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
-        old_mc_static_vertex_state_count != mc_static_vertex_state_count ||
         old_light_cache_buffer_size != light_cache_buffer_size ||
         old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||

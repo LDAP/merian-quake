@@ -86,9 +86,7 @@ void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
 
 void mc_static_load(out MCState mc_state, const vec3 pos) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
-    const uint state_idx = uint(XorShift32(rng_state) * MC_STATIC_VERTEX_STATE_COUNT);
-    // We use the "level" has as state idx
-    const uint buf_idx = hash_grid_level(grid_idx, state_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
+    const uint buf_idx = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
     
     mc_state = mc_states[buf_idx];
     mc_state.sum_w *= float(hash2_grid(grid_idx) == mc_state.hash);
@@ -102,8 +100,7 @@ void mc_static_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
 
 void mc_static_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
-    const uint state_idx = uint(XorShift32(rng_state) * MC_STATIC_VERTEX_STATE_COUNT);
-    const uint buf_idx = hash_grid_level(grid_idx, state_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
+    const uint buf_idx = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
 
     mc_state.hash = hash2_grid(grid_idx);
     mc_states[buf_idx] = mc_state;

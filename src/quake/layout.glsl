@@ -34,14 +34,13 @@ layout (constant_id = 26) const float MC_ADAPTIVE_GRID_TAN_ALPHA_HALF = 0.003;
 layout (constant_id = 27) const float MC_STATIC_GRID_WIDTH = 25.3;
 layout (constant_id = 28) const int MC_ADAPTIVE_GRID_LEVELS = 10;
 layout (constant_id = 29) const int DISTANCE_MC_GRID_WIDTH = 25;
-layout (constant_id = 30) const int MC_STATIC_VERTEX_STATE_COUNT = 23;
-layout (constant_id = 31) const float VOLUME_MAX_T = 1000.;
-layout (constant_id = 32) const float SURF_BSDF_P = 0.15;
-layout (constant_id = 33) const float VOLUME_PHASE_P = 0.3;
-layout (constant_id = 34) const float DIR_GUIDE_PRIOR = 0.2;
-layout (constant_id = 35) const float DIST_GUIDE_P = 0.0;
-layout (constant_id = 36) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
-layout (constant_id = 37) const uint SEED = 0;
+layout (constant_id = 30) const float VOLUME_MAX_T = 1000.;
+layout (constant_id = 31) const float SURF_BSDF_P = 0.15;
+layout (constant_id = 32) const float VOLUME_PHASE_P = 0.3;
+layout (constant_id = 33) const float DIR_GUIDE_PRIOR = 0.2;
+layout (constant_id = 34) const float DIST_GUIDE_P = 0.0;
+layout (constant_id = 35) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
+layout (constant_id = 36) const uint SEED = 0;
 
 #include "grid.h"
 
