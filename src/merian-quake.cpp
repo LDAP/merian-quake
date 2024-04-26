@@ -1,5 +1,5 @@
 #include "imgui.h"
-#include "merian-nodes/blit_glfw_window/blit_glfw_window.hpp"
+#include "merian-nodes/glfw_window/glfw_window.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
@@ -208,7 +208,7 @@ int main(const int argc, const char** argv) {
         auto& run = graph.get().cmd_run(cmd, frame_data.user_data.profiler);
         // MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
 
-        if (output->current_aquire_result().has_value()) {
+        if (output->current_aquire_result()) {
             imgui.new_frame(cmd, *window, output->current_aquire_result().value());
 
             const double frametime_ms = frametime.millis();
