@@ -52,7 +52,7 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::DummyInputController>();
     auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
-    ProcessingGraph graph(argc, argv, context, alloc, queue, debug_utils, loader,
+    ProcessingGraph graph(argc, argv, context, alloc, queue, loader,
                           ring_fences->ring_size(), controller);
 
     auto ring_cmd_pool =

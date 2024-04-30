@@ -151,12 +151,12 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::GLFWInputController>(window);
     auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
-    ProcessingGraph graph(argc, argv, context, alloc, queue, debug_utils, loader,
+    ProcessingGraph graph(argc, argv, context, alloc, queue, loader,
                           ring_fences->ring_size(), controller);
 
     auto output =
         std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
-    graph.add_beauty_output("output", output, 0);
+    graph.add_beauty_output("output", output, "src");
 
     merian::ImGuiConfiguration config;
 

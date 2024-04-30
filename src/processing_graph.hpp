@@ -24,11 +24,10 @@ class ProcessingGraph {
                     const merian::SharedContext& context,
                     const merian::ResourceAllocatorHandle& alloc,
                     const merian::QueueHandle& wait_queue,
-                    const std::shared_ptr<merian::ExtensionVkDebugUtils>& debug_utils,
                     const merian::FileLoader& loader,
                     const uint32_t ring_size,
                     const merian::InputControllerHandle& controller)
-        : graph(context, alloc, wait_queue, debug_utils) {
+        : graph(context, alloc, wait_queue) {
 
         auto blue_noise = std::make_shared<merian::ImageNode>(
             alloc, "blue_noise/1024_1024/LDR_RGBA_0.png", loader, true);
@@ -72,89 +71,72 @@ class ProcessingGraph {
         graph.add_node("beauty image write", beauty_image_write);
         graph.add_node("fxaa", fxaa);
 
-        graph.connect_image(blue_noise, quake, 0, 0);
-
-        // Solid
-        graph.connect_image(quake, accum, 0, 2); // irr
-        graph.connect_image(quake, accum, 4, 4); // moments
-
-        graph.connect_image(accum, accum, 0, 0); // feedback
-        graph.connect_image(accum, accum, 1, 1);
-
-        graph.connect_image(quake, accum, 2, 3);  // mv
-        graph.connect_buffer(quake, accum, 2, 0); // gbuffer
-        graph.connect_buffer(quake, accum, 2, 1);
-
-        graph.connect_buffer(quake, quake, 2, 0); // gbuf
-
-        graph.connect_image(svgf, quake, 0, 1); // prev final image (with variance)
-
-        graph.connect_image(svgf, svgf, 0, 0);  // feedback
-        graph.connect_image(accum, svgf, 0, 1); // irr
-        graph.connect_image(accum, svgf, 1, 2); // moments
-        graph.connect_image(quake, svgf, 1, 3); // albedo
-        graph.connect_image(quake, svgf, 2, 4); // mv
-        graph.connect_buffer(quake, svgf, 2, 0); // gbuffer
-        graph.connect_buffer(quake, svgf, 2, 1);
-        graph.connect_image(svgf, image_writer, 0, 0);
-
-        //  debug output
-        // graph.connect_image(quake, output, 3, 0);
-
-        // Volume
-        graph.connect_image(quake, quake, 7, 2);               // volume depth
-        graph.connect_image(volume_accum, volume_accum, 0, 0); // feedback
-        graph.connect_image(volume_accum, volume_accum, 1, 1);
-        graph.connect_image(quake, volume_accum, 5, 2);  // irr
-        graph.connect_image(quake, volume_accum, 8, 3);  // mv
-        graph.connect_image(quake, volume_accum, 6, 4);  // moments
-        graph.connect_buffer(quake, volume_accum, 2, 0); // gbuffer
-        graph.connect_buffer(quake, volume_accum, 2, 1);
-
-        graph.connect_image(volume_svgf, volume_svgf, 0, 0);  // feedback
-        graph.connect_image(volume_accum, volume_svgf, 0, 1); // irr
-        graph.connect_image(volume_accum, volume_svgf, 1, 2); // moments
-        graph.connect_image(one, volume_svgf, 0, 3);          // albedo
-        graph.connect_image(quake, volume_svgf, 8, 4);        // mv
-        graph.connect_buffer(quake, volume_svgf, 2, 0);       // gbuffer
-        graph.connect_buffer(quake, volume_svgf, 2, 1);
-
-        // Composite
-        graph.connect_image(svgf, add, 0, 1);
-        graph.connect_image(volume_svgf, add, 0, 0);
-        graph.connect_image(volume_svgf, image_writer_volume, 0, 0);
-
-        graph.connect_image(add, exposure, 0, 0);
-        graph.connect_image(exposure, tonemap, 0, 0);
-        graph.connect_buffer(quake, hud, 2, 0);
-        graph.connect_image(tonemap, fxaa, 0, 0);
-        graph.connect_image(fxaa, hud, 0, 0);
-
-        graph.connect_image(fxaa, beauty_image_write, 0, 0);
+        graph.connect_image(one, volume_svgf, "output", "albedo");
+        graph.connect_image(blue_noise, quake, "output", "blue_noise");
+        graph.connect_image(quake, accum, "irradiance", "irr");
+        graph.connect_image(quake, svgf, "albedo", "albedo");
+        graph.connect_image(quake, accum, "mv", "mv");
+        graph.connect_image(quake, svgf, "mv", "mv");
+        graph.connect_image(quake, accum, "moments", "moments_in");
+        graph.connect_image(quake, volume_accum, "volume", "irr");
+        graph.connect_image(quake, volume_accum, "volume_moments", "moments_in");
+        graph.connect_image(quake, quake, "volume_depth", "prev_volume_depth");
+        graph.connect_image(quake, volume_accum, "volume_mv", "mv");
+        graph.connect_image(quake, volume_svgf, "volume_mv", "mv");
+        graph.connect_buffer(quake, accum, "gbuffer", "gbuf");
+        graph.connect_buffer(quake, accum, "gbuffer", "prev_gbuf");
+        graph.connect_buffer(quake, quake, "gbuffer", "prev_gbuf");
+        graph.connect_buffer(quake, svgf, "gbuffer", "gbuffer");
+        graph.connect_buffer(quake, svgf, "gbuffer", "prev_gbuffer");
+        graph.connect_buffer(quake, volume_accum, "gbuffer", "gbuf");
+        graph.connect_buffer(quake, volume_accum, "gbuffer", "prev_gbuf");
+        graph.connect_buffer(quake, volume_svgf, "gbuffer", "gbuffer");
+        graph.connect_buffer(quake, volume_svgf, "gbuffer", "prev_gbuffer");
+        graph.connect_buffer(quake, hud, "gbuffer", "gbuf");
+        graph.connect_image(volume_accum, volume_accum, "out_irr", "prev_accum");
+        graph.connect_image(volume_accum, volume_svgf, "out_irr", "irr");
+        graph.connect_image(volume_accum, volume_accum, "out_moments", "prev_moments");
+        graph.connect_image(volume_accum, volume_svgf, "out_moments", "moments");
+        graph.connect_image(accum, accum, "out_irr", "prev_accum");
+        graph.connect_image(accum, svgf, "out_irr", "irr");
+        graph.connect_image(accum, accum, "out_moments", "prev_moments");
+        graph.connect_image(accum, svgf, "out_moments", "moments");
+        graph.connect_image(volume_svgf, volume_svgf, "out", "prev_out");
+        graph.connect_image(volume_svgf, add, "out", "a");
+        graph.connect_image(volume_svgf, image_writer_volume, "out", "src");
+        graph.connect_image(svgf, quake, "out", "prev_filtered");
+        graph.connect_image(svgf, svgf, "out", "prev_out");
+        graph.connect_image(svgf, image_writer, "out", "src");
+        graph.connect_image(svgf, add, "out", "b");
+        graph.connect_image(add, exposure, "output", "src");
+        graph.connect_image(exposure, tonemap, "output", "src");
+        graph.connect_image(tonemap, fxaa, "output", "in");
+        graph.connect_image(fxaa, hud, "out", "src");
+        graph.connect_image(fxaa, beauty_image_write, "out", "src");
     }
 
     // Outputs the final image
     void add_beauty_output(const std::string& name,
                            const merian::NodeHandle& node,
-                           uint32_t node_input_index) {
+                           const std::string& node_input) {
         graph.add_node(name, node);
-        graph.connect_image(hud, node, 0, node_input_index);
+        graph.connect_image(hud, node, "output", node_input);
     }
 
     // Outputs the surfaces only
     void add_surface_output(const std::string& name,
                             const merian::NodeHandle& node,
-                            uint32_t node_input_index) {
+                            const std::string& node_input) {
         graph.add_node(name, node);
-        graph.connect_image(svgf, node, 0, node_input_index);
+        graph.connect_image(svgf, node, "out", node_input);
     }
 
     // Outputs the volumes only
     void add_volume_output(const std::string& name,
                            const merian::NodeHandle& node,
-                           uint32_t node_input_index) {
+                           const std::string& node_input) {
         graph.add_node(name, node);
-        graph.connect_image(volume_svgf, node, 0, node_input_index);
+        graph.connect_image(volume_svgf, node, "out", node_input);
     }
 
     merian::Graph& get() {
