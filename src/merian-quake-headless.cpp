@@ -56,7 +56,7 @@ int main(const int argc, const char** argv) {
                           ring_fences->ring_size(), controller);
 
     auto ring_cmd_pool =
-        make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
+        make_shared<merian::RingCommandPool<>>(context, queue);
 
     merian::Profiler::Report report;
     bool clear_profiler = false;

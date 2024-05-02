@@ -161,7 +161,7 @@ int main(const int argc, const char** argv) {
     merian::ImGuiConfiguration config;
 
     auto ring_cmd_pool =
-        make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
+        make_shared<merian::RingCommandPool<>>(context, queue);
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
 
@@ -209,7 +209,7 @@ int main(const int argc, const char** argv) {
         // MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
 
         if (output->current_aquire_result()) {
-            imgui.new_frame(cmd, *window, output->current_aquire_result().value());
+            imgui.new_frame(queue, cmd, *window, output->current_aquire_result().value());
 
             const double frametime_ms = frametime.millis();
             frametime.reset();
