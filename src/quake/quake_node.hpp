@@ -10,11 +10,9 @@
 #include "merian/vk/raytrace/blas_builder.hpp"
 #include "merian/vk/raytrace/tlas_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
-#include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/utils/profiler.hpp"
 #include "quake/config.h"
 
-#include <optional>
 #include <queue>
 #include <unordered_set>
 
@@ -127,6 +125,27 @@ class QuakeNode : public merian::Node {
         uint64_t last_rebuild = 0;
     };
 
+    // Per-frame data and updates
+    struct FrameData : public merian::Node::FrameData {
+        // Needed per frame because might reallocate scratch buffer
+        std::unique_ptr<merian::BLASBuilder> blas_builder;
+        std::unique_ptr<merian::TLASBuilder> tlas_builder;
+
+        merian::DescriptorSetHandle quake_sets{nullptr};
+
+        // keep copy of current_textures to keep them alive and to know which descriptors to update
+        std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
+
+        std::vector<RTGeometry> static_geometries;
+        std::vector<RTGeometry> dynamic_geometries;
+
+        // TLAS
+        merian::BufferHandle instances_buffer{nullptr};
+        // Can be nullptr if there is not geometry
+        merian::AccelerationStructureHandle tlas{nullptr};
+        uint32_t last_instances_size{};
+    };
+
   public:
     /* Path to the Quake basedir. This directory must contain the id1 directory.
      * It must be guaranteed that at most `ring_size` resources suffice. (A RingFence with that
@@ -158,6 +177,8 @@ class QuakeNode : public merian::Node {
 
     // -----------------------------------------------------
 
+    std::shared_ptr<merian::Node::FrameData> create_frame_data() override;
+
     std::tuple<std::vector<merian::NodeInputDescriptorImage>,
                std::vector<merian::NodeInputDescriptorBuffer>>
     describe_inputs() override;
@@ -172,7 +193,7 @@ class QuakeNode : public merian::Node {
 
     void cmd_process(const vk::CommandBuffer& cmd,
                      merian::GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
+                     const std::shared_ptr<merian::Node::FrameData>& frame_data,
                      const uint32_t graph_set_index,
                      const merian::NodeIO& io) override;
 
@@ -196,13 +217,18 @@ class QuakeNode : public merian::Node {
                                           const bool force_rebuild,
                                           const vk::BuildAccelerationStructureFlagsKHR flags);
     // Optionally refreshes the geo and updates the current descriptor set if necessary
-    void update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo);
+    void update_static_geo(const vk::CommandBuffer& cmd,
+                           const bool refresh_geo,
+                           const std::shared_ptr<FrameData>& cur_frame);
     // Refreshes the geo and updates the current descriptor set
-    void update_dynamic_geo(const vk::CommandBuffer& cmd);
+    void update_dynamic_geo(const vk::CommandBuffer& cmd,
+                            const std::shared_ptr<FrameData>& cur_frame);
     // Builds the as and updates the current descriptor set
-    void update_as(const vk::CommandBuffer& cmd, const merian::ProfilerHandle profiler);
+    void update_as(const vk::CommandBuffer& cmd,
+                   const merian::ProfilerHandle profiler,
+                   const std::shared_ptr<FrameData>& cur_frame);
     // processes the pending uploads and updates the current descriptor set
-    void update_textures(const vk::CommandBuffer& cmd);
+    void update_textures(const vk::CommandBuffer& cmd, const std::shared_ptr<FrameData>& cur_frame);
 
     void parse_worldspawn();
 
@@ -247,39 +273,11 @@ class QuakeNode : public merian::Node {
     uint32_t texnum_explosion = 0;
 
     // ----------------------------------------------------
-    // Per-frame data and updates
 
-    struct FrameData {
-        // Needed per frame because might reallocate scratch buffer
-        std::unique_ptr<merian::BLASBuilder> blas_builder;
-        std::unique_ptr<merian::TLASBuilder> tlas_builder;
-
-        merian::DescriptorSetHandle quake_sets{nullptr};
-
-        // keep copy of current_textures to keep them alive and to know which descriptors to update
-        std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
-
-        std::vector<RTGeometry> static_geometries;
-        std::vector<RTGeometry> dynamic_geometries;
-
-        // TLAS
-        merian::BufferHandle instances_buffer{nullptr};
-        // Can be nullptr if there is not geometry
-        merian::AccelerationStructureHandle tlas{nullptr};
-        uint32_t last_instances_size{};
-    };
-
-    // Access using frame % frames.size()
-    std::vector<FrameData> frames;
     uint64_t frame = 0;
     double prev_cl_time = 0;
 
     std::array<char, 512> startup_commands_buffer = {0};
-
-    FrameData& current_frame() {
-        assert(frames.size());
-        return frames[frame % frames.size()];
-    }
 
     // "Global" frame info
     // texnum -> texture
