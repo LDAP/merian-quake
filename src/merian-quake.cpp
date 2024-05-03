@@ -124,6 +124,7 @@ static void signal_handler(int signal) {
 struct FrameData {
     merian::StagingMemoryManager::SetID staging_set_id{};
     merian::ProfilerHandle profiler{};
+    merian::GraphFrameData graph_frame_data{};
 };
 
 int main(const int argc, const char** argv) {
@@ -151,8 +152,8 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::GLFWInputController>(window);
     auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
-    ProcessingGraph graph(argc, argv, context, alloc, queue, loader,
-                          ring_fences->ring_size(), controller);
+    ProcessingGraph graph(argc, argv, context, alloc, queue, loader, ring_fences->ring_size(),
+                          controller);
 
     auto output =
         std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
@@ -160,8 +161,7 @@ int main(const int argc, const char** argv) {
 
     merian::ImGuiConfiguration config;
 
-    auto ring_cmd_pool =
-        make_shared<merian::RingCommandPool<>>(context, queue);
+    auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, queue);
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
 
@@ -205,7 +205,8 @@ int main(const int argc, const char** argv) {
         glfwPollEvents();
         frame_data.user_data.profiler->cmd_reset(cmd, clear_profiler);
 
-        auto& run = graph.get().cmd_run(cmd, frame_data.user_data.profiler);
+        auto& run = graph.get().cmd_run(cmd, frame_data.user_data.graph_frame_data,
+                                        frame_data.user_data.profiler);
         // MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
 
         if (output->current_aquire_result()) {

@@ -21,6 +21,7 @@
 struct FrameData {
     merian::StagingMemoryManager::SetID staging_set_id{};
     merian::ProfilerHandle profiler{};
+    merian::GraphFrameData graph_frame_data{};
 };
 
 std::atomic_bool stop;
@@ -52,11 +53,10 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::DummyInputController>();
     auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
 
-    ProcessingGraph graph(argc, argv, context, alloc, queue, loader,
-                          ring_fences->ring_size(), controller);
+    ProcessingGraph graph(argc, argv, context, alloc, queue, loader, ring_fences->ring_size(),
+                          controller);
 
-    auto ring_cmd_pool =
-        make_shared<merian::RingCommandPool<>>(context, queue);
+    auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, queue);
 
     merian::Profiler::Report report;
     bool clear_profiler = false;
@@ -89,7 +89,8 @@ int main(const int argc, const char** argv) {
         auto cmd = cmd_pool->create_and_begin();
         frame_data.user_data.profiler->cmd_reset(cmd, clear_profiler);
 
-        auto& run = graph.get().cmd_run(cmd, frame_data.user_data.profiler);
+        auto& run = graph.get().cmd_run(cmd, frame_data.user_data.graph_frame_data,
+                                        frame_data.user_data.profiler);
 
         frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();
         cmd_pool->end_all();

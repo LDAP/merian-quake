@@ -168,19 +168,13 @@ class QuakeNode : public merian::Node {
         const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
         const std::vector<merian::NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
 
-    void cmd_build(const vk::CommandBuffer& cmd,
-                   const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                   const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-                   const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                   const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) override;
+    void cmd_build(const vk::CommandBuffer& cmd, const std::vector<merian::NodeIO>& ios) override;
 
     void cmd_process(const vk::CommandBuffer& cmd,
                      merian::GraphRun& run,
-                     const uint32_t set_index,
-                     const std::vector<merian::ImageHandle>& image_inputs,
-                     const std::vector<merian::BufferHandle>& buffer_inputs,
-                     const std::vector<merian::ImageHandle>& image_outputs,
-                     const std::vector<merian::BufferHandle>& buffer_outputs) override;
+                     const std::shared_ptr<FrameData>& frame_data,
+                     const uint32_t graph_set_index,
+                     const merian::NodeIO& io) override;
 
     void queue_command(std::string command) {
         pending_commands.push(command);

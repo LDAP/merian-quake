@@ -1264,11 +1264,7 @@ QuakeNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>
     };
 }
 
-void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
-                          const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                          const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-                          const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                          const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
+void QuakeNode::cmd_build(const vk::CommandBuffer& cmd, const std::vector<merian::NodeIO>& ios) {
 
     // Quake sets fov assuming a 4x3 screen :D
     vid.width = render_width;
@@ -1296,8 +1292,7 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
 
     // GRAPH DESC SETS
     std::tie(graph_textures, graph_sets, graph_pool, graph_desc_set_layout) =
-        merian::make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs,
-                                           image_outputs, buffer_outputs, graph_desc_set_layout);
+        merian::make_graph_descriptor_sets(context, allocator, ios, graph_desc_set_layout);
     {
         auto pipe_layout = merian::PipelineLayoutBuilder(context)
                                .add_descriptor_set_layout(graph_desc_set_layout)
@@ -1314,9 +1309,8 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
             mc_samples_adaptive_prob, distance_mc_samples, mc_fast_recovery, light_cache_levels,
             light_cache_tan_alpha_half, light_cache_buffer_size, mc_adaptive_buffer_size,
             mc_static_buffer_size, mc_adaptive_grid_tan_alpha_half, mc_static_grid_width,
-            mc_adaptive_grid_levels, distance_mc_grid_width,
-            volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior, dist_guide_p,
-            distance_mc_vertex_state_count, seed);
+            mc_adaptive_grid_levels, distance_mc_grid_width, volume_max_t, surf_bsdf_p,
+            volume_phase_p, dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed);
 
         auto spec = spec_builder.build();
 
@@ -1361,21 +1355,19 @@ void QuakeNode::cmd_build(const vk::CommandBuffer& cmd,
     }
 
     // ZERO markov chains and light cache
-    cmd.fillBuffer(*buffer_outputs[0][0], 0, VK_WHOLE_SIZE, 0);
-    cmd.fillBuffer(*buffer_outputs[0][1], 0, VK_WHOLE_SIZE, 0);
-    cmd.fillBuffer(*buffer_outputs[0][2], 0, VK_WHOLE_SIZE, 0);
-    cmd.fillBuffer(*buffer_outputs[0][3], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*ios[0].buffer_outputs[0], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*ios[0].buffer_outputs[1], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*ios[0].buffer_outputs[2], 0, VK_WHOLE_SIZE, 0);
+    cmd.fillBuffer(*ios[0].buffer_outputs[3], 0, VK_WHOLE_SIZE, 0);
 
     prev_cl_time = cl.time;
 }
 
 void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
                             merian::GraphRun& run,
-                            const uint32_t graph_set_index,
-                            [[maybe_unused]] const std::vector<merian::ImageHandle>& image_inputs,
-                            [[maybe_unused]] const std::vector<merian::BufferHandle>& buffer_inputs,
-                            const std::vector<merian::ImageHandle>& image_outputs,
-                            const std::vector<merian::BufferHandle>& buffer_outputs) {
+                            const std::shared_ptr<merian::Node::FrameData>& frame_data,
+                            [[maybe_unused]] const uint32_t graph_set_index,
+                            const merian::NodeIO& io) {
     FrameData& cur_frame = current_frame();
 
     if (update_gamestate) {
@@ -1504,7 +1496,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         pc.prev_cam_w_mu_sy.a = fog_color[1] * pc.cam_x_mu_t.a;
         pc.prev_cam_u_mu_sz.a = fog_color[2] * pc.cam_x_mu_t.a;
     }
-    {   
+    {
         // motion tracking time diff
         const float time_diff = pc.cl_time - prev_cl_time;
         if (time_diff > 0)
@@ -1538,10 +1530,10 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 
     auto volume_mv_bar =
-        image_outputs[8]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
-                                  vk::AccessFlagBits::eShaderRead);
-    auto gbuf_bar = buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
-                                                      vk::AccessFlagBits::eMemoryRead);
+        io.image_outputs[8]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                     vk::AccessFlagBits::eShaderRead);
+    auto gbuf_bar = io.buffer_outputs[2]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
+                                                         vk::AccessFlagBits::eMemoryRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, gbuf_bar, volume_mv_bar);
     {
@@ -1560,7 +1552,7 @@ void QuakeNode::cmd_process(const vk::CommandBuffer& cmd,
         const std::size_t count =
             std::min(128 * 1024 * 1024 / sizeof(MCState), (std::size_t)mc_adaptive_buffer_size);
         const MCState* buf = static_cast<const MCState*>(allocator->getStaging()->cmdFromBuffer(
-            cmd, *buffer_outputs[0], 0, sizeof(MCState) * count));
+            cmd, *io.buffer_outputs[0], 0, sizeof(MCState) * count));
         run.add_submit_callback([count, buf](const merian::QueueHandle& queue) {
             queue->wait_idle();
             nlohmann::json j;
@@ -1937,7 +1929,7 @@ void QuakeNode::get_configuration(merian::Configuration& config, bool& needs_reb
     update_gamestate |= frame == 0;
 
     config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
-    if (!randomize_seed)  {
+    if (!randomize_seed) {
         config.config_uint("seed", seed, "");
     } else {
         config.output_text(fmt::format("seed: {}", seed));
