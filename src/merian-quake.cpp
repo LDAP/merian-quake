@@ -19,6 +19,7 @@
 #include <merian/vk/window/imgui_context.hpp>
 
 #include "configuration.hpp"
+#include "merian/vk/window/glfw_surface.hpp"
 #include "processing_graph.hpp"
 
 std::weak_ptr<merian::GLFWWindow> weak_window;
@@ -138,14 +139,15 @@ int main(const int argc, const char** argv) {
     std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, resources, extAS, extRQ};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
-    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
     extensions.push_back(debug_utils);
 #endif
 
     merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
-    auto [window, surface] = extGLFW->get();
+    merian::GLFWWindowHandle window = std::make_shared<merian::GLFWWindow>(context);
+    merian::SurfaceHandle surface = window->get_surface();
     weak_window = window;
 
     std::shared_ptr<merian::InputController> controller =
