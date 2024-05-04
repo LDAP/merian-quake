@@ -23,7 +23,7 @@ Maps in screenshots: start from [Alkaline](https://alkalinequake.wordpress.com/)
 
 This project requires a GPU with ray tracing support (Vulkan Ray Query).
 
-Tested: NVIDIA RTX 2080 TI,  NVIDIA RTX 3070 TI, NVIDIA RTX 3080 TI, AMD RX 6800 XT.
+Tested: NVIDIA RTX 2080 / 3070 TI / 3080 TI, AMD RX 6800 XT and Intel Arc.
 
 ## Usage
 
