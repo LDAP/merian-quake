@@ -94,8 +94,9 @@ int main(const int argc, const char** argv) {
 
         frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();
         cmd_pool->end_all();
-        queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),
-                      run.get_wait_semaphores(), run.get_wait_stages());
+        queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphores(),
+                      run.get_wait_semaphores(), run.get_wait_stages(),
+                      run.get_timeline_semaphore_submit_info());
         run.execute_callbacks(queue);
     }
 
