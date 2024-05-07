@@ -2,15 +2,14 @@
 #include "GLFW/glfw3.h"
 #include "clear.comp.spv.h"
 #include "ext/json.hpp"
-#include "glm/gtc/type_ptr.hpp"
 #include "grid.h"
 #include "merian-nodes/common/gbuffer.glsl.h"
 #include "merian/utils/bitpacking.hpp"
 #include "merian/utils/colors.hpp"
+#include "merian/utils/concurrent/utils.hpp"
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/string.hpp"
-#include "merian/utils/threads.hpp"
 #include "merian/utils/xorshift.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
@@ -1708,7 +1707,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
     dynamic_idx.clear();
     dynamic_ext.clear();
 
-    std::thread particle_viewent([&]() {
+    std::future<void> future = context->thread_pool.submit<void>([&]() {
         if (playermodel == 1) {
             add_geo(&cl.viewent, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext);
         } else if (playermodel == 2) {
@@ -1739,9 +1738,9 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
                         thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
                         thread_dynamic_ext[thread_index]);
         },
-        concurrency);
+        context->thread_pool);
 
-    particle_viewent.join();
+    future.get();
 
     for (uint32_t i = 0; i < concurrency; i++) {
         uint32_t old_vtx_count = dynamic_vtx.size() / 3;
