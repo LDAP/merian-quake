@@ -1719,12 +1719,12 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
                       texnum_explosion, reproducible_renders, prev_cl_time);
     });
 
-    const uint32_t concurrency = std::thread::hardware_concurrency();
+    const uint32_t number_tasks = context->thread_pool.size();
 
-    std::vector<std::vector<float>> thread_dynamic_vtx(concurrency);
-    std::vector<std::vector<float>> thread_dynamic_prev_vtx(concurrency);
-    std::vector<std::vector<uint32_t>> thread_dynamic_idx(concurrency);
-    std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(concurrency);
+    std::vector<std::vector<float>> thread_dynamic_vtx(number_tasks);
+    std::vector<std::vector<float>> thread_dynamic_prev_vtx(number_tasks);
+    std::vector<std::vector<uint32_t>> thread_dynamic_idx(number_tasks);
+    std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(number_tasks);
 
     merian::parallel_for(
         std::max(cl_numvisedicts, cl.num_statics),
@@ -1738,11 +1738,11 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
                         thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
                         thread_dynamic_ext[thread_index]);
         },
-        context->thread_pool);
+        context->thread_pool, number_tasks);
 
     future.get();
 
-    for (uint32_t i = 0; i < concurrency; i++) {
+    for (uint32_t i = 0; i < number_tasks; i++) {
         uint32_t old_vtx_count = dynamic_vtx.size() / 3;
 
         merian::raw_copy_back(dynamic_vtx, thread_dynamic_vtx[i]);
