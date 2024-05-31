@@ -1,5 +1,8 @@
 #include "imgui.h"
-#include "merian-nodes/glfw_window/glfw_window.hpp"
+#include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
+
+#include "merian-nodes/graph/graph.hpp"
+#include "merian-nodes/graph/node.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
@@ -10,16 +13,12 @@
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/extension/extension_vk_ray_query.hpp"
-#include "merian/vk/graph/graph.hpp"
-#include "merian/vk/graph/node.hpp"
-#include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
 #include <csignal>
 #include <merian/vk/window/imgui_context.hpp>
 
 #include "configuration.hpp"
-#include "merian/vk/window/glfw_surface.hpp"
 #include "processing_graph.hpp"
 
 std::weak_ptr<merian::GLFWWindow> weak_window;
@@ -122,12 +121,6 @@ static void signal_handler(int signal) {
     glfwSetWindowShouldClose(*weak_window.lock(), GLFW_TRUE);
 }
 
-struct FrameData {
-    merian::StagingMemoryManager::SetID staging_set_id{};
-    merian::ProfilerHandle profiler{};
-    merian::GraphFrameData graph_frame_data{};
-};
-
 int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::debug);
     merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
@@ -146,19 +139,13 @@ int main(const int argc, const char** argv) {
     merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
-    merian::GLFWWindowHandle window = std::make_shared<merian::GLFWWindow>(context);
-    merian::SurfaceHandle surface = window->get_surface();
-    weak_window = window;
 
+    auto output = std::make_shared<merian_nodes::GLFWWindow>(context);
     std::shared_ptr<merian::InputController> controller =
-        std::make_shared<merian::GLFWInputController>(window);
-    auto ring_fences = make_shared<merian::RingFences<2, FrameData>>(context);
+        std::make_shared<merian::GLFWInputController>(output->get_window());
+    weak_window = output->get_window();
 
-    ProcessingGraph graph(argc, argv, context, alloc, queue, loader, ring_fences->ring_size(),
-                          controller);
-
-    auto output =
-        std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
+    ProcessingGraph graph(argc, argv, context, alloc, loader, controller);
     graph.add_beauty_output("output", output, "src");
 
     merian::ImGuiConfiguration config;
@@ -174,9 +161,6 @@ int main(const int argc, const char** argv) {
     quake_font_lg =
         io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 46);
 
-    merian::Profiler::Report report;
-    bool clear_profiler = false;
-    merian::Stopwatch report_intervall;
     merian::Stopwatch frametime;
 
     ConfigurationManager config_manager(graph, loader);
@@ -185,34 +169,9 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    while (!glfwWindowShouldClose(*window)) {
-        auto& frame_data = ring_fences->next_cycle_wait_and_get();
-
-        if (!frame_data.user_data.profiler) {
-            frame_data.user_data.profiler = std::make_shared<merian::Profiler>(context, queue);
-        } else {
-            frame_data.user_data.profiler->collect();
-            if (report_intervall.millis() > 100) {
-                report = frame_data.user_data.profiler->get_report();
-                clear_profiler = true;
-                report_intervall.reset();
-            } else {
-                clear_profiler = false;
-            }
-        }
-
-        alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
-        auto cmd_pool = ring_cmd_pool->set_cycle();
-        auto cmd = cmd_pool->create_and_begin();
-        glfwPollEvents();
-        frame_data.user_data.profiler->cmd_reset(cmd, clear_profiler);
-
-        auto& run = graph.get().cmd_run(cmd, frame_data.user_data.graph_frame_data,
-                                        frame_data.user_data.profiler);
-        // MERIAN_PROFILE_SCOPE_GPU(frame_data.user_data.profiler, cmd, "frame");
-
-        if (output->current_aquire_result()) {
-            imgui.new_frame(queue, cmd, *window, output->current_aquire_result().value());
+    output->set_on_blit_completed(
+        [&](const vk::CommandBuffer& cmd, merian::SwapchainAcquireResult& aquire_result) {
+            imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
             const double frametime_ms = frametime.millis();
             frametime.reset();
@@ -221,7 +180,6 @@ int main(const int argc, const char** argv) {
                              .c_str(),
                          NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
-            frame_data.user_data.profiler->get_report_imgui(report);
             config_manager.get(config);
             ImGui::End();
 
@@ -230,14 +188,11 @@ int main(const int argc, const char** argv) {
             imgui.render(cmd);
             controller->set_active(
                 !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
-        }
+        });
 
-        frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();
-        cmd_pool->end_all();
-        queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphores(),
-                      run.get_wait_semaphores(), run.get_wait_stages(),
-                      run.get_timeline_semaphore_submit_info());
-        run.execute_callbacks(queue);
+    while (!output->get_window()->should_close()) {
+        glfwPollEvents();
+        graph.get().run();
     }
 
     config_manager.store();

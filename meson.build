@@ -56,15 +56,15 @@ exe = executable(
     install : true,
 )
 
-exe_headless = executable(
-    'merian-quake-headless',
-    [src_files, 'src/merian-quake-headless.cpp'],
-    dependencies: [
-        merian,
-        quake,
-    ],
-    include_directories: inc_dirs,
-    install : true,
-)
+# exe_headless = executable(
+#     'merian-quake-headless',
+#     [src_files, 'src/merian-quake-headless.cpp'],
+#     dependencies: [
+#         merian,
+#         quake,
+#     ],
+#     include_directories: inc_dirs,
+#     install : true,
+# )
 
 install_subdir('res', install_dir : '.')

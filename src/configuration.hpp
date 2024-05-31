@@ -27,15 +27,15 @@ class ConfigurationManager {
             SPDLOG_DEBUG("loading default config {}", FALLBACK_CONFIG_NAME);
         }
 
-        auto load = merian::JSONLoadConfiguration(config_path);
-        graph.get().get_configuration(load);
+        auto load = merian::JSONLoadConfiguration(std::filesystem::path(config_path));
+        graph.get().configuration(load);
     }
     void store() {
         auto dump = merian::JSONDumpConfiguration(CONFIG_NAME);
-        graph.get().get_configuration(dump);
+        graph.get().configuration(dump);
     }
     void get(merian::Configuration& config) {
-        graph.get().get_configuration(config);
+        graph.get().configuration(config);
     }
 
   private:

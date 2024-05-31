@@ -2,6 +2,9 @@
 #include "hud.comp.spv.h"
 #include "merian/utils/glm.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
+
 #include "quake/quake_node.hpp"
 
 extern "C" {
@@ -11,40 +14,26 @@ extern mleaf_t* r_viewleaf;
 
 namespace merian {
 
-QuakeHud::QuakeHud(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : ComputeNode(context, allocator, sizeof(PushConstant)) {
+QuakeHud::QuakeHud(const SharedContext context)
+    : AbstractCompute(context, "Hud", sizeof(PushConstant)) {
     shader =
         std::make_shared<ShaderModule>(context, merian_hud_comp_spv_size(), merian_hud_comp_spv());
 }
 
 QuakeHud::~QuakeHud() {}
 
-std::string QuakeHud::name() {
-    return "Hud";
-}
-
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-QuakeHud::describe_inputs() {
+std::vector<merian_nodes::InputConnectorHandle> QuakeHud::describe_inputs() {
     return {
-        {
-            NodeInputDescriptorImage::compute_read("src"),
-        },
-        {
-            NodeInputDescriptorBuffer::compute_read("gbuf"),
-        },
+        con_src,
+        merian_nodes::VkBufferIn::compute_read("gbuf"),
     };
 }
 
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-QuakeHud::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                           const std::vector<NodeOutputDescriptorBuffer>&) {
-    extent = connected_image_outputs[0].create_info.extent;
+std::vector<merian_nodes::OutputConnectorHandle>
+QuakeHud::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) {
+    extent = output_for_input[con_src]->create_info.extent;
     return {
-        {
-            NodeOutputDescriptorImage::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
-                                                     extent),
-        },
-        {},
+        merian_nodes::VkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat, extent),
     };
 }
 
@@ -54,7 +43,7 @@ SpecializationInfoHandle QuakeHud::get_specialization_info() const noexcept {
     return spec_builder.build();
 }
 
-const void* QuakeHud::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun& run) {
     if (cl.worldmodel && sv_player && cl.intermission == 0) {
         // Demos do not have a player set
         pc.health = sv_player->v.health;
@@ -90,9 +79,11 @@ ShaderModuleHandle QuakeHud::get_shader_module() {
     return shader;
 }
 
-void QuakeHud::get_configuration(Configuration& config, bool&) {
+QuakeHud::NodeStatusFlags QuakeHud::configuration(Configuration& config) {
     config.output_text(
         fmt::format("blend: ({}, {}, {}, {})", pc.blend.r, pc.blend.g, pc.blend.b, pc.blend.a));
+
+    return {};
 }
 
 } // namespace merian

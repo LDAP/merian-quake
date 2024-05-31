@@ -1,10 +1,12 @@
 #pragma once
 
 #include "glm/ext/vector_float4.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/graph/node.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/sdl_audio_device.hpp"
 #include "merian/utils/string.hpp"
-#include "merian/vk/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/blas_builder.hpp"
@@ -20,7 +22,7 @@ extern "C" {
 #include "quakedef.h"
 }
 
-class QuakeNode : public merian::Node {
+class QuakeNode : public merian_nodes::Node {
   public:
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
@@ -126,18 +128,18 @@ class QuakeNode : public merian::Node {
     };
 
     // Per-frame data and updates
-    struct FrameData : public merian::Node::FrameData {
+    struct FrameData {
         // Needed per frame because might reallocate scratch buffer
-        std::unique_ptr<merian::BLASBuilder> blas_builder;
-        std::unique_ptr<merian::TLASBuilder> tlas_builder;
+        std::unique_ptr<merian::BLASBuilder> blas_builder{};
+        std::unique_ptr<merian::TLASBuilder> tlas_builder{};
 
         merian::DescriptorSetHandle quake_sets{nullptr};
 
         // keep copy of current_textures to keep them alive and to know which descriptors to update
         std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
 
-        std::vector<RTGeometry> static_geometries;
-        std::vector<RTGeometry> dynamic_geometries;
+        std::vector<RTGeometry> static_geometries{};
+        std::vector<RTGeometry> dynamic_geometries{};
 
         // TLAS
         merian::BufferHandle instances_buffer{nullptr};
@@ -147,22 +149,13 @@ class QuakeNode : public merian::Node {
     };
 
   public:
-    /* Path to the Quake basedir. This directory must contain the id1 directory.
-     * It must be guaranteed that at most `ring_size` resources suffice. (A RingFence with that
-     * RING_SIZE).
-     */
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle& allocator,
               const std::shared_ptr<merian::InputController> controller,
-              const uint32_t ring_size,
               const int quakespasm_argc = 0,
               const char** quakespasm_argv = nullptr);
 
     ~QuakeNode();
-
-    virtual std::string name() override {
-        return "Quake";
-    }
 
     // Callbacks from quake -------------------------------
 
@@ -177,31 +170,26 @@ class QuakeNode : public merian::Node {
 
     // -----------------------------------------------------
 
-    std::shared_ptr<merian::Node::FrameData> create_frame_data() override;
+    std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<merian::NodeInputDescriptorImage>,
-               std::vector<merian::NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    std::vector<merian_nodes::OutputConnectorHandle>
+    describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
 
-    std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-               std::vector<merian::NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<merian::NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    NodeStatusFlags
+    on_connected(const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    void cmd_build(const vk::CommandBuffer& cmd, const std::vector<merian::NodeIO>& ios) override;
+    void process(merian_nodes::GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const merian::DescriptorSetHandle& descriptor_set,
+                 const merian_nodes::NodeIO& io) override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     merian::GraphRun& run,
-                     const std::shared_ptr<merian::Node::FrameData>& frame_data,
-                     const uint32_t graph_set_index,
-                     const merian::NodeIO& io) override;
+    NodeStatusFlags configuration(merian::Configuration& config) override;
+
+    // -----------------------------------------------------
 
     void queue_command(std::string command) {
         pending_commands.push(command);
     }
-
-    void get_configuration(merian::Configuration& config, bool& needs_rebuild) override;
 
   private:
     // Attemps to reuse the supplied old_geo (by update, buffer reuse).
@@ -217,18 +205,16 @@ class QuakeNode : public merian::Node {
                                           const bool force_rebuild,
                                           const vk::BuildAccelerationStructureFlagsKHR flags);
     // Optionally refreshes the geo and updates the current descriptor set if necessary
-    void update_static_geo(const vk::CommandBuffer& cmd,
-                           const bool refresh_geo,
-                           const std::shared_ptr<FrameData>& cur_frame);
+    void
+    update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo, FrameData& cur_frame);
     // Refreshes the geo and updates the current descriptor set
-    void update_dynamic_geo(const vk::CommandBuffer& cmd,
-                            const std::shared_ptr<FrameData>& cur_frame);
+    void update_dynamic_geo(const vk::CommandBuffer& cmd, FrameData& cur_frame);
     // Builds the as and updates the current descriptor set
     void update_as(const vk::CommandBuffer& cmd,
                    const merian::ProfilerHandle profiler,
-                   const std::shared_ptr<FrameData>& cur_frame);
+                   FrameData& cur_frame);
     // processes the pending uploads and updates the current descriptor set
-    void update_textures(const vk::CommandBuffer& cmd, const std::shared_ptr<FrameData>& cur_frame);
+    void update_textures(const vk::CommandBuffer& cmd, FrameData& cur_frame);
 
     void parse_worldspawn();
 
@@ -244,10 +230,29 @@ class QuakeNode : public merian::Node {
     merian::ShaderModuleHandle volume_shader;
     merian::ShaderModuleHandle volume_forward_project_shader;
 
-    merian::DescriptorSetLayoutHandle graph_desc_set_layout;
-    merian::DescriptorPoolHandle graph_pool;
-    std::vector<merian::DescriptorSetHandle> graph_sets;
-    std::vector<merian::TextureHandle> graph_textures;
+    merian_nodes::VkImageInHandle con_blue_noise =
+        merian_nodes::VkImageIn::compute_read("blue_noise", 0);
+    merian_nodes::VkImageInHandle con_prev_filtered =
+        merian_nodes::VkImageIn::compute_read("prev_filtered", 1);
+    merian_nodes::VkImageInHandle con_prev_volume_depth =
+        merian_nodes::VkImageIn::compute_read("prev_volume_depth", 1);
+    merian_nodes::VkBufferInHandle con_prev_gbuf =
+        merian_nodes::VkBufferIn::compute_read("prev_gbuf", 1);
+
+    merian_nodes::VkImageOutHandle con_irradiance;
+    merian_nodes::VkImageOutHandle con_albedo;
+    merian_nodes::VkImageOutHandle con_mv;
+    merian_nodes::VkImageOutHandle con_debug;
+    merian_nodes::VkImageOutHandle con_moments;
+    merian_nodes::VkImageOutHandle con_volume;
+    merian_nodes::VkImageOutHandle con_volume_moments;
+    merian_nodes::VkImageOutHandle con_volume_depth;
+    merian_nodes::VkImageOutHandle con_volume_mv;
+
+    merian_nodes::VkBufferOutHandle con_markovchain;
+    merian_nodes::VkBufferOutHandle con_lightcache;
+    merian_nodes::VkBufferOutHandle con_gbuffer;
+    merian_nodes::VkBufferOutHandle con_volume_distancemc;
 
     // Use this buffer in bindings when the real resource is not available
     merian::BufferHandle binding_dummy_buffer;

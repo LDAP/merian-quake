@@ -1,10 +1,11 @@
 #pragma once
 
-#include "merian-nodes/compute_node/compute_node.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian {
 
-class QuakeHud : public ComputeNode {
+class QuakeHud : public merian_nodes::AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -18,31 +19,28 @@ class QuakeHud : public ComputeNode {
     };
 
   public:
-    QuakeHud(const SharedContext context, const ResourceAllocatorHandle alloc);
+    QuakeHud(const SharedContext context);
 
     ~QuakeHud();
 
-    std::string name() override;
+    std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
-
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    std::vector<merian_nodes::OutputConnectorHandle>
+    describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
+    const void* get_push_constant(merian_nodes::GraphRun& run) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
+    merian_nodes::VkImageInHandle con_src = merian_nodes::VkImageIn::compute_read("src");
+
     vk::Extent3D extent;
     PushConstant pc;
     ShaderModuleHandle shader;
