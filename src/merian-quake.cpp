@@ -120,7 +120,7 @@ static void signal_handler(int signal) {
 }
 
 int main(const int argc, const char** argv) {
-    spdlog::set_level(spdlog::level::debug);
+    spdlog::set_level(spdlog::level::trace);
     merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
 
     std::shared_ptr<merian::ExtensionVkGLFW> extGLFW;
