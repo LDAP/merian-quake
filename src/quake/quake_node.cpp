@@ -799,20 +799,30 @@ void add_geo(entity_t* ent,
 // If the supplied buffer is not nullptr and is large enough, it is returned and an upload is
 // recorded. A new larger buffer is used otherwise.
 template <typename T>
-merian::BufferHandle
-ensure_buffer(const merian::ResourceAllocatorHandle& allocator,
-              const vk::BufferUsageFlags usage,
-              const vk::CommandBuffer& cmd,
-              const std::vector<T>& data,
-              const merian::BufferHandle optional_buffer,
-              const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
+merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& allocator,
+                                   const vk::BufferUsageFlags usage,
+                                   const vk::CommandBuffer& cmd,
+                                   const std::vector<T>& data,
+                                   const merian::BufferHandle optional_buffer,
+                                   const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
+                                   const std::string& debug_name = {}) {
     merian::BufferHandle buffer;
     if (optional_buffer && optional_buffer->get_size() >= sizeof(T) * data.size()) {
         buffer = optional_buffer;
+
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR |
+                vk::PipelineStageFlagBits::eComputeShader,
+            vk::PipelineStageFlagBits::eTransfer, {}, {},
+            buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                       vk::AccessFlagBits::eShaderRead |
+                                       vk::AccessFlagBits::eTransferRead,
+                                   vk::AccessFlagBits::eTransferWrite),
+            {});
     } else {
         // Make it a bit larger for logarithmic growth
-        buffer = allocator->createBuffer(sizeof(T) * data.size() * 1.25, usage, merian::NONE, {},
-                                         min_alignment);
+        buffer = allocator->createBuffer(sizeof(T) * data.size() * 1.25, usage, merian::NONE,
+                                         debug_name, min_alignment);
     }
     allocator->getStaging()->cmdToBuffer(cmd, *buffer, 0, sizeof(T) * data.size(), data.data());
     return buffer;
@@ -838,32 +848,43 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
                     vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
     auto usage_storage = vk::BufferUsageFlagBits::eStorageBuffer;
 
-    merian::BufferHandle vertex_buffer =
-        ensure_buffer(allocator, usage_rt, cmd, vtx, optional_vtx_buffer);
+    merian::BufferHandle vertex_buffer = ensure_buffer(
+        allocator, usage_rt, cmd, vtx, optional_vtx_buffer, {}, "Quake: vertex buffer");
     merian::BufferHandle prev_vertex_buffer =
-        ensure_buffer(allocator, usage_rt, cmd, prev_vtx, optional_prev_vtx_buffer);
-    merian::BufferHandle index_buffer =
-        ensure_buffer(allocator, usage_rt, cmd, idx, optional_idx_buffer);
-    merian::BufferHandle ext_buffer =
-        ensure_buffer(allocator, usage_storage, cmd, ext, optional_ext_buffer);
+        ensure_buffer(allocator, usage_rt, cmd, prev_vtx, optional_prev_vtx_buffer, {},
+                      "Quake: previous vertex buffer");
+    merian::BufferHandle index_buffer = ensure_buffer(
+        allocator, usage_rt, cmd, idx, optional_idx_buffer, {}, "Quake: index buffer");
+    merian::BufferHandle ext_buffer = ensure_buffer(allocator, usage_storage, cmd, ext,
+                                                    optional_ext_buffer, {}, "Quake: ext buffer");
 
     const std::array<vk::BufferMemoryBarrier2, 4> barriers = {
-        vertex_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
-                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::AccessFlagBits2::eTransferWrite,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR),
+        vertex_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
+                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR | vk::AccessFlagBits2::eShaderRead |
+                vk::AccessFlagBits2::eTransferWrite),
         prev_vertex_buffer->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer,
-            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
+                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
             vk::AccessFlagBits2::eTransferWrite,
-            vk::AccessFlagBits2::eAccelerationStructureReadKHR),
-        index_buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
-                                      vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                      vk::AccessFlagBits2::eTransferWrite,
-                                      vk::AccessFlagBits2::eAccelerationStructureReadKHR),
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR | vk::AccessFlagBits2::eShaderRead |
+                vk::AccessFlagBits2::eTransferWrite),
+        index_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
+                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eAccelerationStructureReadKHR | vk::AccessFlagBits2::eShaderRead |
+                vk::AccessFlagBits2::eTransferWrite),
         ext_buffer->buffer_barrier2(
-            vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eComputeShader,
-            vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead),
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferWrite),
     };
 
     vk::DependencyInfo dep_info{{}, {}, barriers, {}};
@@ -912,7 +933,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             .build_layout(context);
     quake_pool = std::make_shared<merian::DescriptorPool>(
         quake_desc_set_layout, 3, vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-    binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer);
+    binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer,
+                                                   merian::NONE, "Quake: Dummy buffer");
 
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
@@ -1364,6 +1386,9 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
             io[con_volume_distancemc]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                       vk::AccessFlagBits::eShaderRead),
         };
+
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, barriers, {});
     }
 
     auto& cur_frame_ptr = io.frame_data<std::shared_ptr<FrameData>>();
