@@ -1,0 +1,34 @@
+# The main, heavy-duty validation checks. This may be valuable early in the
+# development cycle to reduce validation output while correcting
+# parameter/object usage errors.
+khronos_validation.validate_core = true
+
+# Enable synchronization validation during command buffers recording. This
+# feature reports resource access conflicts due to missing or incorrect
+# synchronization operations between actions (Draw, Copy, Dispatch, Blit)
+# reading or writing the same regions of memory.
+khronos_validation.validate_sync = true
+
+# Thread checks. In order to not degrade performance, it might be best to run
+# your program with thread-checking disabled most of the time, enabling it
+# occasionally for a quick sanity check or when debugging difficult application
+# behaviors.
+khronos_validation.thread_safety = true
+
+# Specifies what action is to be taken when a layer reports information
+khronos_validation.debug_action = 
+
+# Comma-delineated list of options specifying the types of messages to be reported
+khronos_validation.report_flags = debug,error,perf,info,warn
+
+# Enable limiting of duplicate messages.
+khronos_validation.enable_message_limit = true
+
+# Maximum number of times any single validation message should be reported.
+khronos_validation.duplicate_message_limit = 3
+
+# khronos_validation.validate_best_practices = true
+# khronos_validation.validate_best_practices_amd = true
+# khronos_validation.validate_best_practices_nvidia = true
+
+# khronos_validation.validate_gpu_based = GPU_BASED_GPU_ASSISTED
