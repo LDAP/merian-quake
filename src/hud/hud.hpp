@@ -41,6 +41,8 @@ class QuakeHud : public merian_nodes::AbstractCompute {
   private:
     merian_nodes::VkImageInHandle con_src = merian_nodes::VkImageIn::compute_read("src");
 
+    SpecializationInfoHandle spec_info;
+
     vk::Extent3D extent;
     PushConstant pc;
     ShaderModuleHandle shader;

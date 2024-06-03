@@ -18,6 +18,9 @@ QuakeHud::QuakeHud(const SharedContext context)
     : AbstractCompute(context, "Hud", sizeof(PushConstant)) {
     shader =
         std::make_shared<ShaderModule>(context, merian_hud_comp_spv_size(), merian_hud_comp_spv());
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_info = spec_builder.build();
 }
 
 QuakeHud::~QuakeHud() {}
@@ -38,9 +41,7 @@ QuakeHud::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input)
 }
 
 SpecializationInfoHandle QuakeHud::get_specialization_info() const noexcept {
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
-    return spec_builder.build();
+    return spec_info;
 }
 
 const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun& run) {

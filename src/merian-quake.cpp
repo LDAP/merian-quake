@@ -5,8 +5,8 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/configuration_imgui.hpp"
+#include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
-#include "merian/vk/command/ring_command_pool.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
@@ -21,7 +21,7 @@
 #include "configuration.hpp"
 #include "processing_graph.hpp"
 
-std::weak_ptr<merian::GLFWWindow> weak_window;
+std::atomic_bool stop(false);
 ImFont* quake_font_sm;
 ImFont* quake_font_lg;
 
@@ -116,81 +116,84 @@ static void QuakeMessageOverlay() {
 
 static void signal_handler(int signal) {
     SPDLOG_INFO("SIGINT/TERM ({}) caught. Shutting down", signal);
-    if (weak_window.expired())
-        return;
-    glfwSetWindowShouldClose(*weak_window.lock(), GLFW_TRUE);
+    stop.store(true);
 }
 
 int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::debug);
     merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
 
-    auto extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
+    std::shared_ptr<merian::ExtensionVkGLFW> extGLFW;
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, resources, extAS, extRQ};
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
     debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
     extensions.push_back(debug_utils);
 #endif
 
+    if (argc == 1 || strcmp(argv[1], "--headless")) {
+        extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
+        extensions.push_back(extGLFW);
+    }
+
     merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
-    auto output = std::make_shared<merian_nodes::GLFWWindow>(context);
-    std::shared_ptr<merian::InputController> controller =
-        std::make_shared<merian::GLFWInputController>(output->get_window());
-    weak_window = output->get_window();
+    std::shared_ptr<merian::InputController> controller;
+    std::shared_ptr<merian_nodes::GLFWWindow> output;
+    if (extGLFW) {
+        output = std::make_shared<merian_nodes::GLFWWindow>(context);
+        controller = std::make_shared<merian::GLFWInputController>(output->get_window());
+    } else {
+        controller = std::make_shared<merian::DummyInputController>();
+    }
 
     ProcessingGraph graph(argc, argv, context, alloc, loader, controller);
-    graph.add_beauty_output("output", output, "src");
-
+    ConfigurationManager config_manager(graph, loader);
     merian::ImGuiConfiguration config;
-
-    auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, queue);
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
-
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
     quake_font_sm =
         io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 26);
     quake_font_lg =
         io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 46);
-
     merian::Stopwatch frametime;
+    if (output) {
+        graph.add_beauty_output("output", output, "src");
+        output->set_on_blit_completed(
+            [&](const vk::CommandBuffer& cmd, merian::SwapchainAcquireResult& aquire_result) {
+                imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
-    ConfigurationManager config_manager(graph, loader);
+                const double frametime_ms = frametime.millis();
+                frametime.reset();
+                ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
+                                         frametime_ms, 1000 / frametime_ms)
+                                 .c_str(),
+                             NULL, ImGuiWindowFlags_NoFocusOnAppearing);
+
+                config_manager.get(config);
+                ImGui::End();
+
+                QuakeMessageOverlay();
+
+                imgui.render(cmd);
+                controller->set_active(
+                    !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
+            });
+    }
+
     config_manager.load();
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    output->set_on_blit_completed(
-        [&](const vk::CommandBuffer& cmd, merian::SwapchainAcquireResult& aquire_result) {
-            imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
-
-            const double frametime_ms = frametime.millis();
-            frametime.reset();
-            ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
-                                     frametime_ms, 1000 / frametime_ms)
-                             .c_str(),
-                         NULL, ImGuiWindowFlags_NoFocusOnAppearing);
-
-            config_manager.get(config);
-            ImGui::End();
-
-            QuakeMessageOverlay();
-
-            imgui.render(cmd);
-            controller->set_active(
-                !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
-        });
-
-    while (!output->get_window()->should_close()) {
+    while (!(stop || (output && output->get_window()->should_close()))) {
         glfwPollEvents();
         graph.get().run();
     }
