@@ -76,27 +76,27 @@ layout(set = 0, binding = 3, scalar) buffer buf_prev_gbuf {
 };
 
 // GRAPH image out
-layout(set = 0, binding = 4) uniform writeonly image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly image2D img_mv;
-layout(set = 0, binding = 7) uniform writeonly image2D img_debug;
-layout(set = 0, binding = 8) uniform writeonly image2D img_moments;
-layout(set = 0, binding = 9) uniform writeonly image2D img_volume;
-layout(set = 0, binding = 10) uniform writeonly image2D img_volume_moments;
-layout(set = 0, binding = 11) uniform writeonly image2D img_volume_depth;
-layout(set = 0, binding = 12, rg16f) uniform image2D img_volume_mv;
+layout(set = 0, binding = 4) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 5) uniform writeonly restrict image2D img_albedo;
+layout(set = 0, binding = 6) uniform writeonly restrict image2D img_mv;
+layout(set = 0, binding = 7) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 8) uniform writeonly restrict image2D img_moments;
+layout(set = 0, binding = 9) uniform writeonly restrict image2D img_volume;
+layout(set = 0, binding = 10) uniform writeonly restrict image2D img_volume_moments;
+layout(set = 0, binding = 11) uniform writeonly restrict image2D img_volume_depth;
+layout(set = 0, binding = 12, rg16f) uniform restrict image2D img_volume_mv;
 
 // GRAPH buffer out
-layout(set = 0, binding = 13, scalar) buffer buf_mc_states {
+layout(set = 0, binding = 13, scalar) buffer restrict buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 14, scalar) buffer buf_light_cache {
+layout(set = 0, binding = 14, scalar) buffer restrict buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 15, scalar) buffer buf_gbuf {
+layout(set = 0, binding = 15, scalar) buffer restrict buf_gbuf {
     GBuffer gbuffer[];
 };
-layout(set = 0, binding = 16, scalar) buffer buf_dist_mc_states {
+layout(set = 0, binding = 16, scalar) buffer restrict buf_dist_mc_states {
     DistanceMCVertex distance_mc_states[];
 };
 
@@ -114,22 +114,22 @@ struct VertexExtraData {
     f16mat3x2 st;
 };
 
-layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer buf_vtx_t {
+layout(set = 1, binding = BINDING_VTX_BUF, scalar) buffer readonly restrict buf_vtx_t {
     // vertex positons
     vec3 v[];
 } buf_vtx[MAX_GEOMETRIES];
 
-layout(set = 1, binding = BINDING_PREV_VTX_BUF, scalar) buffer buf_prev_vtx_t {
+layout(set = 1, binding = BINDING_PREV_VTX_BUF, scalar) buffer readonly restrict buf_prev_vtx_t {
     // vertex positons
     vec3 v[];
 } buf_prev_vtx[MAX_GEOMETRIES];
 
-layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer buf_idx_t {
+layout(set = 1, binding = BINDING_IDX_BUF, scalar) buffer readonly restrict buf_idx_t {
     // index data for every instance
     uvec3 i[];
 } buf_idx[MAX_GEOMETRIES];
 
-layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer buf_ext_t {
+layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer readonly restrict buf_ext_t {
     // extra geo info
     VertexExtraData v[];
 } buf_ext[MAX_GEOMETRIES];
