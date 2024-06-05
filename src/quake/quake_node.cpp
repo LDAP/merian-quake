@@ -38,6 +38,7 @@ extern "C" {
 
 #include "bgmusic.h"
 #include "quakedef.h"
+#include "screen.h"
 
 // Quake uses lots of static global variables,
 // so we need to do that to
@@ -47,6 +48,8 @@ static QuakeData quake_data;
 extern float r_avertexnormals[162][3];
 // from r_part.c
 extern particle_t* active_particles;
+
+extern qboolean scr_drawloading;
 
 extern cvar_t scr_fov, cl_gun_fovscale;
 
@@ -68,6 +71,11 @@ extern "C" void QS_texture_load(gltexture_t* glt, uint32_t* data) {
 // called from within qs, pretty much a copy from in_sdl.c:
 extern "C" void IN_Move(usercmd_t* cmd) {
     quake_data.node->IN_Move(cmd);
+}
+
+// called when rendering
+extern "C" void SCR_Render() {
+    quake_data.node->SCR_Render();
 }
 
 // Helper -----------------------------------------------------------------------------------------
@@ -126,42 +134,6 @@ static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
     merian::TextureHandle tex = allocator->createTexture(image, tex_view_info, sampler);
 
     return tex;
-}
-
-void init_quake(const int quakespasm_argc, const char** quakespasm_argv) {
-
-    std::vector<const char*> quakespasm_args = {"quakespasm"};
-    if (quakespasm_argc > 0) {
-        quakespasm_args.resize(1 + quakespasm_argc);
-        memcpy(&quakespasm_args[1], quakespasm_argv, quakespasm_argc * sizeof(quakespasm_argv));
-    }
-
-    quake_data.params.argc = quakespasm_args.size();
-    quake_data.params.argv = (char**)quakespasm_args.data();
-    quake_data.params.errstate = 0;
-    quake_data.params.memsize = 256 * 1024 * 1024; // qs default in 0.94.3
-    quake_data.params.membase = malloc(quake_data.params.memsize);
-
-    srand(1337); // quake uses this
-    COM_InitArgv(quake_data.params.argc, quake_data.params.argv);
-    Sys_Init();
-
-    Sys_Printf("Quake %1.2f (c) id Software\n", VERSION);
-    Sys_Printf("GLQuake %1.2f (c) id Software\n", GLQUAKE_VERSION);
-    Sys_Printf("FitzQuake %1.2f (c) John Fitzgibbons\n", FITZQUAKE_VERSION);
-    Sys_Printf("FitzQuake SDL port (c) SleepwalkR, Baker\n");
-    Sys_Printf("QuakeSpasm " QUAKESPASM_VER_STRING " (c) Ozkan Sezer, Eric Wasylishen & others\n");
-
-    Sys_Printf("Host_Init\n");
-    Host_Init();
-
-    // Set target
-    key_dest = key_game;
-    m_state = m_none;
-}
-
-void deinit_quake() {
-    free(quake_data.params.membase);
 }
 
 uint16_t
@@ -903,14 +875,6 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                      const char** quakespasm_argv)
     : Node("Quake"), context(context), allocator(allocator), controller(controller) {
 
-    // QUAKE INIT
-    if (quake_data.node) {
-        throw std::runtime_error{"Only one quake node can be created."};
-    }
-    quake_data.node = this;
-    host_parms = &quake_data.params;
-    init_quake(quakespasm_argc, quakespasm_argv);
-
     // PIPELINE CREATION
     rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(),
                                                        merian_quake_comp_spv());
@@ -1007,6 +971,83 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     });
     // clang-format on
 
+    // INIT QUAKE
+    if (quake_data.node) {
+        throw std::runtime_error{"Only one quake node can be created."};
+    }
+    quake_data.node = this;
+    host_parms = &quake_data.params;
+
+    // Run gamestate in other thread
+
+    std::atomic_bool quake_ready(false);
+
+    game_thread = std::thread([&] {
+        // INIT Quake
+        std::vector<const char*> quakespasm_args = {"quakespasm"};
+        if (quakespasm_argc > 0) {
+            quakespasm_args.resize(1 + quakespasm_argc);
+            memcpy(&quakespasm_args[1], quakespasm_argv, quakespasm_argc * sizeof(quakespasm_argv));
+        }
+
+        quake_data.params.argc = quakespasm_args.size();
+        quake_data.params.argv = (char**)quakespasm_args.data();
+        quake_data.params.errstate = 0;
+        quake_data.params.memsize = 256 * 1024 * 1024; // qs default in 0.94.3
+        quake_data.params.membase = malloc(quake_data.params.memsize);
+
+        srand(1337); // quake uses this
+        COM_InitArgv(quake_data.params.argc, quake_data.params.argv);
+        Sys_Init();
+
+        Sys_Printf("Quake %1.2f (c) id Software\n", VERSION);
+        Sys_Printf("GLQuake %1.2f (c) id Software\n", GLQUAKE_VERSION);
+        Sys_Printf("FitzQuake %1.2f (c) John Fitzgibbons\n", FITZQUAKE_VERSION);
+        Sys_Printf("FitzQuake SDL port (c) SleepwalkR, Baker\n");
+        Sys_Printf("QuakeSpasm " QUAKESPASM_VER_STRING
+                   " (c) Ozkan Sezer, Eric Wasylishen & others\n");
+
+        Sys_Printf("Host_Init\n");
+        Host_Init();
+
+        // Set target
+        key_dest = key_game;
+        m_state = m_none;
+
+        quake_ready.store(true);
+
+        // RUN GAMELOOP
+        while (game_running) {
+            if (update_gamestate) {
+                if (!pending_commands.empty()) {
+                    Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
+                    pending_commands.pop();
+                }
+
+                double newtime = Sys_DoubleTime();
+                double timediff;
+                if (force_timediff > 0) {
+                    timediff = force_timediff / 1000.0;
+                } else {
+                    timediff = old_time == 0 ? 0. : newtime - old_time;
+                }
+
+                Host_Frame(timediff);
+                old_time = newtime;
+            }
+        }
+
+        // CLEANUP
+        free(quake_data.params.membase);
+    });
+
+    // Setup audio
+    while (!quake_ready) {
+        sync_render.pop();
+        sync_gamestate.push(true);
+    }
+    sync_render.pop();
+
     audio_device = std::make_unique<merian::SDLAudioDevice>(
         merian::SDLAudioDevice::FORMAT_S16_LSB, [](uint8_t* stream, int len) {
             // from
@@ -1049,7 +1090,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 }
 
 QuakeNode::~QuakeNode() {
-    deinit_quake();
+    game_running.store(false);
+    sync_gamestate.push(true);
+    game_thread.join();
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1123,6 +1166,11 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
         else
             cmd->forwardmove -= m_forward.value * dmy;
     }
+}
+
+void QuakeNode::SCR_Render() {
+    sync_render.push(true);
+    sync_gamestate.pop();
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1428,21 +1476,8 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
     if (update_gamestate) {
         // UPDATE GAMESTATE
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
-        if (!pending_commands.empty()) {
-            Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
-            pending_commands.pop();
-        }
-
-        double newtime = Sys_DoubleTime();
-        double timediff;
-        if (force_timediff > 0) {
-            timediff = force_timediff / 1000.0;
-        } else {
-            timediff = old_time == 0 ? 0. : newtime - old_time;
-        }
-
-        Host_Frame(timediff);
-        old_time = newtime;
+        sync_gamestate.push(true);
+        sync_render.pop();
     }
 
     if (update_gamestate && key_dest == key_game) {
@@ -1497,7 +1532,7 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
             run.request_reconnect();
     }
 
-    if (!cur_frame.tlas || !cl.worldmodel) {
+    if (!cur_frame.tlas || !cl.worldmodel || scr_drawloading) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         clear_pipe->bind(cmd);
         clear_pipe->bind_descriptor_set(cmd, graph_descriptor_set);

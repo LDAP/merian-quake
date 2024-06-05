@@ -31,6 +31,7 @@ extern "C" {
 extern char scr_centerstring[1024];
 extern float scr_centertime_start;
 extern cvar_t scr_centertime;
+extern qboolean scr_drawloading;
 
 // console notify
 extern int con_linewidth;
@@ -56,12 +57,17 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     if (ImGui::Begin("CenterString", NULL, window_flags)) {
-        if (scr_centertime_start <= cl.time &&
-            cl.time < scr_centertime_start + scr_centertime.value) {
-            std::string s = scr_centerstring;
-            // undo colored text
-            for (uint32_t i = 0; i < s.size(); i++)
-                s[i] &= ~128;
+        if (scr_drawloading || (scr_centertime_start <= cl.time &&
+                                cl.time < scr_centertime_start + scr_centertime.value)) {
+            std::string s;
+            if (scr_drawloading) {
+                s = "Loading...";
+            } else {
+                s = scr_centerstring;
+                // undo colored text
+                for (uint32_t i = 0; i < s.size(); i++)
+                    s[i] &= ~128;
+            }
             merian::split(s, "\n", [](const std::string& s) {
                 // hack to display centered text
                 const float font_size = ImGui::CalcTextSize(s.c_str()).x;

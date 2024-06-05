@@ -168,6 +168,9 @@ class QuakeNode : public merian_nodes::Node {
     // called from within qs
     void IN_Move(usercmd_t* cmd);
 
+    // called when Quake wants to render
+    void SCR_Render();
+
     // -----------------------------------------------------
 
     std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
@@ -305,6 +308,11 @@ class QuakeNode : public merian_nodes::Node {
 
     // ----------------------------------------------------
     // Gamestate
+
+    std::thread game_thread;
+    std::atomic_bool game_running = true;
+    merian::ConcurrentQueue<bool> sync_render{1};
+    merian::ConcurrentQueue<bool> sync_gamestate{1};
 
     std::queue<std::string> pending_commands;
     bool worldspawn = false;
