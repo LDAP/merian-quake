@@ -1048,7 +1048,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     sync_render.pop();
 
     audio_device = std::make_unique<merian::SDLAudioDevice>(
-        merian::SDLAudioDevice::FORMAT_S16_LSB, [](uint8_t* stream, int len) {
+        merian::SDLAudioDevice::FORMAT_S16_LSB,
+        [](uint8_t* stream, int len) {
             // from
             // https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
             int buffersize = shm->samples * (shm->samplebits / 8);
@@ -1084,7 +1085,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
             if (shm->samplepos >= buffersize)
                 shm->samplepos = 0;
-        });
+        },
+        1024, 44100, 2);
     audio_device->unpause_audio();
 }
 
