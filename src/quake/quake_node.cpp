@@ -1018,23 +1018,22 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
         // RUN GAMELOOP
         while (game_running) {
-            if (update_gamestate) {
-                if (!pending_commands.empty()) {
-                    Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
-                    pending_commands.pop();
-                }
 
-                double newtime = Sys_DoubleTime();
-                double timediff;
-                if (force_timediff > 0) {
-                    timediff = force_timediff / 1000.0;
-                } else {
-                    timediff = old_time == 0 ? 0. : newtime - old_time;
-                }
-
-                Host_Frame(timediff);
-                old_time = newtime;
+            if (!pending_commands.empty()) {
+                Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
+                pending_commands.pop();
             }
+
+            double newtime = Sys_DoubleTime();
+            double timediff;
+            if (force_timediff > 0) {
+                timediff = force_timediff / 1000.0;
+            } else {
+                timediff = old_time == 0 ? 0. : newtime - old_time;
+            }
+
+            Host_Frame(timediff);
+            old_time = newtime;
         }
 
         // CLEANUP
