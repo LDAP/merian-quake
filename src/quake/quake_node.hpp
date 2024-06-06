@@ -146,6 +146,11 @@ class QuakeNode : public merian_nodes::Node {
         // Can be nullptr if there is not geometry
         merian::AccelerationStructureHandle tlas{nullptr};
         uint32_t last_instances_size{};
+
+        merian::PipelineHandle pipe;
+        merian::PipelineHandle clear_pipe;
+        merian::PipelineHandle volume_pipe;
+        merian::PipelineHandle volume_forward_project_pipe;
     };
 
   public:
@@ -263,6 +268,7 @@ class QuakeNode : public merian_nodes::Node {
 
     //-----------------------------------------------------
 
+    merian::DescriptorSetLayoutHandle graph_desc_set_layout;
     merian::DescriptorSetLayoutHandle quake_desc_set_layout;
     merian::DescriptorPoolHandle quake_pool;
 

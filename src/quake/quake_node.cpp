@@ -1346,33 +1346,43 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap&
 
 QuakeNode::NodeStatusFlags
 QuakeNode::on_connected(const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
+    this->graph_desc_set_layout = graph_desc_set_layout;
+    pipe.reset();
 
-    // Quake sets fov assuming a 4x3 screen :D
-    vid.width = render_width;
-    vid.height = render_height;
-    fov_tan_alpha_half = glm::tan(glm::radians(r_refdef.fov_x) / 2);
+    prev_cl_time = cl.time;
+    return {};
+}
 
-    glm::vec3 sun_dir;
-    glm::vec3 sun_col;
-    if (overwrite_sun) {
-        sun_dir = overwrite_sun_dir;
-        sun_col = overwrite_sun_col;
-    } else {
-        sun_dir = quake_sun_dir;
-        sun_col = quake_sun_col;
-    }
-    if (glm::length(sun_dir) > 0)
-        sun_dir = glm::normalize(sun_dir);
+void QuakeNode::process(merian_nodes::GraphRun& run,
+                        const vk::CommandBuffer& cmd,
+                        const merian::DescriptorSetHandle& graph_descriptor_set,
+                        const merian_nodes::NodeIO& io) {
+    // (RE-) CREATE PIPELINE
+    if (!pipe || !clear_pipe || !volume_pipe || !volume_forward_project_pipe) {
+        glm::vec3 sun_dir;
+        glm::vec3 sun_col;
+        if (overwrite_sun) {
+            sun_dir = overwrite_sun_dir;
+            sun_col = overwrite_sun_col;
+        } else {
+            sun_dir = quake_sun_dir;
+            sun_col = quake_sun_col;
+        }
+        if (glm::length(sun_dir) > 0)
+            sun_dir = glm::normalize(sun_dir);
 
-    if (randomize_seed) {
-        std::random_device dev;
-        std::mt19937 rng(dev());
-        std::uniform_int_distribution<uint32_t> dist;
-        seed = dist(rng);
-    }
+        if (randomize_seed) {
+            std::random_device dev;
+            std::mt19937 rng(dev());
+            std::uniform_int_distribution<uint32_t> dist;
+            seed = dist(rng);
+        }
 
-    // GRAPH DESC SETS
-    {
+        // Quake sets fov assuming a 4x3 screen :D
+        vid.width = render_width;
+        vid.height = render_height;
+        fov_tan_alpha_half = glm::tan(glm::radians(r_refdef.fov_x) / 2);
+
         auto pipe_layout = merian::PipelineLayoutBuilder(context)
                                .add_descriptor_set_layout(graph_desc_set_layout)
                                .add_descriptor_set_layout(quake_desc_set_layout)
@@ -1400,15 +1410,17 @@ QuakeNode::on_connected(const merian::DescriptorSetLayoutHandle& graph_desc_set_
             pipe_layout, volume_forward_project_shader, spec);
     }
 
-    prev_cl_time = cl.time;
-    return {};
-}
+    auto& cur_frame_ptr = io.frame_data<std::shared_ptr<FrameData>>();
+    if (!cur_frame_ptr)
+        cur_frame_ptr = std::make_shared<FrameData>();
+    FrameData& cur_frame = *cur_frame_ptr;
 
-void QuakeNode::process(merian_nodes::GraphRun& run,
-                        const vk::CommandBuffer& cmd,
-                        const merian::DescriptorSetHandle& graph_descriptor_set,
-                        const merian_nodes::NodeIO& io) {
+    cur_frame.pipe = pipe;
+    cur_frame.clear_pipe = clear_pipe;
+    cur_frame.volume_pipe = volume_pipe;
+    cur_frame.volume_forward_project_pipe = volume_forward_project_pipe;
 
+    // RESET MARKOV CHAINS AT ITERATION 0
     if (run.get_iteration() == 0ul) {
         // DUMMY IMAGE as placeholder
         if (!binding_dummy_image) {
@@ -1438,11 +1450,7 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, barriers, {});
     }
 
-    auto& cur_frame_ptr = io.frame_data<std::shared_ptr<FrameData>>();
-    if (!cur_frame_ptr)
-        cur_frame_ptr = std::make_shared<FrameData>();
-    FrameData& cur_frame = *cur_frame_ptr;
-
+    // CREATE COPIES FOR THE CURRENT FRAME IN FLIGHT
     if (!cur_frame.quake_sets) {
         cur_frame.quake_sets = std::make_shared<merian::DescriptorSet>(quake_pool);
         cur_frame.blas_builder = std::make_unique<merian::BLASBuilder>(context, allocator);
@@ -1473,7 +1481,6 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
     }
 
     if (update_gamestate) {
-        // UPDATE GAMESTATE
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         sync_gamestate.push(true);
         sync_render.pop();
@@ -2134,6 +2141,7 @@ QuakeNode::NodeStatusFlags QuakeNode::configuration(merian::Configuration& confi
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
 
+    // Only require a pipeline recreation
     if (old_spp != spp || old_max_path_lenght != max_path_length ||
         old_use_light_cache_tail != use_light_cache_tail ||
         old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
@@ -2142,21 +2150,25 @@ QuakeNode::NodeStatusFlags QuakeNode::configuration(merian::Configuration& confi
         old_mc_samples_adaptive_prob != mc_samples_adaptive_prob ||
         old_distance_mc_samples != distance_mc_samples || old_overwrite_sun != overwrite_sun ||
         old_overwrite_sun_dir != overwrite_sun_dir || old_overwrite_sun_col != overwrite_sun_col ||
-        old_render_width != render_width || old_render_height != render_height ||
         old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
         old_light_cache_tan_alpha_half != light_cache_tan_alpha_half ||
-        old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
-        old_mc_static_buffer_size != mc_static_buffer_size ||
         old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
         old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
+        old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
+        old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
+        old_dist_guide_p != dist_guide_p || old_seed != seed ||
+        old_randomize_seed != randomize_seed) {
+        pipe.reset();
+    }
+
+    // Change outputs and require a graph rebuild
+    if (old_render_width != render_width || old_render_height != render_height ||
+        old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
+        old_mc_static_buffer_size != mc_static_buffer_size ||
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
         old_light_cache_buffer_size != light_cache_buffer_size ||
-        old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
-        old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
-        old_dist_guide_p != dist_guide_p ||
-        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count || old_seed != seed ||
-        old_randomize_seed != randomize_seed) {
+        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count) {
         return NEEDS_RECONNECT;
     }
 
