@@ -190,6 +190,7 @@ int main(const int argc, const char** argv) {
 
                 imgui.render(cmd);
                 controller->set_active(
+                    controller->get_raw_mouse_input() ||
                     !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
             });
     }
