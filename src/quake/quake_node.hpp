@@ -164,7 +164,7 @@ class QuakeNode : public merian_nodes::Node {
 
     // Callbacks from quake -------------------------------
 
-    // called each time a new map is (re)loaded
+    // called each time a new is (re)loaded
     void QS_worldspawn();
 
     // called when a texture should be loaded

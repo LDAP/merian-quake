@@ -793,8 +793,9 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
             {});
     } else {
         // Make it a bit larger for logarithmic growth
-        buffer = allocator->createBuffer(sizeof(T) * data.size() * 1.25, usage, merian::NONE,
-                                         debug_name, min_alignment);
+        buffer =
+            allocator->createBuffer(sizeof(T) * data.size() * 1.25, usage,
+                                    merian::MemoryMappingType::NONE, debug_name, min_alignment);
     }
     allocator->getStaging()->cmdToBuffer(cmd, *buffer, 0, sizeof(T) * data.size(), data.data());
     return buffer;
@@ -897,8 +898,9 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
             .build_layout(context);
     quake_pool = std::make_shared<merian::DescriptorPool>(
         quake_desc_set_layout, 3, vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-    binding_dummy_buffer = allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer,
-                                                   merian::NONE, "Quake: Dummy buffer");
+    binding_dummy_buffer =
+        allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer,
+                                merian::MemoryMappingType::NONE, "Quake: Dummy buffer");
 
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
