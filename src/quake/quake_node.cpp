@@ -1034,7 +1034,11 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
                 timediff = old_time == 0 ? 0. : newtime - old_time;
             }
 
-            Host_Frame(timediff);
+            try {
+                Host_Frame(timediff);
+            } catch (const std::runtime_error&) {
+                // game quit, do nothing
+            }
             old_time = newtime;
         }
 
@@ -1045,7 +1049,7 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
     // Setup audio
     while (!quake_ready) {
         sync_render.pop();
-        sync_gamestate.push(true);
+        sync_gamestate.push(true, 1);
     }
     sync_render.pop();
 
@@ -1094,6 +1098,8 @@ QuakeNode::QuakeNode(const merian::SharedContext& context,
 
 QuakeNode::~QuakeNode() {
     game_running.store(false);
+    // make sure to unlock
+    sync_gamestate.push(true);
     sync_gamestate.push(true);
     game_thread.join();
 }
@@ -1172,9 +1178,9 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
 }
 
 void QuakeNode::R_RenderScene() {
-    sync_render.push(true);
+    sync_render.push(true, 1);
     if (!game_running) {
-        throw std::runtime_error{"quit"};
+        std::runtime_error{"quit"};
     }
     sync_gamestate.pop();
 }
@@ -1489,7 +1495,7 @@ void QuakeNode::process(merian_nodes::GraphRun& run,
 
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
-        sync_gamestate.push(true);
+        sync_gamestate.push(true, 1);
         sync_render.pop();
     }
 

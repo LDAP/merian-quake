@@ -317,8 +317,8 @@ class QuakeNode : public merian_nodes::Node {
 
     std::thread game_thread;
     std::atomic_bool game_running = true;
-    merian::ConcurrentQueue<bool> sync_render{1};
-    merian::ConcurrentQueue<bool> sync_gamestate{1};
+    merian::ConcurrentQueue<bool> sync_render;
+    merian::ConcurrentQueue<bool> sync_gamestate;
 
     std::queue<std::string> pending_commands;
     bool worldspawn = false;
