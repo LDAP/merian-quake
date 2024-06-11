@@ -29,7 +29,7 @@ extern "C" {
 
 // centerstring
 extern char scr_centerstring[1024];
-extern float scr_centertime_start;
+extern float scr_centertime_off;
 extern cvar_t scr_centertime;
 extern qboolean scr_drawloading;
 
@@ -57,8 +57,7 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     if (ImGui::Begin("CenterString", NULL, window_flags)) {
-        if (scr_drawloading || (scr_centertime_start <= cl.time &&
-                                cl.time < scr_centertime_start + scr_centertime.value)) {
+        if (scr_drawloading || (cl.intermission && !((scr_centertime_off <= 0 || key_dest != key_game || cl.paused)))) {
             std::string s;
             if (scr_drawloading) {
                 s = "Loading...";

@@ -174,7 +174,7 @@ class QuakeNode : public merian_nodes::Node {
     void IN_Move(usercmd_t* cmd);
 
     // called when Quake wants to render
-    void SCR_Render();
+    void R_RenderScene();
 
     // -----------------------------------------------------
 

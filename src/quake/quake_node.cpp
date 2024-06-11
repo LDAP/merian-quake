@@ -74,8 +74,8 @@ extern "C" void IN_Move(usercmd_t* cmd) {
 }
 
 // called when rendering
-extern "C" void SCR_Render() {
-    quake_data.node->SCR_Render();
+extern "C" void R_RenderScene() {
+    quake_data.node->R_RenderScene();
 }
 
 // Helper -----------------------------------------------------------------------------------------
@@ -1171,8 +1171,11 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
     }
 }
 
-void QuakeNode::SCR_Render() {
+void QuakeNode::R_RenderScene() {
     sync_render.push(true);
+    if (!game_running) {
+        throw std::runtime_error{"quit"};
+    }
     sync_gamestate.pop();
 }
 
