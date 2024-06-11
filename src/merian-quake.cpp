@@ -57,7 +57,7 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     if (ImGui::Begin("CenterString", NULL, window_flags)) {
-        if (scr_drawloading || (cl.intermission && !((scr_centertime_off <= 0 || key_dest != key_game || cl.paused)))) {
+        if (scr_drawloading || (!cl.intermission && !((scr_centertime_off <= 0 || key_dest != key_game || cl.paused)))) {
             std::string s;
             if (scr_drawloading) {
                 s = "Loading...";
