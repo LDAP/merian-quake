@@ -377,6 +377,7 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
         // Set target
         key_dest = key_game;
         m_state = m_none;
+        merian::Stopwatch sw;
 
         // RUN GAMELOOP
         while (game_running) {
@@ -400,6 +401,9 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
                 // game quit, do nothing
             }
             old_time = newtime;
+
+            server_fps = 1 / sw.seconds();
+            sw.reset();
         }
 
         // CLEANUP
@@ -550,6 +554,7 @@ QuakeNode::NodeStatusFlags QuakeNode::configuration(merian::Configuration& confi
                                    render_info.sun_color.g, render_info.sun_color.b));
     config.output_text(fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                                    r_refdef.viewangles[1], r_refdef.viewangles[2]));
+    config.output_text(fmt::format("server fps: {}", server_fps));
 
     return {};
 }

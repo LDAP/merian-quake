@@ -70,6 +70,7 @@ class QuakeNode : public merian_nodes::Node {
     float force_timediff = 0;
     bool update_gamestate = true;
     QuakeRenderInfo render_info;
+    double server_fps = 0;
 
     // Input processing
     const std::shared_ptr<merian::InputController> controller;
