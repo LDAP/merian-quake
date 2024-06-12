@@ -4,7 +4,6 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/utils/input_controller.hpp"
-#include "merian/utils/sdl_audio_device.hpp"
 
 #include "renderer/render_markovchain.hpp"
 

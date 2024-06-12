@@ -1,5 +1,6 @@
 #include "quake_node.hpp"
 
+#include "merian/utils/audio/sdl_audio_device.hpp"
 #include "merian/utils/colors.hpp"
 
 #include <GLFW/glfw3.h>
@@ -47,48 +48,48 @@ extern "C" void R_RenderScene() {
 }
 
 extern "C" qboolean SNDDMA_Init(dma_t* dma) {
+    quake_data.audio_device = std::make_unique<merian::SDLAudioDevice>();
 
-    quake_data.audio_device =
-        std::make_unique<merian::SDLAudioDevice>([](uint8_t* stream, int len) {
-            // from
-            // https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
-            int buffersize = shm->samples * (shm->samplebits / 8);
-            int pos, tobufend;
-            int len1, len2;
+    const auto callback = [](uint8_t* stream, int len) {
+        // from
+        // https://github.com/sezero/quakespasm/blob/70df2b661e9c632d04825b259e63ad58c29c01ac/Quake/snd_sdl.c#L156
+        int buffersize = shm->samples * (shm->samplebits / 8);
+        int pos, tobufend;
+        int len1, len2;
 
-            if (!shm) { /* shouldn't happen, but just in case */
-                memset(stream, 0, len);
-                return;
-            }
+        if (!shm) { /* shouldn't happen, but just in case */
+            memset(stream, 0, len);
+            return;
+        }
 
-            pos = (shm->samplepos * (shm->samplebits / 8));
-            if (pos >= buffersize)
-                shm->samplepos = pos = 0;
+        pos = (shm->samplepos * (shm->samplebits / 8));
+        if (pos >= buffersize)
+            shm->samplepos = pos = 0;
 
-            tobufend = buffersize - pos; /* bytes to buffer's end. */
-            len1 = len;
-            len2 = 0;
+        tobufend = buffersize - pos; /* bytes to buffer's end. */
+        len1 = len;
+        len2 = 0;
 
-            if (len1 > tobufend) {
-                len1 = tobufend;
-                len2 = len - len1;
-            }
+        if (len1 > tobufend) {
+            len1 = tobufend;
+            len2 = len - len1;
+        }
 
-            memcpy(stream, shm->buffer + pos, len1);
+        memcpy(stream, shm->buffer + pos, len1);
 
-            if (len2 <= 0) {
-                shm->samplepos += (len1 / (shm->samplebits / 8));
-            } else { /* wraparound? */
-                memcpy(stream + len1, shm->buffer, len2);
-                shm->samplepos = (len2 / (shm->samplebits / 8));
-            }
+        if (len2 <= 0) {
+            shm->samplepos += (len1 / (shm->samplebits / 8));
+        } else { /* wraparound? */
+            memcpy(stream + len1, shm->buffer, len2);
+            shm->samplepos = (len2 / (shm->samplebits / 8));
+        }
 
-            if (shm->samplepos >= buffersize)
-                shm->samplepos = 0;
-        });
+        if (shm->samplepos >= buffersize)
+            shm->samplepos = 0;
+    };
 
-    merian::SDLAudioDevice::AudioSpec desired = {
-        merian::SDLAudioDevice::FORMAT_S16_LSB,
+    merian::AudioDevice::AudioSpec desired = {
+        merian::AudioDevice::FORMAT_S16_LSB,
         1024,
         static_cast<int>(snd_mixspeed.value),
         2,
@@ -104,8 +105,8 @@ extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     else
         desired.buffersize = 4096; /* for 96 kHz */
 
-    std::optional<merian::SDLAudioDevice::AudioSpec> actual =
-        quake_data.audio_device->open_device(desired);
+    std::optional<merian::AudioDevice::AudioSpec> actual =
+        quake_data.audio_device->open_device(desired, callback);
 
     if (!actual) {
         return false;
@@ -118,7 +119,7 @@ extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     shm = dma;
     /* Fill the audio DMA information block */
     shm->samplebits = (actual->format & 0xFF); /* first byte of format is bits */
-    shm->signed8 = (actual->format == merian::SDLAudioDevice::FORMAT_S8);
+    shm->signed8 = (actual->format == merian::AudioDevice::FORMAT_S8);
     shm->speed = actual->samplerate;
     shm->channels = actual->channels;
     int tmp = (actual->buffersize * actual->channels) * 10;
@@ -134,7 +135,7 @@ extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     shm->submission_chunk = 1;
 
     size_t buffersize = shm->samples * (shm->samplebits / 8);
-    shm->buffer = (unsigned char *) calloc (1, buffersize);
+    shm->buffer = (unsigned char*)calloc(1, buffersize);
 
     quake_data.audio_device->unpause_audio();
     return true;
