@@ -5,7 +5,7 @@
 
 #include "merian-nodes/connectors/vk_buffer_in.hpp"
 
-#include "quake/quake_node.hpp"
+#include "renderer/render_markovchain.hpp"
 
 extern "C" {
 // from gl_rmain.c

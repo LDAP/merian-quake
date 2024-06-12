@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/quake_node.hpp"
 #include "merian-nodes/graph/graph.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
@@ -14,7 +15,7 @@
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 
 #include "hud/hud.hpp"
-#include "quake/quake_node.hpp"
+#include "renderer/render_markovchain.hpp"
 
 class ProcessingGraph {
   public:
@@ -27,13 +28,15 @@ class ProcessingGraph {
         : graph(context, alloc) {
 
         auto blue_noise = std::make_shared<merian_nodes::LDRImageRead>(
-            alloc->getStaging(), loader.find_file("blue_noise/1024_1024/LDR_RGBA_0.png").value(), true, true);
+            alloc->getStaging(), loader.find_file("blue_noise/1024_1024/LDR_RGBA_0.png").value(),
+            true, true);
         const std::array<float, 4> white_color = {1., 1., 1., 1.};
         auto one = std::make_shared<merian_nodes::ColorImage>(vk::Format::eR16G16B16A16Sfloat,
                                                               vk::Extent3D{1920, 1080, 1},
                                                               vk::ClearColorValue(white_color));
+        auto mc_render = std::make_shared<RendererMarkovChain>(context, alloc);
         auto quake =
-            std::make_shared<QuakeNode>(context, alloc, controller, argc - 1, argv + 1);
+            std::make_shared<QuakeNode>(context, controller, argc - 1, argv + 1, mc_render.get());
         auto accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         auto volume_accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         svgf = std::make_shared<merian_nodes::SVGF>(context, alloc);
@@ -52,9 +55,10 @@ class ProcessingGraph {
         image_writer->set_callback([accum]() { accum->request_clear(); });
         image_writer_volume->set_callback([volume_accum]() { volume_accum->request_clear(); });
 
+        graph.add_node(quake);
         graph.add_node(one, "one");
         graph.add_node(blue_noise, "blue_noise");
-        graph.add_node(quake, "quake");
+        graph.add_node(mc_render, "render_markovchain");
         graph.add_node(accum, "accum");
         graph.add_node(svgf, "denoiser");
         graph.add_node(volume_svgf, "volume denoiser");
@@ -68,28 +72,29 @@ class ProcessingGraph {
         graph.add_node(beauty_image_write, "beauty image write");
         graph.add_node(fxaa, "fxaa");
 
+        graph.add_connection(quake, mc_render, "render_info", "render_info");
         graph.add_connection(one, volume_svgf, "out", "albedo");
-        graph.add_connection(blue_noise, quake, "out", "blue_noise");
-        graph.add_connection(quake, accum, "irradiance", "irr");
-        graph.add_connection(quake, svgf, "albedo", "albedo");
-        graph.add_connection(quake, accum, "mv", "mv");
-        graph.add_connection(quake, svgf, "mv", "mv");
-        graph.add_connection(quake, accum, "moments", "moments_in");
-        graph.add_connection(quake, volume_accum, "volume", "irr");
-        graph.add_connection(quake, volume_accum, "volume_moments", "moments_in");
-        graph.add_connection(quake, quake, "volume_depth", "prev_volume_depth");
-        graph.add_connection(quake, volume_accum, "volume_mv", "mv");
-        graph.add_connection(quake, volume_svgf, "volume_mv", "mv");
-        graph.add_connection(quake, accum, "gbuffer", "gbuf");
-        graph.add_connection(quake, accum, "gbuffer", "prev_gbuf");
-        graph.add_connection(quake, quake, "gbuffer", "prev_gbuf");
-        graph.add_connection(quake, svgf, "gbuffer", "gbuffer");
-        graph.add_connection(quake, svgf, "gbuffer", "prev_gbuffer");
-        graph.add_connection(quake, volume_accum, "gbuffer", "gbuf");
-        graph.add_connection(quake, volume_accum, "gbuffer", "prev_gbuf");
-        graph.add_connection(quake, volume_svgf, "gbuffer", "gbuffer");
-        graph.add_connection(quake, volume_svgf, "gbuffer", "prev_gbuffer");
-        graph.add_connection(quake, hud, "gbuffer", "gbuf");
+        graph.add_connection(blue_noise, mc_render, "out", "blue_noise");
+        graph.add_connection(mc_render, accum, "irradiance", "irr");
+        graph.add_connection(mc_render, svgf, "albedo", "albedo");
+        graph.add_connection(mc_render, accum, "mv", "mv");
+        graph.add_connection(mc_render, svgf, "mv", "mv");
+        graph.add_connection(mc_render, accum, "moments", "moments_in");
+        graph.add_connection(mc_render, volume_accum, "volume", "irr");
+        graph.add_connection(mc_render, volume_accum, "volume_moments", "moments_in");
+        graph.add_connection(mc_render, mc_render, "volume_depth", "prev_volume_depth");
+        graph.add_connection(mc_render, volume_accum, "volume_mv", "mv");
+        graph.add_connection(mc_render, volume_svgf, "volume_mv", "mv");
+        graph.add_connection(mc_render, accum, "gbuffer", "gbuf");
+        graph.add_connection(mc_render, accum, "gbuffer", "prev_gbuf");
+        graph.add_connection(mc_render, mc_render, "gbuffer", "prev_gbuf");
+        graph.add_connection(mc_render, svgf, "gbuffer", "gbuffer");
+        graph.add_connection(mc_render, svgf, "gbuffer", "prev_gbuffer");
+        graph.add_connection(mc_render, volume_accum, "gbuffer", "gbuf");
+        graph.add_connection(mc_render, volume_accum, "gbuffer", "prev_gbuf");
+        graph.add_connection(mc_render, volume_svgf, "gbuffer", "gbuffer");
+        graph.add_connection(mc_render, volume_svgf, "gbuffer", "prev_gbuffer");
+        graph.add_connection(mc_render, hud, "gbuffer", "gbuf");
         graph.add_connection(volume_accum, volume_accum, "out_irr", "prev_accum");
         graph.add_connection(volume_accum, volume_svgf, "out_irr", "irr");
         graph.add_connection(volume_accum, volume_accum, "out_moments", "prev_moments");
@@ -101,7 +106,7 @@ class ProcessingGraph {
         graph.add_connection(volume_svgf, volume_svgf, "out", "prev_out");
         graph.add_connection(volume_svgf, add, "out", "a");
         graph.add_connection(volume_svgf, image_writer_volume, "out", "src");
-        graph.add_connection(svgf, quake, "out", "prev_filtered");
+        graph.add_connection(svgf, mc_render, "out", "prev_filtered");
         graph.add_connection(svgf, svgf, "out", "prev_out");
         graph.add_connection(svgf, image_writer, "out", "src");
         graph.add_connection(svgf, add, "out", "b");

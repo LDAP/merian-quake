@@ -57,16 +57,13 @@ static void QuakeMessageOverlay() {
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
     if (ImGui::Begin("CenterString", NULL, window_flags)) {
-        if (scr_drawloading || (!cl.intermission && !((scr_centertime_off <= 0 || key_dest != key_game || cl.paused)))) {
+        if (!cl.intermission && !((scr_centertime_off <= 0 || key_dest != key_game || cl.paused))) {
             std::string s;
-            if (scr_drawloading) {
-                s = "Loading...";
-            } else {
-                s = scr_centerstring;
-                // undo colored text
-                for (uint32_t i = 0; i < s.size(); i++)
-                    s[i] &= ~128;
-            }
+            s = scr_centerstring;
+            // undo colored text
+            for (uint32_t i = 0; i < s.size(); i++)
+                s[i] &= ~128;
+
             merian::split(s, "\n", [](const std::string& s) {
                 // hack to display centered text
                 const float font_size = ImGui::CalcTextSize(s.c_str()).x;
@@ -104,13 +101,18 @@ static void QuakeMessageOverlay() {
     ImGui::PopFont();
 
     ImGui::PushFont(quake_font_lg);
-    if (cl.intermission == 1 && key_dest == key_game) {
+    if (scr_drawloading || (cl.intermission == 1 && key_dest == key_game)) {
         ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowBgAlpha(0.f); // Transparent background
         if (ImGui::Begin("Intermission", NULL, window_flags)) {
-            ImGui::Text("Time: %d:%02d", cl.completed_time / 60, cl.completed_time % 60);
-            ImGui::Text("Secrets: %d/%2d", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
-            ImGui::Text("Monsters: %d/%2d", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
+            if (scr_drawloading) {
+                ImGui::Text("Loading...");
+            } else {
+                ImGui::Text("Time: %d:%02d", cl.completed_time / 60, cl.completed_time % 60);
+                ImGui::Text("Secrets: %d/%2d", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
+                ImGui::Text("Monsters: %d/%2d", cl.stats[STAT_MONSTERS],
+                            cl.stats[STAT_TOTALMONSTERS]);
+            }
         }
         ImGui::End();
     }

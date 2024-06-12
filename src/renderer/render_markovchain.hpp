@@ -1,11 +1,10 @@
 #pragma once
 
 #include "glm/ext/vector_float4.hpp"
+#include "merian-nodes/connectors/any_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian/utils/input_controller.hpp"
-#include "merian/utils/sdl_audio_device.hpp"
 #include "merian/utils/string.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -13,16 +12,15 @@
 #include "merian/vk/raytrace/tlas_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/utils/profiler.hpp"
-#include "quake/config.h"
+#include "renderer/config.h"
 
-#include <queue>
 #include <unordered_set>
 
 extern "C" {
 #include "quakedef.h"
 }
 
-class QuakeNode : public merian_nodes::Node {
+class RendererMarkovChain : public merian_nodes::Node {
   public:
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
@@ -154,27 +152,15 @@ class QuakeNode : public merian_nodes::Node {
     };
 
   public:
-    QuakeNode(const merian::SharedContext& context,
-              const merian::ResourceAllocatorHandle& allocator,
-              const std::shared_ptr<merian::InputController> controller,
-              const int quakespasm_argc = 0,
-              const char** quakespasm_argv = nullptr);
+    RendererMarkovChain(const merian::SharedContext& context,
+                        const merian::ResourceAllocatorHandle& allocator);
 
-    ~QuakeNode();
+    ~RendererMarkovChain();
 
     // Callbacks from quake -------------------------------
 
-    // called each time a new is (re)loaded
-    void QS_worldspawn();
-
     // called when a texture should be loaded
     void QS_texture_load(gltexture_t* glt, uint32_t* data);
-
-    // called from within qs
-    void IN_Move(usercmd_t* cmd);
-
-    // called when Quake wants to render
-    void R_RenderScene();
 
     // -----------------------------------------------------
 
@@ -193,25 +179,20 @@ class QuakeNode : public merian_nodes::Node {
 
     NodeStatusFlags configuration(merian::Configuration& config) override;
 
-    // -----------------------------------------------------
-
-    void queue_command(std::string command) {
-        pending_commands.push(command);
-    }
-
   private:
     // Attemps to reuse the supplied old_geo (by update, buffer reuse).
     // Uses "flags" if building, else old_geo.flags.
     // If force_rebuild is false and an update is possible an update is queued instead if a rebuild.
-    QuakeNode::RTGeometry get_rt_geometry(const vk::CommandBuffer& cmd,
-                                          const std::vector<float>& vtx,
-                                          const std::vector<float>& prev_vtx,
-                                          const std::vector<uint32_t>& idx,
-                                          const std::vector<QuakeNode::VertexExtraData>& ext,
-                                          const std::unique_ptr<merian::BLASBuilder>& blas_builder,
-                                          const QuakeNode::RTGeometry old_geometry,
-                                          const bool force_rebuild,
-                                          const vk::BuildAccelerationStructureFlagsKHR flags);
+    RendererMarkovChain::RTGeometry
+    get_rt_geometry(const vk::CommandBuffer& cmd,
+                    const std::vector<float>& vtx,
+                    const std::vector<float>& prev_vtx,
+                    const std::vector<uint32_t>& idx,
+                    const std::vector<RendererMarkovChain::VertexExtraData>& ext,
+                    const std::unique_ptr<merian::BLASBuilder>& blas_builder,
+                    const RendererMarkovChain::RTGeometry old_geometry,
+                    const bool force_rebuild,
+                    const vk::BuildAccelerationStructureFlagsKHR flags);
     // Optionally refreshes the geo and updates the current descriptor set if necessary
     void
     update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo, FrameData& cur_frame);
@@ -224,14 +205,9 @@ class QuakeNode : public merian_nodes::Node {
     // processes the pending uploads and updates the current descriptor set
     void update_textures(const vk::CommandBuffer& cmd, FrameData& cur_frame);
 
-    void parse_worldspawn();
-
   private:
     const merian::SharedContext context;
     const merian::ResourceAllocatorHandle allocator;
-    const std::shared_ptr<merian::InputController> controller;
-
-    std::unique_ptr<merian::SDLAudioDevice> audio_device;
 
     merian::ShaderModuleHandle rt_shader;
     merian::ShaderModuleHandle clear_shader;
@@ -246,6 +222,7 @@ class QuakeNode : public merian_nodes::Node {
         merian_nodes::VkImageIn::compute_read("prev_volume_depth", 1);
     merian_nodes::VkBufferInHandle con_prev_gbuf =
         merian_nodes::VkBufferIn::compute_read("prev_gbuf", 1);
+    merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
 
     merian_nodes::VkImageOutHandle con_irradiance;
     merian_nodes::VkImageOutHandle con_albedo;
@@ -291,8 +268,6 @@ class QuakeNode : public merian_nodes::Node {
     uint64_t frame = 0;
     double prev_cl_time = 0;
 
-    std::array<char, 512> startup_commands_buffer = {0};
-
     // "Global" frame info
     // texnum -> texture
     std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
@@ -305,38 +280,14 @@ class QuakeNode : public merian_nodes::Node {
     std::vector<float> dynamic_vtx;
     std::vector<float> dynamic_prev_vtx;
     std::vector<uint32_t> dynamic_idx;
-    std::vector<QuakeNode::VertexExtraData> dynamic_ext;
+    std::vector<RendererMarkovChain::VertexExtraData> dynamic_ext;
 
     std::vector<float> static_vtx;
     std::vector<float> static_prev_vtx;
     std::vector<uint32_t> static_idx;
-    std::vector<QuakeNode::VertexExtraData> static_ext;
+    std::vector<RendererMarkovChain::VertexExtraData> static_ext;
 
     // ----------------------------------------------------
-    // Gamestate
-
-    std::thread game_thread;
-    std::atomic_bool game_running = true;
-    merian::ConcurrentQueue<bool> sync_render;
-    merian::ConcurrentQueue<bool> sync_gamestate;
-
-    std::queue<std::string> pending_commands;
-    bool worldspawn = false;
-
-    double old_time = 0;
-    bool update_gamestate = true;
-    bool sound = true;
-    bool raw_mouse_was_enabled = false;
-    int stop_after_worldspawn = -1;
-    bool rebuild_after_stop = true;
-    uint64_t last_worldspawn_frame = 0;
-    float force_timediff = 0;
-
-    double mouse_oldx = 0;
-    double mouse_oldy = 0;
-    double mouse_x = 0;
-    double mouse_y = 0;
-
     int32_t render_width = 1920;
     int32_t render_height = 1080;
 
@@ -345,9 +296,6 @@ class QuakeNode : public merian_nodes::Node {
 
     float fov = glm::radians(90.);
     float fov_tan_alpha_half = glm::tan(fov / 2);
-
-    glm::vec3 quake_sun_dir{0};
-    glm::vec3 quake_sun_col{0};
 
     bool overwrite_sun = false;
     glm::vec3 overwrite_sun_dir{0, 0, 1};
