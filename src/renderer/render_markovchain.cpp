@@ -912,26 +912,26 @@ std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_in
 std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_outputs(
     [[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input) {
 
-    con_irradiance = merian_nodes::VkImageOut::compute_write(
+    con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_albedo = merian_nodes::VkImageOut::compute_write("albedo", vk::Format::eR16G16B16A16Sfloat,
+    con_albedo = merian_nodes::ManagedVkImageOut::compute_write("albedo", vk::Format::eR16G16B16A16Sfloat,
                                                          render_width, render_height);
-    con_mv = merian_nodes::VkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat, render_width,
+    con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat, render_width,
                                                      render_height);
-    con_debug = merian_nodes::VkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
+    con_debug = merian_nodes::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
                                                         render_width, render_height);
-    con_moments = merian_nodes::VkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
+    con_moments = merian_nodes::ManagedVkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
                                                           render_width, render_height);
-    con_volume = merian_nodes::VkImageOut::compute_write("volume", vk::Format::eR16G16B16A16Sfloat,
+    con_volume = merian_nodes::ManagedVkImageOut::compute_write("volume", vk::Format::eR16G16B16A16Sfloat,
                                                          render_width, render_height);
-    con_volume_moments = merian_nodes::VkImageOut::compute_write(
+    con_volume_moments = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height);
-    con_volume_depth = merian_nodes::VkImageOut::compute_write(
+    con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR32Sfloat, render_width, render_height);
-    con_volume_mv = merian_nodes::VkImageOut::compute_write("volume_mv", vk::Format::eR16G16Sfloat,
+    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_write("volume_mv", vk::Format::eR16G16Sfloat,
                                                             render_width, render_height);
 
-    con_markovchain = std::make_shared<merian_nodes::VkBufferOut>(
+    con_markovchain = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -941,7 +941,7 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
-    con_lightcache = std::make_shared<merian_nodes::VkBufferOut>(
+    con_lightcache = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -951,7 +951,7 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
-    con_gbuffer = std::make_shared<merian_nodes::VkBufferOut>(
+    con_gbuffer = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "gbuffer", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -960,7 +960,7 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc});
-    con_volume_distancemc = std::make_shared<merian_nodes::VkBufferOut>(
+    con_volume_distancemc = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "volume_distancemc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,

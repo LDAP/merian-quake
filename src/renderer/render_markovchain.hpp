@@ -2,8 +2,8 @@
 
 #include "glm/ext/vector_float4.hpp"
 #include "merian-nodes/connectors/any_in.hpp"
-#include "merian-nodes/connectors/vk_buffer_in.hpp"
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/string.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -214,30 +214,30 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian::ShaderModuleHandle volume_shader;
     merian::ShaderModuleHandle volume_forward_project_shader;
 
-    merian_nodes::VkImageInHandle con_blue_noise =
-        merian_nodes::VkImageIn::compute_read("blue_noise", 0);
-    merian_nodes::VkImageInHandle con_prev_filtered =
-        merian_nodes::VkImageIn::compute_read("prev_filtered", 1);
-    merian_nodes::VkImageInHandle con_prev_volume_depth =
-        merian_nodes::VkImageIn::compute_read("prev_volume_depth", 1);
-    merian_nodes::VkBufferInHandle con_prev_gbuf =
-        merian_nodes::VkBufferIn::compute_read("prev_gbuf", 1);
+    merian_nodes::ManagedVkImageInHandle con_blue_noise =
+        merian_nodes::ManagedVkImageIn::compute_read("blue_noise", 0);
+    merian_nodes::ManagedVkImageInHandle con_prev_filtered =
+        merian_nodes::ManagedVkImageIn::compute_read("prev_filtered", 1);
+    merian_nodes::ManagedVkImageInHandle con_prev_volume_depth =
+        merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
+    merian_nodes::ManagedVkBufferInHandle con_prev_gbuf =
+        merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuf", 1);
     merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
 
-    merian_nodes::VkImageOutHandle con_irradiance;
-    merian_nodes::VkImageOutHandle con_albedo;
-    merian_nodes::VkImageOutHandle con_mv;
-    merian_nodes::VkImageOutHandle con_debug;
-    merian_nodes::VkImageOutHandle con_moments;
-    merian_nodes::VkImageOutHandle con_volume;
-    merian_nodes::VkImageOutHandle con_volume_moments;
-    merian_nodes::VkImageOutHandle con_volume_depth;
-    merian_nodes::VkImageOutHandle con_volume_mv;
+    merian_nodes::ManagedVkImageOutHandle con_irradiance;
+    merian_nodes::ManagedVkImageOutHandle con_albedo;
+    merian_nodes::ManagedVkImageOutHandle con_mv;
+    merian_nodes::ManagedVkImageOutHandle con_debug;
+    merian_nodes::ManagedVkImageOutHandle con_moments;
+    merian_nodes::ManagedVkImageOutHandle con_volume;
+    merian_nodes::ManagedVkImageOutHandle con_volume_moments;
+    merian_nodes::ManagedVkImageOutHandle con_volume_depth;
+    merian_nodes::ManagedVkImageOutHandle con_volume_mv;
 
-    merian_nodes::VkBufferOutHandle con_markovchain;
-    merian_nodes::VkBufferOutHandle con_lightcache;
-    merian_nodes::VkBufferOutHandle con_gbuffer;
-    merian_nodes::VkBufferOutHandle con_volume_distancemc;
+    merian_nodes::ManagedVkBufferOutHandle con_markovchain;
+    merian_nodes::ManagedVkBufferOutHandle con_lightcache;
+    merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
+    merian_nodes::ManagedVkBufferOutHandle con_volume_distancemc;
 
     // Use this buffer in bindings when the real resource is not available
     merian::BufferHandle binding_dummy_buffer;
