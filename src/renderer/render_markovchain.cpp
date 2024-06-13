@@ -1502,7 +1502,7 @@ void RendererMarkovChain::update_dynamic_geo(const vk::CommandBuffer& cmd, Frame
             (*candidates).second.pop_back();
         }
 
-        bool force_rebuild = frame - old_geo.last_rebuild > 1000;
+        bool force_rebuild = true;//frame - old_geo.last_rebuild > 1000;
         cur_frame.dynamic_geometries.emplace_back(
             get_rt_geometry(cmd, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext,
                             cur_frame.blas_builder, old_geo, force_rebuild,
