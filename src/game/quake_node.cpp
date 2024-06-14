@@ -34,7 +34,7 @@ extern "C" void QS_worldspawn() {
 
 // called when a texture should be loaded
 extern "C" void QS_texture_load(gltexture_t* glt, uint32_t* data) {
-    quake_data.render_node->QS_texture_load(glt, data);
+    quake_data.quake_node->QS_texture_load(glt, data);
 }
 
 // called from within qs, pretty much a copy from in_sdl.c:
@@ -111,9 +111,6 @@ extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     if (!actual) {
         return false;
     }
-
-    SPDLOG_DEBUG("audio device open: {} Hz, {} samples, {} channels", actual->samplerate,
-                 actual->buffersize, actual->channels);
 
     memset((void*)dma, 0, sizeof(dma_t));
     shm = dma;
@@ -261,11 +258,12 @@ void parse_worldspawn(QuakeNode::QuakeRenderInfo& renderer_info) {
 }
 
 QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
+                     const merian::ResourceAllocatorHandle allocator,
                      const std::shared_ptr<merian::InputController>& controller,
                      const int quakespasm_argc,
                      const char** quakespasm_argv,
                      RendererMarkovChain* renderer)
-    : Node("Quake"), controller(controller) {
+    : Node("Quake"), allocator(allocator), controller(controller) {
 
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
@@ -470,21 +468,83 @@ void QuakeNode::R_RenderScene() {
     sync_gamestate.pop();
 }
 
+void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
+    // LOG -----------------------------------------------
+
+    std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
+    SPDLOG_DEBUG("texture_load {} {} {}x{} from {}, frame: {}", glt->texnum, glt->name, glt->width,
+                 glt->height, source, glt->visframe);
+
+    if (glt->width == 0 || glt->height == 0) {
+        SPDLOG_WARN("image extent was 0. skipping");
+        return;
+    }
+
+    // STORE SOME TEXTURE IDs ----------------------------
+
+    // HACK: for blood patch
+    if (!strcmp(glt->name, "progs/gib_1.mdl:frame0"))
+        render_info.texnum_blood = glt->texnum;
+    // HACK: for sparks and for emissive rocket particle trails
+    if (!strcmp(glt->name, "progs/s_exp_big.spr:frame10"))
+        render_info.texnum_explosion = glt->texnum;
+
+    // ALLOCATE ----------------------------
+
+    // We store the texture on system memory for now
+    // and upload in cmd_process later
+    std::shared_ptr<QuakeTexture> texture = std::make_shared<QuakeTexture>(glt, data);
+    // If we replace an existing texture the old texture is automatically freed.
+    current_textures[glt->texnum] = texture;
+    pending_uploads.insert(glt->texnum);
+}
+
 std::vector<merian_nodes::OutputConnectorHandle>
 QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input) {
-    return {
-        con_render_info,
-    };
+    return {con_render_info, con_textures};
+}
+
+void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
+    for (auto texnum : pending_uploads) {
+        std::shared_ptr<QuakeTexture>& tex = current_textures[texnum];
+        assert(!tex->gpu_tex);
+        tex->gpu_tex = allocator->createTextureFromRGB8(
+            cmd, tex->cpu_tex.data(), tex->width, tex->height,
+            tex->flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest, !tex->linear);
+        io[con_textures].set(texnum, tex->gpu_tex);
+    }
+    pending_uploads.clear();
 }
 
 void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
                         [[maybe_unused]] const vk::CommandBuffer& cmd,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
                         [[maybe_unused]] const merian_nodes::NodeIO& io) {
+    if (run.get_iteration() == 0ul) {
+        uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
+        std::vector<uint32_t> image_data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
+        const merian::TextureHandle missing_texture =
+            allocator->createTextureFromRGB8(cmd, image_data.data(), 2, 2, vk::Filter::eLinear);
+
+        for (uint32_t texnum = 0; texnum < MAX_GLTEXTURES; texnum++) {
+            if (current_textures[texnum] && current_textures[texnum]->gpu_tex) {
+                auto& tex = current_textures[texnum];
+                io[con_textures].set(texnum, tex->gpu_tex);
+            } else {
+                io[con_textures].set(texnum, missing_texture);
+            }
+        }
+    }
+
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         sync_gamestate.push(true, 1);
         sync_render.pop();
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
+        update_textures(cmd, io);
     }
 
     if (cl.worldmodel && render_info.worldspawn) {

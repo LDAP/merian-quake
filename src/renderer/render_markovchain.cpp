@@ -4,7 +4,6 @@
 #include "game/quake_node.hpp"
 #include "merian-nodes/common/gbuffer.glsl.h"
 #include "merian/utils/bitpacking.hpp"
-#include "merian/utils/colors.hpp"
 #include "merian/utils/concurrent/utils.hpp"
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
@@ -45,62 +44,6 @@ extern cvar_t scr_fov, cl_gun_fovscale;
 }
 
 // Helper -----------------------------------------------------------------------------------------
-
-static merian::TextureHandle make_rgb8_texture(const vk::CommandBuffer cmd,
-                                               const merian::ResourceAllocatorHandle& allocator,
-                                               const std::vector<uint32_t>& data,
-                                               uint32_t width,
-                                               uint32_t height,
-                                               bool force_linear_filter = false,
-                                               bool srgb = true) {
-    static vk::ImageCreateInfo tex_image_info{
-        {},
-        vk::ImageType::e2D,
-        vk::Format::eR8G8B8A8Srgb,
-        {0, 0, 1},
-        1,
-        1,
-        vk::SampleCountFlagBits::e1,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-        vk::SharingMode::eExclusive,
-        {},
-        {},
-        vk::ImageLayout::eUndefined,
-    };
-    static vk::ImageViewCreateInfo tex_view_info{
-        {},
-        VK_NULL_HANDLE,
-        vk::ImageViewType::e2D,
-        vk::Format::eR8G8B8A8Srgb,
-        {},
-        merian::first_level_and_layer(),
-    };
-
-    tex_image_info.extent.width = width;
-    tex_image_info.extent.height = height;
-
-    if (srgb) {
-        tex_image_info.format = vk::Format::eR8G8B8A8Srgb;
-        tex_view_info.format = vk::Format::eR8G8B8A8Srgb;
-    } else {
-        tex_image_info.format = vk::Format::eR8G8B8A8Unorm;
-        tex_view_info.format = vk::Format::eR8G8B8A8Unorm;
-    }
-
-    merian::ImageHandle image =
-        allocator->createImage(cmd, data.size() * sizeof(uint32_t), data.data(), tex_image_info);
-    tex_view_info.image = *image;
-    merian::SamplerHandle sampler;
-    if (force_linear_filter)
-        sampler = allocator->get_sampler_pool()->linear_repeat();
-    else
-        sampler = allocator->get_sampler_pool()->nearest_repeat();
-
-    merian::TextureHandle tex = allocator->createTexture(image, tex_view_info, sampler);
-
-    return tex;
-}
 
 uint16_t
 make_texnum_alpha(gltexture_s* tex, entity_t* entity = nullptr, msurface_t* surface = nullptr) {
@@ -855,7 +798,6 @@ RendererMarkovChain::RendererMarkovChain(const merian::SharedContext& context,
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
-            .add_binding_combined_sampler(vk::ShaderStageFlagBits::eCompute, MAX_GLTEXTURES)
             .add_binding_acceleration_structure()
             .add_binding_storage_buffer(vk::ShaderStageFlagBits::eCompute, MAX_GEOMETRIES)
             .build_layout(context);
@@ -870,42 +812,10 @@ RendererMarkovChain::~RendererMarkovChain() {}
 
 // -------------------------------------------------------------------------------------------
 
-void RendererMarkovChain::QS_texture_load(gltexture_t* glt, uint32_t* data) {
-    // LOG -----------------------------------------------
-
-    std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
-    SPDLOG_DEBUG("texture_load {} {} {}x{} from {}, frame: {}", glt->texnum, glt->name, glt->width,
-                 glt->height, source, glt->visframe);
-
-    if (glt->width == 0 || glt->height == 0) {
-        SPDLOG_WARN("image extent was 0. skipping");
-        return;
-    }
-
-    // STORE SOME TEXTURE IDs ----------------------------
-
-    // HACK: for blood patch
-    if (!strcmp(glt->name, "progs/gib_1.mdl:frame0"))
-        texnum_blood = glt->texnum;
-    // HACK: for sparks and for emissive rocket particle trails
-    if (!strcmp(glt->name, "progs/s_exp_big.spr:frame10"))
-        texnum_explosion = glt->texnum;
-
-    // ALLOCATE ----------------------------
-
-    // We store the texture on system memory for now
-    // and upload in cmd_process later
-    std::shared_ptr<QuakeTexture> texture = std::make_shared<QuakeTexture>(glt, data);
-    // If we replace an existing texture the old texture is automatically freed.
-    current_textures[glt->texnum] = texture;
-    pending_uploads.insert(glt->texnum);
-}
-
-// -------------------------------------------------------------------------------------------
-
 std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
     return {
-        con_blue_noise, con_prev_filtered, con_prev_volume_depth, con_prev_gbuf, con_render_info,
+        con_blue_noise, con_prev_filtered, con_prev_volume_depth,
+        con_prev_gbuf,  con_render_info,   con_textures,
     };
 }
 
@@ -914,22 +824,22 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
 
     con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_albedo = merian_nodes::ManagedVkImageOut::compute_write("albedo", vk::Format::eR16G16B16A16Sfloat,
-                                                         render_width, render_height);
-    con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat, render_width,
-                                                     render_height);
-    con_debug = merian_nodes::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
-                                                        render_width, render_height);
-    con_moments = merian_nodes::ManagedVkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
-                                                          render_width, render_height);
-    con_volume = merian_nodes::ManagedVkImageOut::compute_write("volume", vk::Format::eR16G16B16A16Sfloat,
-                                                         render_width, render_height);
+    con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
+        "albedo", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
+    con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
+                                                            render_width, render_height);
+    con_debug = merian_nodes::ManagedVkImageOut::compute_write(
+        "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
+    con_moments = merian_nodes::ManagedVkImageOut::compute_write(
+        "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
+    con_volume = merian_nodes::ManagedVkImageOut::compute_write(
+        "volume", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
     con_volume_moments = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR32Sfloat, render_width, render_height);
-    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_write("volume_mv", vk::Format::eR16G16Sfloat,
-                                                            render_width, render_height);
+    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_write(
+        "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height);
 
     con_markovchain = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
@@ -1072,13 +982,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
     // RESET MARKOV CHAINS AT ITERATION 0
     if (run.get_iteration() == 0ul) {
-        // DUMMY IMAGE as placeholder
-        if (!binding_dummy_image) {
-            uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
-            binding_dummy_image = make_rgb8_texture(
-                cmd, allocator, {missing_rgba, missing_rgba, missing_rgba, missing_rgba}, 2, 2);
-        }
-
         // ZERO markov chains and light cache
         io[con_markovchain]->fill(cmd);
         io[con_lightcache]->fill(cmd);
@@ -1107,14 +1010,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         cur_frame.tlas_builder = std::make_unique<merian::TLASBuilder>(context, allocator);
 
         merian::DescriptorSetUpdate update(cur_frame.quake_sets);
-        for (uint32_t texnum = 0; texnum < MAX_GLTEXTURES; texnum++) {
-            if (current_textures[texnum] && current_textures[texnum]->gpu_tex) {
-                auto& tex = current_textures[texnum];
-                update.write_descriptor_texture(BINDING_IMG_TEX, tex->gpu_tex, texnum);
-            } else {
-                update.write_descriptor_texture(BINDING_IMG_TEX, binding_dummy_image, texnum);
-            }
-        }
 
         for (uint32_t geometry = 0; geometry < MAX_GEOMETRIES; geometry++) {
             update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
@@ -1142,18 +1037,13 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         }
         {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "upload dynamic");
-            update_dynamic_geo(cmd, cur_frame);
+            update_dynamic_geo(cmd, cur_frame, render_info.texnum_blood,
+                               render_info.texnum_explosion);
         }
         {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "build acceleration structures");
             update_as(cmd, run.get_profiler(), cur_frame);
         }
-    }
-
-    // UPDATE TEXTURES
-    {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");
-        update_textures(cmd, cur_frame);
     }
 
     if (!cur_frame.tlas || !cl.worldmodel || scr_drawloading || render_info.worldspawn) {
@@ -1293,28 +1183,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     frame++;
 }
 
-void RendererMarkovChain::update_textures(const vk::CommandBuffer& cmd, FrameData& cur_frame) {
-    // Make sure the current_textures is valid for the current frame
-    for (auto texnum : pending_uploads) {
-        std::shared_ptr<QuakeTexture>& tex = current_textures[texnum];
-        assert(!tex->gpu_tex);
-        const bool force_linear_filter = tex->flags & TEXPREF_LINEAR;
-        tex->gpu_tex = make_rgb8_texture(cmd, allocator, tex->cpu_tex, tex->width, tex->height,
-                                         force_linear_filter, !tex->linear);
-    }
-    // Update descriptors for this frame and copy texture ptr to keep them alive
-    pending_uploads.clear();
-    merian::DescriptorSetUpdate update(cur_frame.quake_sets);
-    for (uint32_t texnum = 0; texnum < current_textures.size(); texnum++) {
-        if (current_textures[texnum] != cur_frame.textures[texnum]) {
-            cur_frame.textures[texnum] = current_textures[texnum];
-            update.write_descriptor_texture(BINDING_IMG_TEX, current_textures[texnum]->gpu_tex,
-                                            texnum);
-        }
-    }
-    update.update(context);
-}
-
 RendererMarkovChain::RTGeometry
 RendererMarkovChain::get_rt_geometry(const vk::CommandBuffer& cmd,
                                      const std::vector<float>& vtx,
@@ -1412,7 +1280,10 @@ void RendererMarkovChain::update_static_geo(const vk::CommandBuffer& cmd,
     cur_frame.static_geometries = current_static_geo;
 }
 
-void RendererMarkovChain::update_dynamic_geo(const vk::CommandBuffer& cmd, FrameData& cur_frame) {
+void RendererMarkovChain::update_dynamic_geo(const vk::CommandBuffer& cmd,
+                                             FrameData& cur_frame,
+                                             const uint32_t texnum_blood,
+                                             const uint32_t texnum_explosion) {
     dynamic_vtx.clear();
     dynamic_prev_vtx.clear();
     dynamic_idx.clear();
@@ -1502,7 +1373,7 @@ void RendererMarkovChain::update_dynamic_geo(const vk::CommandBuffer& cmd, Frame
             (*candidates).second.pop_back();
         }
 
-        bool force_rebuild = true;//frame - old_geo.last_rebuild > 1000;
+        bool force_rebuild = true; // frame - old_geo.last_rebuild > 1000;
         cur_frame.dynamic_geometries.emplace_back(
             get_rt_geometry(cmd, dynamic_vtx, dynamic_prev_vtx, dynamic_idx, dynamic_ext,
                             cur_frame.blas_builder, old_geo, force_rebuild,

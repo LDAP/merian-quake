@@ -1,9 +1,11 @@
 #pragma once
 
 #include "merian-nodes/connectors/any_out.hpp"
+#include "merian-nodes/connectors/vk_texture_array_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/utils/input_controller.hpp"
+#include "merian/utils/string.hpp"
 
 #include "renderer/render_markovchain.hpp"
 
@@ -11,16 +13,48 @@
 
 class QuakeNode : public merian_nodes::Node {
   public:
+    struct QuakeTexture {
+        explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
+            : width(glt->width), height(glt->height), flags(glt->flags) {
+            cpu_tex.resize(width * height);
+
+            memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
+
+            linear = false;
+            linear |= merian::ends_with(glt->name, "_norm");
+            linear |= merian::ends_with(glt->name, "_gloss");
+        }
+
+        uint32_t width;
+        uint32_t height;
+        // bitmask of TEXPREF_* flags in gl_texmgr
+        uint32_t flags;
+        // if true interpret linearly (Unorm) else as Srgb.
+        bool linear;
+
+        std::vector<uint32_t> cpu_tex{};
+
+        // allocated and uploaded in cmd_process
+        merian::TextureHandle gpu_tex{};
+    };
+
     struct QuakeRenderInfo {
         glm::vec3 sun_color{};
         glm::vec3 sun_direction{};
+
         bool worldspawn{};
+
         uint64_t last_worldspawn_frame = 0;
         uint64_t frame = 0;
+
+        // Store some textures for custom patches
+        uint32_t texnum_blood = 0;
+        uint32_t texnum_explosion = 0;
     };
 
   public:
     QuakeNode(const merian::SharedContext& context,
+              const merian::ResourceAllocatorHandle allocator,
               const std::shared_ptr<merian::InputController>& controller,
               const int quakespasm_argc,
               const char** quakespasm_argv,
@@ -40,6 +74,9 @@ class QuakeNode : public merian_nodes::Node {
 
     // -----------------------------------------------------
 
+    // called when a texture should be loaded
+    void QS_texture_load(gltexture_t* glt, uint32_t* data);
+
     // called from within qs
     void IN_Move(usercmd_t* cmd);
 
@@ -56,8 +93,16 @@ class QuakeNode : public merian_nodes::Node {
     }
 
   private:
+    // processes the pending uploads and updates the current descriptor set
+    void update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
+
+  private:
+    const merian::ResourceAllocatorHandle allocator;
+
     // Graph outputs
     merian_nodes::AnyOutHandle con_render_info = merian_nodes::AnyOut::create("render_info");
+    merian_nodes::TextureArrayOutHandle con_textures =
+        merian_nodes::TextureArrayOut::create("textures", MAX_GLTEXTURES);
 
     // Game thread / synchronization
     std::thread game_thread;
@@ -87,4 +132,9 @@ class QuakeNode : public merian_nodes::Node {
     // Helpers for image generation
     int stop_after_worldspawn = -1;
     bool rebuild_after_stop = true;
+
+    // Textures
+    // texnum -> texture
+    std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
+    std::unordered_set<uint32_t> pending_uploads;
 };

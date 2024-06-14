@@ -35,8 +35,8 @@ class ProcessingGraph {
                                                               vk::Extent3D{1920, 1080, 1},
                                                               vk::ClearColorValue(white_color));
         auto mc_render = std::make_shared<RendererMarkovChain>(context, alloc);
-        auto quake =
-            std::make_shared<QuakeNode>(context, controller, argc - 1, argv + 1, mc_render.get());
+        auto quake = std::make_shared<QuakeNode>(context, alloc, controller, argc - 1, argv + 1,
+                                                 mc_render.get());
         auto accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         auto volume_accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         svgf = std::make_shared<merian_nodes::SVGF>(context, alloc);
@@ -72,6 +72,7 @@ class ProcessingGraph {
         graph.add_node(beauty_image_write, "beauty image write");
         graph.add_node(fxaa, "fxaa");
 
+        graph.add_connection(quake, mc_render, "textures", "textures");
         graph.add_connection(quake, mc_render, "render_info", "render_info");
         graph.add_connection(one, volume_svgf, "out", "albedo");
         graph.add_connection(blue_noise, mc_render, "out", "blue_noise");

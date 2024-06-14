@@ -75,28 +75,30 @@ layout(set = 0, binding = 3, scalar) buffer buf_prev_gbuf {
     GBuffer prev_gbuffer[];
 };
 
+layout(set = 0, binding = 4) uniform sampler2D img_tex[MAX_GLTEXTURES];
+
 // GRAPH image out
-layout(set = 0, binding = 4) uniform writeonly restrict image2D img_irradiance;
-layout(set = 0, binding = 5) uniform writeonly restrict image2D img_albedo;
-layout(set = 0, binding = 6) uniform writeonly restrict image2D img_mv;
-layout(set = 0, binding = 7) uniform writeonly restrict image2D img_debug;
-layout(set = 0, binding = 8) uniform writeonly restrict image2D img_moments;
-layout(set = 0, binding = 9) uniform writeonly restrict image2D img_volume;
-layout(set = 0, binding = 10) uniform writeonly restrict image2D img_volume_moments;
-layout(set = 0, binding = 11) uniform writeonly restrict image2D img_volume_depth;
-layout(set = 0, binding = 12, rg16f) uniform restrict image2D img_volume_mv;
+layout(set = 0, binding = 5) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 6) uniform writeonly restrict image2D img_albedo;
+layout(set = 0, binding = 7) uniform writeonly restrict image2D img_mv;
+layout(set = 0, binding = 8) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 9) uniform writeonly restrict image2D img_moments;
+layout(set = 0, binding = 10) uniform writeonly restrict image2D img_volume;
+layout(set = 0, binding = 11) uniform writeonly restrict image2D img_volume_moments;
+layout(set = 0, binding = 12) uniform writeonly restrict image2D img_volume_depth;
+layout(set = 0, binding = 13, rg16f) uniform restrict image2D img_volume_mv;
 
 // GRAPH buffer out
-layout(set = 0, binding = 13, scalar) buffer restrict buf_mc_states {
+layout(set = 0, binding = 14, scalar) buffer restrict buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 14, scalar) buffer restrict buf_light_cache {
+layout(set = 0, binding = 15, scalar) buffer restrict buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 15, scalar) buffer restrict buf_gbuf {
+layout(set = 0, binding = 16, scalar) buffer restrict buf_gbuf {
     GBuffer gbuffer[];
 };
-layout(set = 0, binding = 16, scalar) buffer restrict buf_dist_mc_states {
+layout(set = 0, binding = 17, scalar) buffer restrict buf_dist_mc_states {
     DistanceMCVertex distance_mc_states[];
 };
 
@@ -133,7 +135,5 @@ layout(set = 1, binding = BINDING_EXT_BUF, scalar) buffer readonly restrict buf_
     // extra geo info
     VertexExtraData v[];
 } buf_ext[MAX_GEOMETRIES];
-
-layout(set = 1, binding = BINDING_IMG_TEX) uniform sampler2D img_tex[MAX_GLTEXTURES];
 
 layout(set = 1, binding = BINDING_TLAS) uniform accelerationStructureEXT tlas;

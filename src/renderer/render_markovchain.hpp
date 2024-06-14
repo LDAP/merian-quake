@@ -4,8 +4,8 @@
 #include "merian-nodes/connectors/any_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_array_in.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian/utils/string.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/raytrace/blas_builder.hpp"
@@ -22,31 +22,6 @@ extern "C" {
 
 class RendererMarkovChain : public merian_nodes::Node {
   public:
-    struct QuakeTexture {
-        explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
-            : width(glt->width), height(glt->height), flags(glt->flags) {
-            cpu_tex.resize(width * height);
-
-            memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
-
-            linear = false;
-            linear |= merian::ends_with(glt->name, "_norm");
-            linear |= merian::ends_with(glt->name, "_gloss");
-        }
-
-        uint32_t width;
-        uint32_t height;
-        // bitmask of TEXPREF_* flags in gl_texmgr
-        uint32_t flags;
-        // if true interpret linearly (Unorm) else as Srgb.
-        bool linear;
-
-        std::vector<uint32_t> cpu_tex{};
-
-        // allocated and uploaded in cmd_process
-        merian::TextureHandle gpu_tex{};
-    };
-
     struct PlayerData {
         // see PLAYER_* in config.h
         unsigned char flags;
@@ -133,9 +108,6 @@ class RendererMarkovChain : public merian_nodes::Node {
 
         merian::DescriptorSetHandle quake_sets{nullptr};
 
-        // keep copy of current_textures to keep them alive and to know which descriptors to update
-        std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> textures{};
-
         std::vector<RTGeometry> static_geometries{};
         std::vector<RTGeometry> dynamic_geometries{};
 
@@ -156,11 +128,6 @@ class RendererMarkovChain : public merian_nodes::Node {
                         const merian::ResourceAllocatorHandle& allocator);
 
     ~RendererMarkovChain();
-
-    // Callbacks from quake -------------------------------
-
-    // called when a texture should be loaded
-    void QS_texture_load(gltexture_t* glt, uint32_t* data);
 
     // -----------------------------------------------------
 
@@ -193,17 +160,19 @@ class RendererMarkovChain : public merian_nodes::Node {
                     const RendererMarkovChain::RTGeometry old_geometry,
                     const bool force_rebuild,
                     const vk::BuildAccelerationStructureFlagsKHR flags);
+
     // Optionally refreshes the geo and updates the current descriptor set if necessary
     void
     update_static_geo(const vk::CommandBuffer& cmd, const bool refresh_geo, FrameData& cur_frame);
     // Refreshes the geo and updates the current descriptor set
-    void update_dynamic_geo(const vk::CommandBuffer& cmd, FrameData& cur_frame);
+    void update_dynamic_geo(const vk::CommandBuffer& cmd,
+                            FrameData& cur_frame,
+                            const uint32_t texnum_blood,
+                            const uint32_t texnum_explosion);
     // Builds the as and updates the current descriptor set
     void update_as(const vk::CommandBuffer& cmd,
                    const merian::ProfilerHandle profiler,
                    FrameData& cur_frame);
-    // processes the pending uploads and updates the current descriptor set
-    void update_textures(const vk::CommandBuffer& cmd, FrameData& cur_frame);
 
   private:
     const merian::SharedContext context;
@@ -223,6 +192,8 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian_nodes::ManagedVkBufferInHandle con_prev_gbuf =
         merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuf", 1);
     merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
+    merian_nodes::TextureArrayInHandle con_textures =
+        merian_nodes::TextureArrayIn::create("textures", vk::ShaderStageFlagBits::eCompute);
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_albedo;
@@ -241,7 +212,6 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     // Use this buffer in bindings when the real resource is not available
     merian::BufferHandle binding_dummy_buffer;
-    merian::TextureHandle binding_dummy_image;
 
     //-----------------------------------------------------
 
@@ -259,19 +229,10 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     PushConstant pc;
 
-    // Store some textures for custom patches
-    uint32_t texnum_blood = 0;
-    uint32_t texnum_explosion = 0;
-
     // ----------------------------------------------------
 
     uint64_t frame = 0;
     double prev_cl_time = 0;
-
-    // "Global" frame info
-    // texnum -> texture
-    std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
-    std::unordered_set<uint32_t> pending_uploads;
 
     // Static geo
     std::vector<RTGeometry> current_static_geo;
