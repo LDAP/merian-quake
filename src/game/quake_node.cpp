@@ -394,7 +394,16 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
             }
 
             try {
+                render_info.render = false;
                 Host_Frame(timediff);
+                if (!render_info.render) {
+                    // make sure we release the main thread
+                    sync_gamestate.push(true, 1);
+                    if (!game_running) {
+                        std::runtime_error{"quit"};
+                    }
+                    sync_render.pop();
+                }
             } catch (const std::runtime_error&) {
                 // game quit, do nothing
             }
@@ -407,14 +416,14 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
         // CLEANUP
         free(quake_data.params.membase);
     });
-    sync_render.pop();
+    sync_gamestate.pop();
 }
 
 QuakeNode::~QuakeNode() {
     game_running.store(false);
     // make sure to unlock
-    sync_gamestate.push(true);
-    sync_gamestate.push(true);
+    sync_render.push(true);
+    sync_render.push(true);
     game_thread.join();
 
     quake_data.audio_device.reset();
@@ -461,11 +470,12 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
 }
 
 void QuakeNode::R_RenderScene() {
-    sync_render.push(true, 1);
     if (!game_running) {
         std::runtime_error{"quit"};
     }
-    sync_gamestate.pop();
+    render_info.render = true;
+    sync_gamestate.push(true, 1);
+    sync_render.pop();
 }
 
 void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
@@ -538,8 +548,8 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
 
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
-        sync_gamestate.push(true, 1);
-        sync_render.pop();
+        sync_render.push(true, 1);
+        sync_gamestate.pop();
     }
 
     {

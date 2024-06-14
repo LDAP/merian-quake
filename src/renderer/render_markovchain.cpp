@@ -1046,7 +1046,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         }
     }
 
-    if (!cur_frame.tlas || !cl.worldmodel || scr_drawloading || render_info.worldspawn) {
+    if (!render_info.render || !cur_frame.tlas || !cl.worldmodel || scr_drawloading || render_info.worldspawn) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         clear_pipe->bind(cmd);
         clear_pipe->bind_descriptor_set(cmd, graph_descriptor_set);

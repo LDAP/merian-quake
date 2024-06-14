@@ -39,6 +39,8 @@ class QuakeNode : public merian_nodes::Node {
     };
 
     struct QuakeRenderInfo {
+        bool render;
+
         glm::vec3 sun_color{};
         glm::vec3 sun_direction{};
 
@@ -107,8 +109,8 @@ class QuakeNode : public merian_nodes::Node {
     // Game thread / synchronization
     std::thread game_thread;
     std::atomic_bool game_running = true;
-    merian::ConcurrentQueue<bool> sync_render;
     merian::ConcurrentQueue<bool> sync_gamestate;
+    merian::ConcurrentQueue<bool> sync_render;
 
     // Game state
     double old_time = 0;
