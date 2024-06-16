@@ -1,5 +1,6 @@
 #include "quake_node.hpp"
 
+#include "glm/ext/matrix_clip_space.hpp"
 #include "merian/utils/audio/sdl_audio_device.hpp"
 #include "merian/utils/colors.hpp"
 
@@ -10,6 +11,7 @@ extern "C" {
 #include "quakedef.h"
 #include "screen.h"
 
+extern vrect_t scr_vrect;
 extern cvar_t cl_maxpitch; // johnfitz -- variable pitch clamping
 extern cvar_t cl_minpitch; // johnfitz -- variable pitch clamping
 }
@@ -19,6 +21,7 @@ struct QuakeData {
     QuakeNode* quake_node{nullptr};
     quakeparms_t params;
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
+    vk::CommandBuffer cmd_2d;
 };
 // Quake uses lots of static global variables,
 // so we need to do that to
@@ -173,6 +176,119 @@ extern "C" void SNDDMA_UnblockSound(void) {
     if (!quake_data.audio_device)
         return;
     quake_data.audio_device->unpause_audio();
+}
+
+extern "C" void GL_BeginRendering(int* x, int* y, int* width, int* height) {
+    *x = *y = 0;
+    *width = 1920;
+    *height = 1080;
+}
+
+void push_ortho_matrix(float left, float right, float bottom, float top, float n, float f) {
+    glm::mat4 proj = glm::ortho(left, right, bottom, top, n, f);
+}
+
+void set_viewport(float x, float y, float width, float height) {
+    vk::Viewport viewport;
+    viewport.x = x;
+    viewport.y = vid.height - (y + height);
+    viewport.width = width;
+    viewport.height = height;
+    viewport.minDepth = 0;
+    viewport.maxDepth = 1.;
+
+    // vkCmdSetViewport (cbx->cb, 0, 1, &viewport);
+}
+
+extern "C" void GL_SetCanvas(canvastype newcanvas) {
+    switch (newcanvas) {
+    case CANVAS_DEFAULT: {
+        push_ortho_matrix(0, glwidth, glheight, 0, -99999, 99999);
+        set_viewport(glx, gly, glwidth, glheight);
+        break;
+    }
+    case CANVAS_CONSOLE: {
+        int lines = vid.conheight - (scr_con_current * vid.conheight / glheight);
+        push_ortho_matrix(0, vid.conwidth, vid.conheight + lines, lines, -99999, 99999);
+        set_viewport(glx, gly, glwidth, glheight);
+        break;
+    }
+    case CANVAS_MENU: {
+        float s = std::min((float)glwidth / 320.0f, (float)glheight / 200.0f);
+        s = std::clamp(scr_menuscale.value, 1.0f, s);
+        // ericw -- doubled width to 640 to accommodate long keybindings
+        push_ortho_matrix(0, 640, 200, 0, -99999, 99999);
+        set_viewport(glx + (glwidth - 320 * s) / 2, gly + (glheight - 200 * s) / 2, 640 * s,
+                     200 * s);
+        break;
+    }
+    case CANVAS_SBAR: {
+        float s = std::clamp(scr_sbarscale.value, 1.0f, (float)glwidth / 320.0f);
+        if (cl.gametype == GAME_DEATHMATCH) {
+            push_ortho_matrix(0, glwidth / s, 48, 0, -99999, 99999);
+            set_viewport(glx, gly, glwidth, 48 * s);
+        } else {
+            push_ortho_matrix(0, 320, 48, 0, -99999, 99999);
+            set_viewport(glx + (glwidth - 320 * s) / 2, gly, 320 * s, 48 * s);
+        }
+        break;
+    }
+    case CANVAS_WARPIMAGE: {
+        push_ortho_matrix(0, 128, 0, 128, -99999, 99999);
+        set_viewport(glx, gly + glheight - gl_warpimagesize, gl_warpimagesize, gl_warpimagesize);
+        break;
+    }
+    case CANVAS_CROSSHAIR: { // 0,0 is center of viewport
+        float s = std::clamp(scr_crosshairscale.value, 1.0f, 10.0f);
+        push_ortho_matrix(scr_vrect.width / -2 / s, scr_vrect.width / 2 / s,
+                          scr_vrect.height / 2 / s, scr_vrect.height / -2 / s, -99999, 99999);
+        set_viewport(scr_vrect.x, glheight - scr_vrect.y - scr_vrect.height, scr_vrect.width & ~1,
+                     scr_vrect.height & ~1);
+        break;
+    }
+    case CANVAS_BOTTOMLEFT: {                    // used by devstats
+        float s = (float)glwidth / vid.conwidth; // use console scale
+        push_ortho_matrix(0, 320, 200, 0, -99999, 99999);
+        set_viewport(glx, gly, 320 * s, 200 * s);
+        break;
+    }
+    case CANVAS_BOTTOMRIGHT: {                   // used by fps/clock
+        float s = (float)glwidth / vid.conwidth; // use console scale
+        push_ortho_matrix(0, 320, 200, 0, -99999, 99999);
+        set_viewport(glx + glwidth - 320 * s, gly, 320 * s, 200 * s);
+        break;
+    }
+    case CANVAS_TOPRIGHT: { // used by disc
+        float s = 1;
+        push_ortho_matrix(0, 320, 200, 0, -99999, 99999);
+        set_viewport(glx + glwidth - 320 * s, gly + glheight - 200 * s, 320 * s, 200 * s);
+        break;
+    }
+    default:
+        Sys_Error("GL_SetCanvas: bad canvas type");
+    }
+}
+
+extern "C" void Draw_CharacterQuad(int x, int y, char num) {
+    // int             row, col;
+    // float           frow, fcol, size;
+
+    // row = num>>4;
+    // col = num&15;
+
+    // frow = row*0.0625;
+    // fcol = col*0.0625;
+    // size = 0.0625;
+
+    // glTexCoord2f (fcol, frow);
+    // glVertex2f (x, y);
+    // glTexCoord2f (fcol + size, frow);
+    // glVertex2f (x+8, y);
+    // glTexCoord2f (fcol + size, frow + size);
+    // glVertex2f (x+8, y+8);
+    // glTexCoord2f (fcol, frow + size);
+    // glVertex2f (x, y+8);
+    SPDLOG_DEBUG("{} {} {}", x, y, num);
 }
 
 void parse_worldspawn(QuakeNode::QuakeRenderInfo& renderer_info) {
@@ -546,11 +662,17 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         }
     }
 
+    vk::CommandBufferInheritanceInfo inheritance_info;
+    quake_data.cmd_2d = run.get_cmd_pool()->create(vk::CommandBufferLevel::eSecondary, true,
+                                                   vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+                                                   &inheritance_info);
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         sync_render.push(true, 1);
         sync_gamestate.pop();
     }
+    quake_data.cmd_2d.end();
+    cmd.executeCommands(quake_data.cmd_2d);
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update textures");

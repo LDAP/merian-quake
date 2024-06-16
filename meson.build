@@ -29,7 +29,7 @@ endif
 
 # Dependencies
 merian = dependency('merian', fallback: ['merian', 'merian_dep'])
-quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'], default_options: {'snd_extern': true})
+quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'], default_options: {'snd_extern': true, 'draw_extern': true})
 
 # Shaders
 glslc = find_program('glslangValidator')
