@@ -80,7 +80,7 @@ ShaderModuleHandle QuakeHud::get_shader_module() {
     return shader;
 }
 
-QuakeHud::NodeStatusFlags QuakeHud::configuration(Configuration& config) {
+QuakeHud::NodeStatusFlags QuakeHud::properties(Properties& config) {
     config.output_text(
         fmt::format("blend: ({}, {}, {}, {})", pc.blend.r, pc.blend.g, pc.blend.b, pc.blend.a));
 

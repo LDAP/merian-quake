@@ -36,7 +36,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     merian_nodes::ManagedVkImageInHandle con_src = merian_nodes::ManagedVkImageIn::compute_read("src");

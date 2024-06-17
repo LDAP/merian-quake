@@ -530,22 +530,6 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
                         [[maybe_unused]] const vk::CommandBuffer& cmd,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
                         [[maybe_unused]] const merian_nodes::NodeIO& io) {
-    if (run.get_iteration() == 0ul) {
-        uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
-        std::vector<uint32_t> image_data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
-        const merian::TextureHandle missing_texture =
-            allocator->createTextureFromRGB8(cmd, image_data.data(), 2, 2, vk::Filter::eLinear);
-
-        for (uint32_t texnum = 0; texnum < MAX_GLTEXTURES; texnum++) {
-            if (current_textures[texnum] && current_textures[texnum]->gpu_tex) {
-                auto& tex = current_textures[texnum];
-                io[con_textures].set(texnum, tex->gpu_tex);
-            } else {
-                io[con_textures].set(texnum, missing_texture);
-            }
-        }
-    }
-
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         sync_render.push(true, 1);
@@ -587,7 +571,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
     render_info.frame++;
 }
 
-QuakeNode::NodeStatusFlags QuakeNode::configuration(merian::Configuration& config) {
+QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.st_separate("General");
     config.config_bool("gamestate update", update_gamestate);
     update_gamestate |= render_info.frame == 0;

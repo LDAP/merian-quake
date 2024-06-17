@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/utils/configuration_json_dump.hpp"
-#include "merian/utils/configuration_json_load.hpp"
+#include "merian/utils/properties_json_dump.hpp"
+#include "merian/utils/properties_json_load.hpp"
 
 #include "processing_graph.hpp"
 
@@ -27,15 +27,15 @@ class ConfigurationManager {
             SPDLOG_DEBUG("loading default config {}", FALLBACK_CONFIG_NAME);
         }
 
-        auto load = merian::JSONLoadConfiguration(std::filesystem::path(config_path));
-        graph.get().configuration(load);
+        auto load = merian::JSONLoadProperties(std::filesystem::path(config_path));
+        graph.get().properties(load);
     }
     void store() {
-        auto dump = merian::JSONDumpConfiguration(CONFIG_NAME);
-        graph.get().configuration(dump);
+        auto dump = merian::JSONDumpProperties(CONFIG_NAME);
+        graph.get().properties(dump);
     }
-    void get(merian::Configuration& config) {
-        graph.get().configuration(config);
+    void get(merian::Properties& config) {
+        graph.get().properties(config);
     }
 
   private:

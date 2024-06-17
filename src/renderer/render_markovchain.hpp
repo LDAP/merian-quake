@@ -144,7 +144,7 @@ class RendererMarkovChain : public merian_nodes::Node {
                  const merian::DescriptorSetHandle& descriptor_set,
                  const merian_nodes::NodeIO& io) override;
 
-    NodeStatusFlags configuration(merian::Configuration& config) override;
+    NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
     // Attemps to reuse the supplied old_geo (by update, buffer reuse).
@@ -209,9 +209,6 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian_nodes::ManagedVkBufferOutHandle con_lightcache;
     merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
     merian_nodes::ManagedVkBufferOutHandle con_volume_distancemc;
-
-    // Use this buffer in bindings when the real resource is not available
-    merian::BufferHandle binding_dummy_buffer;
 
     //-----------------------------------------------------
 

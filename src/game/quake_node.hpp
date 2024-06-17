@@ -72,7 +72,7 @@ class QuakeNode : public merian_nodes::Node {
                  const merian::DescriptorSetHandle& descriptor_set,
                  const merian_nodes::NodeIO& io);
 
-    NodeStatusFlags configuration(merian::Configuration& config);
+    NodeStatusFlags properties(merian::Properties& config);
 
     // -----------------------------------------------------
 

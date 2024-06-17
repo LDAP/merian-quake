@@ -803,9 +803,6 @@ RendererMarkovChain::RendererMarkovChain(const merian::SharedContext& context,
             .build_layout(context);
     quake_pool = std::make_shared<merian::DescriptorPool>(
         quake_desc_set_layout, 3, vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-    binding_dummy_buffer =
-        allocator->createBuffer(8, vk::BufferUsageFlagBits::eStorageBuffer,
-                                merian::MemoryMappingType::NONE, "Quake: Dummy buffer");
 }
 
 RendererMarkovChain::~RendererMarkovChain() {}
@@ -1012,14 +1009,14 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         merian::DescriptorSetUpdate update(cur_frame.quake_sets);
 
         for (uint32_t geometry = 0; geometry < MAX_GEOMETRIES; geometry++) {
-            update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
-                                           geometry);
-            update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, binding_dummy_buffer, 0,
+            update.write_descriptor_buffer(BINDING_VTX_BUF, allocator->get_dummy_buffer(), 0,
                                            VK_WHOLE_SIZE, geometry);
-            update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
-                                           geometry);
-            update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
-                                           geometry);
+            update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, allocator->get_dummy_buffer(), 0,
+                                           VK_WHOLE_SIZE, geometry);
+            update.write_descriptor_buffer(BINDING_IDX_BUF, allocator->get_dummy_buffer(), 0,
+                                           VK_WHOLE_SIZE, geometry);
+            update.write_descriptor_buffer(BINDING_EXT_BUF, allocator->get_dummy_buffer(), 0,
+                                           VK_WHOLE_SIZE, geometry);
         }
 
         update.update(context);
@@ -1046,7 +1043,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         }
     }
 
-    if (!render_info.render || !cur_frame.tlas || !cl.worldmodel || scr_drawloading || render_info.worldspawn) {
+    if (!render_info.render || !cur_frame.tlas || !cl.worldmodel || scr_drawloading ||
+        render_info.worldspawn) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         clear_pipe->bind(cmd);
         clear_pipe->bind_descriptor_set(cmd, graph_descriptor_set);
@@ -1428,11 +1426,14 @@ void RendererMarkovChain::update_as(const vk::CommandBuffer& cmd,
     }
 
     for (uint32_t i = all_geometries.size(); i < MAX_GEOMETRIES; i++) {
-        update.write_descriptor_buffer(BINDING_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
-        update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE,
-                                       i);
-        update.write_descriptor_buffer(BINDING_IDX_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
-        update.write_descriptor_buffer(BINDING_EXT_BUF, binding_dummy_buffer, 0, VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_VTX_BUF, allocator->get_dummy_buffer(), 0,
+                                       VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_PREV_VTX_BUF, allocator->get_dummy_buffer(), 0,
+                                       VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_IDX_BUF, allocator->get_dummy_buffer(), 0,
+                                       VK_WHOLE_SIZE, i);
+        update.write_descriptor_buffer(BINDING_EXT_BUF, allocator->get_dummy_buffer(), 0,
+                                       VK_WHOLE_SIZE, i);
     }
 
     const vk::BufferUsageFlags instances_buffer_usage =
@@ -1466,7 +1467,7 @@ void RendererMarkovChain::update_as(const vk::CommandBuffer& cmd,
 }
 
 RendererMarkovChain::NodeStatusFlags
-RendererMarkovChain::configuration(merian::Configuration& config) {
+RendererMarkovChain::properties(merian::Properties& config) {
     const int32_t old_render_width = render_width;
     const int32_t old_render_height = render_height;
     const int32_t old_spp = spp;

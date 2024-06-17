@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/graph.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/io/file_loader.hpp"
-#include "merian/utils/configuration_imgui.hpp"
+#include "merian/utils/properties_imgui.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/vk/context.hpp"
@@ -161,7 +161,7 @@ int main(const int argc, const char** argv) {
 
     ProcessingGraph graph(argc, argv, context, alloc, loader, controller);
     ConfigurationManager config_manager(graph, loader);
-    merian::ImGuiConfiguration config;
+    merian::ImGuiProperties config;
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
     ImGuiIO& io = ImGui::GetIO();
