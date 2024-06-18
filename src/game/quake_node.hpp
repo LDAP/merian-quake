@@ -104,8 +104,8 @@ class QuakeNode : public merian_nodes::Node {
 
     // Graph outputs
     merian_nodes::AnyOutHandle con_render_info = merian_nodes::AnyOut::create("render_info");
-    merian_nodes::TextureArrayOutHandle con_textures =
-        merian_nodes::TextureArrayOut::create("textures", MAX_GLTEXTURES);
+    merian_nodes::VkTextureArrayOutHandle con_textures =
+        merian_nodes::VkTextureArrayOut::create("textures", MAX_GLTEXTURES);
 
     // Game thread / synchronization
     std::thread game_thread;
