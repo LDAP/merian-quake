@@ -503,10 +503,7 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
 
     // We store the texture on system memory for now
     // and upload in cmd_process later
-    std::shared_ptr<QuakeTexture> texture = std::make_shared<QuakeTexture>(glt, data);
-    // If we replace an existing texture the old texture is automatically freed.
-    current_textures[glt->texnum] = texture;
-    pending_uploads.insert(glt->texnum);
+    pending_uploads.emplace(glt, data);
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>
@@ -515,13 +512,13 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap&
 }
 
 void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
-    for (auto texnum : pending_uploads) {
-        std::shared_ptr<QuakeTexture>& tex = current_textures[texnum];
-        assert(!tex->gpu_tex);
-        tex->gpu_tex = allocator->createTextureFromRGB8(
-            cmd, tex->cpu_tex.data(), tex->width, tex->height,
-            tex->flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest, !tex->linear);
-        io[con_textures].set(texnum, tex->gpu_tex);
+    for (auto tex : pending_uploads) {
+        merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
+            cmd, tex.cpu_tex.data(), tex.width, tex.height,
+            tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest, !tex.linear,
+            tex.name);
+        io[con_textures].set(tex.texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
+                             vk::PipelineStageFlagBits2::eTransfer);
     }
     pending_uploads.clear();
 }

@@ -15,7 +15,8 @@ class QuakeNode : public merian_nodes::Node {
   public:
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
-            : width(glt->width), height(glt->height), flags(glt->flags) {
+            : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name),
+              texnum(glt->texnum) {
             cpu_tex.resize(width * height);
 
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
@@ -34,8 +35,8 @@ class QuakeNode : public merian_nodes::Node {
 
         std::vector<uint32_t> cpu_tex{};
 
-        // allocated and uploaded in cmd_process
-        merian::TextureHandle gpu_tex{};
+        std::string name;
+        uint32_t texnum;
     };
 
     struct QuakeRenderInfo {
@@ -136,7 +137,10 @@ class QuakeNode : public merian_nodes::Node {
     bool rebuild_after_stop = true;
 
     // Textures
-    // texnum -> texture
-    std::array<std::shared_ptr<QuakeTexture>, MAX_GLTEXTURES> current_textures;
-    std::unordered_set<uint32_t> pending_uploads;
+    struct QuakeTextureCmp {
+        bool operator()(const QuakeTexture& a, const QuakeTexture& b) const {
+            return a.texnum < b.texnum;
+        }
+    };
+    std::set<QuakeTexture, QuakeTextureCmp> pending_uploads;
 };

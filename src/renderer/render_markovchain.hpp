@@ -193,7 +193,7 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuf", 1);
     merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
     merian_nodes::TextureArrayInHandle con_textures =
-        merian_nodes::TextureArrayIn::create("textures", vk::ShaderStageFlagBits::eCompute);
+        merian_nodes::TextureArrayIn::compute_read("textures");
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_albedo;
