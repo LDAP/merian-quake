@@ -1,1 +1,4 @@
-src_files += files('quake_node.cpp')
+src_files += files(
+    'quake_helpers.cpp',
+    'quake_node.cpp',
+)

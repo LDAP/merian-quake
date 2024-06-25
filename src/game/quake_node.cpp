@@ -15,10 +15,13 @@ extern cvar_t cl_minpitch; // johnfitz -- variable pitch clamping
 }
 
 struct QuakeData {
-    RendererMarkovChain* render_node{nullptr};
     QuakeNode* quake_node{nullptr};
     quakeparms_t params;
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
+
+    // updated in parse_worldspawn
+    glm::vec3 current_sun_color{};
+    glm::vec3 current_sun_direction{};
 };
 // Quake uses lots of static global variables,
 // so we need to do that to
@@ -175,9 +178,9 @@ extern "C" void SNDDMA_UnblockSound(void) {
     quake_data.audio_device->unpause_audio();
 }
 
-void parse_worldspawn(QuakeNode::QuakeRenderInfo& renderer_info) {
-    glm::vec3& quake_sun_col = renderer_info.sun_color;
-    glm::vec3& quake_sun_dir = renderer_info.sun_direction;
+void parse_worldspawn() {
+    glm::vec3& quake_sun_col = quake_data.current_sun_color;
+    glm::vec3& quake_sun_dir = quake_data.current_sun_direction;
 
     std::map<std::string, std::string> worldspawn_props;
     char key[128], value[4096];
@@ -261,8 +264,7 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
                      const merian::ResourceAllocatorHandle allocator,
                      const std::shared_ptr<merian::InputController>& controller,
                      const int quakespasm_argc,
-                     const char** quakespasm_argv,
-                     RendererMarkovChain* renderer)
+                     const char** quakespasm_argv)
     : Node("Quake"), allocator(allocator), controller(controller) {
 
     // clang-format off
@@ -341,7 +343,6 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
         throw std::runtime_error{"Only one quake node can be created."};
     }
     quake_data.quake_node = this;
-    quake_data.render_node = renderer;
     host_parms = &quake_data.params;
 
     game_thread = std::thread([&, quakespasm_argc, quakespasm_argv] {
@@ -431,7 +432,10 @@ QuakeNode::~QuakeNode() {
 
 void QuakeNode::QS_worldspawn() {
     SPDLOG_DEBUG("worldspawn");
-    render_info.worldspawn = true;
+
+    parse_worldspawn();
+
+    render_info.constant_data_update = true;
 }
 
 void QuakeNode::IN_Move(usercmd_t* cmd) {
@@ -494,10 +498,10 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
 
     // HACK: for blood patch
     if (!strcmp(glt->name, "progs/gib_1.mdl:frame0"))
-        render_info.texnum_blood = glt->texnum;
+        texnum_blood = glt->texnum;
     // HACK: for sparks and for emissive rocket particle trails
     if (!strcmp(glt->name, "progs/s_exp_big.spr:frame10"))
-        render_info.texnum_explosion = glt->texnum;
+        texnum_explosion = glt->texnum;
 
     // ALLOCATE ----------------------------
 
@@ -538,11 +542,12 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         update_textures(cmd, io);
     }
 
+    render_info.render &= cl.worldmodel && !scr_drawloading;
+
     if (cl.worldmodel && render_info.worldspawn) {
         key_dest = key_game;
         m_state = m_none;
 
-        parse_worldspawn(render_info);
         render_info.last_worldspawn_frame = render_info.frame;
         sv_player = nullptr;
     }

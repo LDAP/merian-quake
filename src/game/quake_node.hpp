@@ -1,18 +1,82 @@
 #pragma once
 
+#include "glm/ext/vector_float4.hpp"
+
 #include "merian-nodes/connectors/any_out.hpp"
 #include "merian-nodes/connectors/vk_texture_array_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/string.hpp"
-
-#include "renderer/render_markovchain.hpp"
+#include "renderer/config.h"
 
 #include <queue>
+#include <set>
+
+extern "C" {
+#include "quakedef.h"
+}
 
 class QuakeNode : public merian_nodes::Node {
   public:
+    struct PlayerData {
+        // see PLAYER_* in config.h
+        unsigned char flags;
+        unsigned char padding0;
+        unsigned char padding1;
+        unsigned char padding2;
+    };
+
+    struct RTConfig {
+        unsigned char flags = 0;
+        unsigned char padding0;
+        unsigned char padding1;
+        unsigned char padding2;
+    };
+
+    struct UniformData {
+        glm::vec4 cam_x_mu_t; // pos, and fog mu_t in alpha
+        glm::vec4 cam_w;      // forward, and time_diff in alpha (set to 1. if 0.)
+        glm::vec4 cam_u;      // up
+
+        glm::vec4 prev_cam_x_mu_sx;
+        glm::vec4 prev_cam_w_mu_sy;
+        glm::vec4 prev_cam_u_mu_sz;
+
+        // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
+        std::array<uint16_t, 6> sky;
+
+        // quake time
+        float cl_time;
+        uint32_t frame;
+
+        PlayerData player;
+        RTConfig rt_config;
+    };
+
+    struct ConstantData {
+        glm::vec3 sun_color{};
+        glm::vec3 sun_direction{};
+
+        float fov = glm::radians(90.);
+        float fov_tan_alpha_half = glm::tan(fov / 2);
+    };
+
+    struct QuakeRenderInfo {
+        // Can be used as push constant.
+        // Updated every frame and only valid if render == true
+        UniformData uniform;
+
+        // Does only change if worldspawn is true
+        ConstantData constant;
+
+        // If this is false do not render, just clear your outputs.
+        bool render;
+        // Set if new constant data is available. For example, if a new map was loaded, maybe reset
+        // stuff?
+        bool constant_data_update = false;
+    };
+
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
             : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name),
@@ -39,29 +103,12 @@ class QuakeNode : public merian_nodes::Node {
         uint32_t texnum;
     };
 
-    struct QuakeRenderInfo {
-        bool render;
-
-        glm::vec3 sun_color{};
-        glm::vec3 sun_direction{};
-
-        bool worldspawn{};
-
-        uint64_t last_worldspawn_frame = 0;
-        uint64_t frame = 0;
-
-        // Store some textures for custom patches
-        uint32_t texnum_blood = 0;
-        uint32_t texnum_explosion = 0;
-    };
-
   public:
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle allocator,
               const std::shared_ptr<merian::InputController>& controller,
               const int quakespasm_argc,
-              const char** quakespasm_argv,
-              RendererMarkovChain* renderer);
+              const char** quakespasm_argv);
 
     ~QuakeNode();
 
@@ -143,4 +190,20 @@ class QuakeNode : public merian_nodes::Node {
         }
     };
     std::set<QuakeTexture, QuakeTextureCmp> pending_uploads;
+
+    // Store some textures for custom patches
+    uint32_t texnum_blood = 0;
+    uint32_t texnum_explosion = 0;
+
+    // Debug overwrites
+    bool overwrite_sun = false;
+    glm::vec3 overwrite_sun_dir{0, 0, 1};
+    glm::vec3 overwrite_sun_col{0};
+    // --
+    bool mu_t_s_overwrite = false;
+    float mu_t = 0.;
+    glm::vec3 mu_s_div_mu_t = glm::vec3(1);
+    // --
+    // 0 None, 1 Gun, 2 Full
+    int playermodel = 1;
 };
