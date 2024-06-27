@@ -921,7 +921,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
         RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
         dynamic_geo.emplace_back(
             get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild));
         dynamic_geo.back().instance_flags =
             vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
     }
