@@ -3,8 +3,13 @@
 #include "merian-nodes/connectors/any_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/special_static_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 #include "merian-nodes/connectors/vk_texture_array_in.hpp"
+#include "merian-nodes/connectors/vk_tlas_in.hpp"
+
 #include "merian-nodes/graph/node.hpp"
+
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
@@ -62,6 +67,17 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
     merian_nodes::VkTextureArrayInHandle con_textures =
         merian_nodes::VkTextureArrayIn::compute_read("textures");
+    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
+        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
+    merian_nodes::VkBufferArrayInHandle con_vtx =
+        merian_nodes::VkBufferArrayIn::compute_read("vtx");
+    merian_nodes::VkBufferArrayInHandle con_prev_vtx =
+        merian_nodes::VkBufferArrayIn::compute_read("prev_vtx");
+    merian_nodes::VkBufferArrayInHandle con_idx =
+        merian_nodes::VkBufferArrayIn::compute_read("idx");
+    merian_nodes::VkBufferArrayInHandle con_ext =
+        merian_nodes::VkBufferArrayIn::compute_read("ext");
+    merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_albedo;
@@ -81,8 +97,7 @@ class RendererMarkovChain : public merian_nodes::Node {
     //-----------------------------------------------------
 
     merian::DescriptorSetLayoutHandle graph_desc_set_layout;
-    merian::DescriptorSetLayoutHandle quake_desc_set_layout;
-    merian::DescriptorPoolHandle quake_pool;
+    merian::PipelineLayoutHandle pipe_layout;
 
     merian::PipelineHandle pipe;
     merian::PipelineHandle clear_pipe;
@@ -111,8 +126,6 @@ class RendererMarkovChain : public merian_nodes::Node {
     float volume_max_t = 1000.;
 
     bool dump_mc = false;
-
-    bool reproducible_renders = false;
 
     int32_t mc_samples = 5;
     float mc_samples_adaptive_prob = 0.7;

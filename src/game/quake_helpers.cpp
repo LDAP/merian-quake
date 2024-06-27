@@ -1,5 +1,3 @@
-#pragma once
-
 #include "quake_helpers.hpp"
 
 #include "glm/ext/matrix_transform.hpp"
@@ -23,8 +21,6 @@ extern "C" {
 extern float r_avertexnormals[162][3];
 // from r_part.c
 extern particle_t* active_particles;
-
-extern qboolean scr_drawloading;
 
 extern cvar_t scr_fov, cl_gun_fovscale;
 }

@@ -5,9 +5,10 @@
 
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 
-#include "renderer/render_markovchain.hpp"
-
 extern "C" {
+
+#include "quakedef.h"
+
 // from gl_rmain.c
 extern mleaf_t* r_viewleaf;
 }

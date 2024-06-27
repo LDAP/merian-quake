@@ -35,8 +35,7 @@ class ProcessingGraph {
                                                               vk::Extent3D{1920, 1080, 1},
                                                               vk::ClearColorValue(white_color));
         auto mc_render = std::make_shared<RendererMarkovChain>(context, alloc);
-        auto quake = std::make_shared<QuakeNode>(context, alloc, controller, argc - 1, argv + 1,
-                                                 mc_render.get());
+        auto quake = std::make_shared<QuakeNode>(context, alloc, controller, argc - 1, argv + 1);
         auto accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         auto volume_accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
         svgf = std::make_shared<merian_nodes::SVGF>(context, alloc);
@@ -51,6 +50,7 @@ class ProcessingGraph {
         auto beauty_image_write =
             std::make_shared<merian_nodes::ImageWrite>(context, alloc, "image");
         auto fxaa = std::make_shared<merian_nodes::FXAA>(context);
+        auto tlas_builder = std::make_shared<merian_nodes::DeviceASBuilder>(context, alloc);
 
         image_writer->set_callback([accum]() { accum->request_clear(); });
         image_writer_volume->set_callback([volume_accum]() { volume_accum->request_clear(); });
@@ -71,8 +71,18 @@ class ProcessingGraph {
         graph.add_node(add, "add");
         graph.add_node(beauty_image_write, "beauty image write");
         graph.add_node(fxaa, "fxaa");
+        graph.add_node(tlas_builder, "TLAS builder");
 
+        graph.add_connection(quake, tlas_builder, "tlas_info", "tlas_info");
+        graph.add_connection(quake, tlas_builder, "vtx", "vtx");
+        graph.add_connection(quake, tlas_builder, "idx", "idx");
+        graph.add_connection(tlas_builder, mc_render, "tlas", "tlas");
+        graph.add_connection(quake, mc_render, "resolution", "resolution");
         graph.add_connection(quake, mc_render, "textures", "textures");
+        graph.add_connection(quake, mc_render, "vtx", "vtx");
+        graph.add_connection(quake, mc_render, "prev_vtx", "prev_vtx");
+        graph.add_connection(quake, mc_render, "idx", "idx");
+        graph.add_connection(quake, mc_render, "ext", "ext");
         graph.add_connection(quake, mc_render, "render_info", "render_info");
         graph.add_connection(one, volume_svgf, "out", "albedo");
         graph.add_connection(blue_noise, mc_render, "out", "blue_noise");

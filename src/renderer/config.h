@@ -21,14 +21,6 @@
 // should match DISTANCE_MC_VERTEX_STATE_COUNT (only increase for testing purposes)
 #define MAX_DISTANCE_MC_VERTEX_STATE_COUNT 10
 
-// BINDINGS
-
-#define BINDING_VTX_BUF 0
-#define BINDING_IDX_BUF 1
-#define BINDING_EXT_BUF 2
-#define BINDING_TLAS 3
-#define BINDING_PREV_VTX_BUF 4
-
 // Material flags
 
 #define MAT_FLAGS_NONE 0
