@@ -701,13 +701,12 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
     if (cl.worldmodel && render_info.constant_data_update) {
         key_dest = key_game;
         m_state = m_none;
-
-        sv_player = nullptr;
     }
 
     render_info.render &= !scr_drawloading;
 
-    if (frame == last_worldspawn_frame) {
+    if (cl.worldmodel && frame == last_worldspawn_frame) {
+        sv_player = nullptr;
         update_static_geo(cmd);
     }
     update_dynamic_geo(cmd);
@@ -734,7 +733,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
 
     // Update uniform data
     {
-        if (sv_player) {
+        if (render_info.render && sv_player) {
             // Demos do not have a player set
             render_info.uniform.player.flags = 0;
             render_info.uniform.player.flags |=
