@@ -33,6 +33,45 @@ struct QuakeData {
 // e.g. to make sure there is only one QuakeNode.
 static QuakeData quake_data;
 
+void init_quakespasm(const int quakespasm_argc, const char** quakespasm_argv) {
+    std::vector<const char*> quakespasm_args = {"quakespasm"};
+    if (quakespasm_argc > 0) {
+        quakespasm_args.resize(1 + quakespasm_argc);
+        memcpy(&quakespasm_args[1], quakespasm_argv, quakespasm_argc * sizeof(quakespasm_argv));
+    }
+
+    quake_data.params.argc = quakespasm_args.size();
+    quake_data.params.argv = (char**)quakespasm_args.data();
+    quake_data.params.errstate = 0;
+    quake_data.params.memsize = 256 * 1024 * 1024; // qs default in 0.94.3
+    quake_data.params.membase = malloc(quake_data.params.memsize);
+
+    srand(1337); // quake uses this
+    COM_InitArgv(quake_data.params.argc, quake_data.params.argv);
+    Sys_Init();
+
+    Sys_Printf("Quake %1.2f (c) id Software\n", VERSION);
+    Sys_Printf("GLQuake %1.2f (c) id Software\n", GLQUAKE_VERSION);
+    Sys_Printf("FitzQuake %1.2f (c) John Fitzgibbons\n", FITZQUAKE_VERSION);
+    Sys_Printf("FitzQuake SDL port (c) SleepwalkR, Baker\n");
+    Sys_Printf("QuakeSpasm " QUAKESPASM_VER_STRING " (c) Ozkan Sezer, Eric Wasylishen & others\n");
+
+    Host_Init();
+
+    // Set target
+    key_dest = key_game;
+    m_state = m_none;
+}
+
+void shutdown_quakespasm() {
+    CL_Disconnect();
+    Host_ShutdownServer(false);
+    Host_Shutdown();
+
+    free(quake_data.params.membase);
+    quake_data.quake_node = nullptr;
+}
+
 // CALLBACKS from within Quake --------------------------------------------------------------------
 
 extern "C" void VID_Changed_f(cvar_t* var) {
@@ -486,37 +525,9 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
     quake_data.quake_node = this;
     host_parms = &quake_data.params;
 
-    game_thread = std::thread([&, quakespasm_argc, quakespasm_argv] {
-        // INIT Quake
-        std::vector<const char*> quakespasm_args = {"quakespasm"};
-        if (quakespasm_argc > 0) {
-            quakespasm_args.resize(1 + quakespasm_argc);
-            memcpy(&quakespasm_args[1], quakespasm_argv, quakespasm_argc * sizeof(quakespasm_argv));
-        }
+    init_quakespasm(quakespasm_argc, quakespasm_argv);
 
-        quake_data.params.argc = quakespasm_args.size();
-        quake_data.params.argv = (char**)quakespasm_args.data();
-        quake_data.params.errstate = 0;
-        quake_data.params.memsize = 256 * 1024 * 1024; // qs default in 0.94.3
-        quake_data.params.membase = malloc(quake_data.params.memsize);
-
-        srand(1337); // quake uses this
-        COM_InitArgv(quake_data.params.argc, quake_data.params.argv);
-        Sys_Init();
-
-        Sys_Printf("Quake %1.2f (c) id Software\n", VERSION);
-        Sys_Printf("GLQuake %1.2f (c) id Software\n", GLQUAKE_VERSION);
-        Sys_Printf("FitzQuake %1.2f (c) John Fitzgibbons\n", FITZQUAKE_VERSION);
-        Sys_Printf("FitzQuake SDL port (c) SleepwalkR, Baker\n");
-        Sys_Printf("QuakeSpasm " QUAKESPASM_VER_STRING
-                   " (c) Ozkan Sezer, Eric Wasylishen & others\n");
-
-        Sys_Printf("Host_Init\n");
-        Host_Init();
-
-        // Set target
-        key_dest = key_game;
-        m_state = m_none;
+    game_thread = std::thread([&] {
         merian::Stopwatch sw;
 
         // RUN GAMELOOP
@@ -554,9 +565,6 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
             server_fps = 1 / sw.seconds();
             sw.reset();
         }
-
-        // CLEANUP
-        free(quake_data.params.membase);
     });
     sync_gamestate.pop();
 }
@@ -568,7 +576,7 @@ QuakeNode::~QuakeNode() {
     sync_render.push(true);
     game_thread.join();
 
-    quake_data.audio_device.reset();
+    shutdown_quakespasm();
 }
 
 void QuakeNode::QS_worldspawn() {
