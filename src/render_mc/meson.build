@@ -6,7 +6,7 @@ shaders = [
 ]
 included_files = files(
     'quake_water.glsl',
-    'config.h',
+    '../config.h',
     'layout.glsl',
     'grid.h',
     'mc.glsl',

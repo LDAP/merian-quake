@@ -13,7 +13,7 @@
 
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/string.hpp"
-#include "renderer/config.h"
+#include "config.h"
 
 #include <queue>
 #include <set>

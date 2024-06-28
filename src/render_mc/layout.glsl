@@ -1,4 +1,4 @@
-#include "config.h"
+#include "../config.h"
 #include "merian-nodes/common/gbuffer.glsl.h"
 
 #extension GL_EXT_scalar_block_layout       : require

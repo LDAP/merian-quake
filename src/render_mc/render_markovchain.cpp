@@ -1,4 +1,4 @@
-#include "renderer/render_markovchain.hpp"
+#include "render_markovchain.hpp"
 
 #include "ext/json.hpp"
 #include "game/quake_node.hpp"
@@ -141,9 +141,8 @@ RendererMarkovChain::on_connected(const merian::DescriptorSetLayoutHandle& graph
                       .add_descriptor_set_layout(graph_desc_set_layout)
                       .add_push_constant<QuakeNode::UniformData>()
                       .build_pipeline_layout();
-    pipe.reset();
 
-    prev_cl_time = cl.time;
+    pipe.reset();
     return {};
 }
 
@@ -232,7 +231,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         clear_pipe->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
                      (render_height + local_size_y - 1) / local_size_y, 1);
-        frame++;
         return;
     }
 
@@ -301,9 +299,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
         dump_mc = false;
     }
-
-    prev_cl_time = cl.time;
-    frame++;
 }
 
 RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Properties& config) {

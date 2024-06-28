@@ -10,7 +10,7 @@
 
 #include "common/camera.glsl"
 
-#include "config.h"
+#include "../config.h"
 #include "layout.glsl"
 
 void main() {

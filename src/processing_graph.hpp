@@ -15,7 +15,7 @@
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 
 #include "hud/hud.hpp"
-#include "renderer/render_markovchain.hpp"
+#include "render_mc/render_markovchain.hpp"
 
 class ProcessingGraph {
   public:

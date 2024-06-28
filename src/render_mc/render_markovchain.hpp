@@ -106,11 +106,6 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     // ----------------------------------------------------
 
-    uint64_t frame = 0;
-    double prev_cl_time = 0;
-
-    // ----------------------------------------------------
-
     // Spec constants
     // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
     static constexpr uint32_t local_size_x = 8;

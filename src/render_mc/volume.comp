@@ -23,7 +23,7 @@ uint rng_state;
 vec3 irr;
 vec2 moments;
 
-#include "config.h"
+#include "../config.h"
 #include "layout.glsl"
 #include "light_cache.glsl"
 #include "mc.glsl"

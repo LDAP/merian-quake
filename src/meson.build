@@ -1,3 +1,4 @@
 subdir('game')
-subdir('renderer')
+subdir('render_mc')
+subdir('render_restir')
 subdir('hud')
