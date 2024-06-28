@@ -145,6 +145,9 @@ class QuakeNode : public merian_nodes::Node {
 
     // -----------------------------------------------------
 
+    // Called when the vid struct changed
+    void VID_Changed_f(cvar_t* var);
+
     // called when a texture should be loaded
     void QS_texture_load(gltexture_t* glt, uint32_t* data);
 

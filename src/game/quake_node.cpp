@@ -35,6 +35,10 @@ static QuakeData quake_data;
 
 // CALLBACKS from within Quake --------------------------------------------------------------------
 
+extern "C" void VID_Changed_f(cvar_t* var) {
+    quake_data.quake_node->VID_Changed_f(var);
+}
+
 // called each time a new map is (re)loaded
 extern "C" void QS_worldspawn() {
     quake_data.quake_node->QS_worldspawn();
@@ -620,6 +624,14 @@ void QuakeNode::R_RenderScene() {
     sync_render.pop();
 }
 
+void QuakeNode::VID_Changed_f([[maybe_unused]] cvar_t* var) {
+    if (!con_resolution) {
+        return;
+    }
+    con_resolution->set(
+        vk::Extent3D{static_cast<uint32_t>(vid.width), static_cast<uint32_t>(vid.height), 1});
+}
+
 void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // LOG -----------------------------------------------
 
@@ -698,19 +710,17 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         update_textures(cmd, io);
     }
 
-    if (cl.worldmodel && render_info.constant_data_update) {
-        key_dest = key_game;
-        m_state = m_none;
-    }
-
     render_info.render &= !scr_drawloading;
 
     if (cl.worldmodel && frame == last_worldspawn_frame) {
+        key_dest = key_game;
+        m_state = m_none;
         sv_player = nullptr;
+
         update_static_geo(cmd);
     }
     update_dynamic_geo(cmd);
-    
+
     update_as(cmd, io);
 
     // Update constant data
