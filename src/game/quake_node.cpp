@@ -665,7 +665,10 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
 
     // We store the texture on system memory for now
     // and upload in cmd_process later
-    pending_uploads.emplace(glt, data);
+    if (pending_uploads.contains(glt->texnum)) {
+        pending_uploads.erase(glt->texnum);
+    }
+    pending_uploads.try_emplace(glt->texnum, glt, data);
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>
@@ -681,12 +684,12 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap&
 }
 
 void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
-    for (auto tex : pending_uploads) {
+    for (const auto& [texnum, tex] : pending_uploads) {
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
             cmd, tex.cpu_tex.data(), tex.width, tex.height,
             tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest, !tex.linear,
             tex.name);
-        io[con_textures].set(tex.texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
+        io[con_textures].set(texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
                              vk::PipelineStageFlagBits2::eTransfer);
     }
     pending_uploads.clear();

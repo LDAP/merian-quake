@@ -11,9 +11,9 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/nodes/as_builder/device_as_builder.hpp"
 
+#include "config.h"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/string.hpp"
-#include "config.h"
 
 #include <queue>
 #include <set>
@@ -84,8 +84,7 @@ class QuakeNode : public merian_nodes::Node {
 
     struct QuakeTexture {
         explicit QuakeTexture(gltexture_t* glt, uint32_t* data)
-            : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name),
-              texnum(glt->texnum) {
+            : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name) {
             cpu_tex.resize(width * height);
 
             memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
@@ -95,17 +94,16 @@ class QuakeNode : public merian_nodes::Node {
             linear |= merian::ends_with(glt->name, "_gloss");
         }
 
-        uint32_t width;
-        uint32_t height;
+        const uint32_t width;
+        const uint32_t height;
         // bitmask of TEXPREF_* flags in gl_texmgr
-        uint32_t flags;
+        const uint32_t flags;
         // if true interpret linearly (Unorm) else as Srgb.
         bool linear;
 
         std::vector<uint32_t> cpu_tex{};
 
-        std::string name;
-        uint32_t texnum;
+        const std::string name;
     };
 
     struct RTGeometry {
@@ -224,12 +222,7 @@ class QuakeNode : public merian_nodes::Node {
     bool rebuild_after_stop = true;
 
     // Textures
-    struct QuakeTextureCmp {
-        bool operator()(const QuakeTexture& a, const QuakeTexture& b) const {
-            return a.texnum < b.texnum;
-        }
-    };
-    std::set<QuakeTexture, QuakeTextureCmp> pending_uploads;
+    std::map<uint32_t, QuakeTexture> pending_uploads;
 
     // Geometry
     std::vector<RTGeometry> static_geo;
