@@ -169,7 +169,7 @@ class QuakeNode : public merian_nodes::Node {
     void update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
 
     void update_static_geo(const vk::CommandBuffer& cmd);
-    void update_dynamic_geo(const vk::CommandBuffer& cmd);
+    void update_dynamic_geo(const vk::CommandBuffer& cmd, const merian::ProfilerHandle& profiler);
     void update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
 
   private:

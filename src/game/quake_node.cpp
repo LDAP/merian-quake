@@ -728,11 +728,19 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         m_state = m_none;
         sv_player = nullptr;
 
-        update_static_geo(cmd);
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update static geo");
+            update_static_geo(cmd);
+        }
     }
-    update_dynamic_geo(cmd);
-
-    update_as(cmd, io);
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update dynamic geo");
+        update_dynamic_geo(cmd, run.get_profiler());
+    }
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update as");
+        update_as(cmd, io);
+    }
 
     // Update constant data
     if (render_info.constant_data_update) {
@@ -872,57 +880,63 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
     }
 }
 
-void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
+void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
+                                   const merian::ProfilerHandle& profiler) {
     vtx.clear();
     prev_vtx.clear();
     idx.clear();
     ext.clear();
 
-    std::future<void> future = context->thread_pool.submit<void>([&]() {
-        if (playermodel == 1) {
-            add_geo(&cl.viewent, vtx, prev_vtx, idx, ext);
-        } else if (playermodel == 2) {
-            add_geo(&cl.viewent, vtx, prev_vtx, idx, ext);
-            add_geo(&cl_entities[cl.viewentity], vtx, prev_vtx, idx, ext);
-        }
-        add_particles(vtx, prev_vtx, idx, ext, texnum_blood, texnum_explosion, reproducible_renders,
-                      render_info.uniform.cl_time);
-    });
-
     const uint32_t number_tasks = context->thread_pool.size();
-
     std::vector<std::vector<float>> thread_dynamic_vtx(number_tasks);
     std::vector<std::vector<float>> thread_dynamic_prev_vtx(number_tasks);
     std::vector<std::vector<uint32_t>> thread_dynamic_idx(number_tasks);
     std::vector<std::vector<VertexExtraData>> thread_dynamic_ext(number_tasks);
 
-    merian::parallel_for(
-        std::max(cl_numvisedicts, cl.num_statics),
-        [&](uint32_t index, uint32_t thread_index) {
-            if (index < (uint32_t)cl_numvisedicts)
-                add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
-                        thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
-                        thread_dynamic_ext[thread_index]);
-            if (index < (uint32_t)cl.num_statics)
-                add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
-                        thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
-                        thread_dynamic_ext[thread_index]);
-        },
-        context->thread_pool, number_tasks);
+    {
+        MERIAN_PROFILE_SCOPE(profiler, "parallel transform");
+        std::future<void> future = context->thread_pool.submit<void>([&]() {
+            if (playermodel == 1) {
+                add_geo(&cl.viewent, vtx, prev_vtx, idx, ext);
+            } else if (playermodel == 2) {
+                add_geo(&cl.viewent, vtx, prev_vtx, idx, ext);
+                add_geo(&cl_entities[cl.viewentity], vtx, prev_vtx, idx, ext);
+            }
+            add_particles(vtx, prev_vtx, idx, ext, texnum_blood, texnum_explosion,
+                          reproducible_renders, render_info.uniform.cl_time);
+        });
 
-    future.get();
+        merian::parallel_for(
+            std::max(cl_numvisedicts, cl.num_statics),
+            [&](uint32_t index, uint32_t thread_index) {
+                if (index < (uint32_t)cl_numvisedicts)
+                    add_geo(cl_visedicts[index], thread_dynamic_vtx[thread_index],
+                            thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
+                            thread_dynamic_ext[thread_index]);
+                if (index < (uint32_t)cl.num_statics)
+                    add_geo(cl_static_entities + index, thread_dynamic_vtx[thread_index],
+                            thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
+                            thread_dynamic_ext[thread_index]);
+            },
+            context->thread_pool, number_tasks);
 
-    for (uint32_t i = 0; i < number_tasks; i++) {
-        uint32_t old_vtx_count = vtx.size() / 3;
+        future.get();
+    }
 
-        merian::raw_copy_back(vtx, thread_dynamic_vtx[i]);
-        merian::raw_copy_back(prev_vtx, thread_dynamic_prev_vtx[i]);
-        merian::raw_copy_back(ext, thread_dynamic_ext[i]);
+    {
+        MERIAN_PROFILE_SCOPE(profiler, "merge");
+        for (uint32_t i = 0; i < number_tasks; i++) {
+            uint32_t old_vtx_count = vtx.size() / 3;
 
-        uint32_t old_idx_size = idx.size();
-        idx.resize(old_idx_size + thread_dynamic_idx[i].size());
-        for (uint j = 0; j < thread_dynamic_idx[i].size(); j++) {
-            idx[old_idx_size + j] = old_vtx_count + thread_dynamic_idx[i][j];
+            merian::raw_copy_back(vtx, thread_dynamic_vtx[i]);
+            merian::raw_copy_back(prev_vtx, thread_dynamic_prev_vtx[i]);
+            merian::raw_copy_back(ext, thread_dynamic_ext[i]);
+
+            uint32_t old_idx_size = idx.size();
+            idx.resize(old_idx_size + thread_dynamic_idx[i].size());
+            for (uint j = 0; j < thread_dynamic_idx[i].size(); j++) {
+                idx[old_idx_size + j] = old_vtx_count + thread_dynamic_idx[i][j];
+            }
         }
     }
 
@@ -935,15 +949,18 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd) {
     SPDLOG_TRACE("dynamic geo: vtx size: {} idx size: {} ext size: {}", dynamic_vtx.size(),
                  dynamic_idx.size(), dynamic_ext.size());
 
-    std::vector<RTGeometry> old_dynamic_geo = dynamic_geo;
-    dynamic_geo.clear();
-    if (!idx.empty()) {
-        RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
-        dynamic_geo.emplace_back(
-            get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild));
-        dynamic_geo.back().instance_flags =
-            vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
+    {
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "upload / copy");
+        std::vector<RTGeometry> old_dynamic_geo = dynamic_geo;
+        dynamic_geo.clear();
+        if (!idx.empty()) {
+            RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
+            dynamic_geo.emplace_back(
+                get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo,
+                                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild));
+            dynamic_geo.back().instance_flags =
+                vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
+        }
     }
 }
 
