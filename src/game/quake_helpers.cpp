@@ -192,9 +192,9 @@ void add_particles(std::vector<float>& vtx,
                 const uint32_t enc_n = merian::encode_normal(n);
 
                 ext.emplace_back(texnum, texnum_fb, enc_n, enc_n, enc_n,
-                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
-                                 merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
+                                 merian::float_to_half(0), merian::float_to_half(1),
+                                 merian::float_to_half(0), merian::float_to_half(0),
+                                 merian::float_to_half(1), merian::float_to_half(0));
             } else {
                 for (int i = 0; i < 3; i++)
                     color_bytes[0] =
@@ -207,9 +207,9 @@ void add_particles(std::vector<float>& vtx,
                 }
 
                 ext.emplace_back(0, 0 | (MAT_FLAGS_SOLID << 12), c, c_fb, 0,
-                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(1),
-                                 merian::float_to_half_aprox(0), merian::float_to_half_aprox(0),
-                                 merian::float_to_half_aprox(1), merian::float_to_half_aprox(0));
+                                 merian::float_to_half(0), merian::float_to_half(1),
+                                 merian::float_to_half(0), merian::float_to_half(0),
+                                 merian::float_to_half(1), merian::float_to_half(0));
             }
         }
     }
@@ -348,17 +348,17 @@ void add_geo_alias(entity_t* ent,
         }
 
         ext.emplace_back(texnum_alpha, fb_texnum, n0, n1, n2,
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[0] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 0]].st[0] + 0.5) /
                                                      (float)hdr->skinwidth),
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 0]].st[1] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 0]].st[1] + 0.5) /
                                                      (float)hdr->skinheight),
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 1]].st[0] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 1]].st[0] + 0.5) /
                                                      (float)hdr->skinwidth),
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 1]].st[1] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) /
                                                      (float)hdr->skinheight),
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[0] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) /
                                                      (float)hdr->skinwidth),
-                         merian::float_to_half_aprox((desc[indexes[3 * i + 2]].st[1] + 0.5) /
+                         merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) /
                                                      (float)hdr->skinheight));
     }
 }
@@ -439,12 +439,12 @@ void add_geo_brush(entity_t* ent,
                 };
                 uint32_t flags = MAT_FLAGS_NONE;
                 if (surf->texinfo->texture->gltexture) {
-                    extra.s_0 = merian::float_to_half_aprox(p->verts[0][3]);
-                    extra.t_0 = merian::float_to_half_aprox(p->verts[0][4]);
-                    extra.s_1 = merian::float_to_half_aprox(p->verts[k - 1][3]);
-                    extra.t_1 = merian::float_to_half_aprox(p->verts[k - 1][4]);
-                    extra.s_2 = merian::float_to_half_aprox(p->verts[k - 0][3]);
-                    extra.t_2 = merian::float_to_half_aprox(p->verts[k - 0][4]);
+                    extra.s_0 = merian::float_to_half(p->verts[0][3]);
+                    extra.t_0 = merian::float_to_half(p->verts[0][4]);
+                    extra.s_1 = merian::float_to_half(p->verts[k - 1][3]);
+                    extra.t_1 = merian::float_to_half(p->verts[k - 1][4]);
+                    extra.s_2 = merian::float_to_half(p->verts[k - 0][3]);
+                    extra.t_2 = merian::float_to_half(p->verts[k - 0][4]);
                     extra.texnum_alpha = make_texnum_alpha(t->gltexture, ent, surf);
                     extra.texnum_fb_flags = t->fullbright ? t->fullbright->texnum : 0;
 
@@ -614,15 +614,15 @@ void add_geo_sprite(entity_t* ent,
         ext.emplace_back(texnum,
                          MAT_FLAGS_SPRITE << 12, // sprite allways emits
                          n_enc, n_enc, n_enc,
-                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(frame->tmax),
-                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(0),
-                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(0));
+                         merian::float_to_half(0),            merian::float_to_half(frame->tmax),
+                         merian::float_to_half(0),            merian::float_to_half(0),
+                         merian::float_to_half(frame->smax),  merian::float_to_half(0));
         ext.emplace_back(texnum,
                          MAT_FLAGS_SPRITE << 12, // sprite allways emits
                          n_enc, n_enc, n_enc,
-                         merian::float_to_half_aprox(0),            merian::float_to_half_aprox(frame->tmax),
-                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(0),
-                         merian::float_to_half_aprox(frame->smax),  merian::float_to_half_aprox(frame->tmax));
+                         merian::float_to_half(0),            merian::float_to_half(frame->tmax),
+                         merian::float_to_half(frame->smax),  merian::float_to_half(0),
+                         merian::float_to_half(frame->smax),  merian::float_to_half(frame->tmax));
         // clang-format on
 
     } // end three axes
