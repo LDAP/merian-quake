@@ -17,8 +17,6 @@ extern "C" {
 #include "quakedef.h"
 #include "screen.h"
 
-// from r_alias.c
-extern float r_avertexnormals[162][3];
 // from r_part.c
 extern particle_t* active_particles;
 
