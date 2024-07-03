@@ -236,7 +236,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             hit.albedo = ldr_to_hdr(albedo_texture.rgb);
             contribution += throughput * hit.albedo;
         } else {
-            const uint16_t texnum_fb = uint16_t(extra_data.texnum_fb_flags & 0xfff);
+            const uint16_t texnum_fb = extra_data.texnum_fb_flags & 0xfffs;
             hit.albedo = albedo_texture.rgb;
             if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
                 const f16vec3 emission = ldr_to_hdr(f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb));
