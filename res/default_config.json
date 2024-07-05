@@ -1,199 +1,298 @@
 {
-    "accum": {
-        "IPR factor": 50.0,
-        "adaptivity": 0.9009900093078613,
-        "adaptivity IPR factor": 3.0,
-        "adaptivity percentile lower": 0.25,
-        "adaptivity percentile upper": 0.949999988079071,
-        "alpha": 0.8999999761581421,
-        "depth threshold": 0.026403000578284264,
-        "extended search": true,
-        "filter mode": "linear",
-        "firefly filter bias": 0.20000000298023224,
-        "firefly filter enable": true,
-        "firefly percentile lower": 0.25,
-        "firefly percentile upper": 0.8999999761581421,
-        "hard clamp": "inf",
-        "max history": "inf",
-        "normal threshold": 0.645771861076355,
-        "reuse border": true
+    "nodes": {
+        "Quake 0": {
+            "disable node": false,
+            "properties": {
+                "force timediff (ms)": 0.0,
+                "gamestate update": true,
+                "overwrite mu_t/s": false,
+                "overwrite sun": false,
+                "player model": "gun only",
+                "rebuild after stop": true,
+                "reproducible renders": false,
+                "startup commands": "",
+                "stop after worldspawn": -1
+            }
+        },
+        "TLAS builder": {
+            "disable node": false
+        },
+        "accum": {
+            "disable node": false,
+            "properties": {
+                "IPR factor": 50.0,
+                "adaptivity": 0.9009900093078613,
+                "adaptivity IPR factor": 3.0,
+                "adaptivity percentile lower": 0.25,
+                "adaptivity percentile upper": 0.949999988079071,
+                "alpha": 0.8999999761581421,
+                "depth threshold": 0.026403000578284264,
+                "extended search": true,
+                "filter mode": "linear",
+                "firefly filter bias": 0.20000000298023224,
+                "firefly filter enable": true,
+                "firefly percentile lower": 0.25,
+                "firefly percentile upper": 0.8999999761581421,
+                "hard clamp": "inf",
+                "max history": "inf",
+                "normal threshold": 0.645771861076355,
+                "reuse border": true
+            }
+        },
+        "add": {
+            "disable node": false
+        },
+        "beauty image write": {
+            "disable node": false,
+            "properties": {
+                "advanced": {
+                    "callback after capture": false,
+                    "callback on record": false,
+                    "concurrency": 16,
+                    "enable run": -1,
+                    "exit after seconds": -1.0,
+                    "exit at iteration": -1,
+                    "exit at run": -1,
+                    "rebuild on record": false,
+                    "scale": 1.0,
+                    "stop after seconds": -1.0,
+                    "stop at iteration": -1,
+                    "stop at run": -1
+                },
+                "enable": false,
+                "filename": "image2",
+                "format": "PNG",
+                "iteration": 473,
+                "iteration offset": 1,
+                "iteration power": 1,
+                "rebuild after capture": false,
+                "trigger": "iteration"
+            }
+        },
+        "blue_noise": {
+            "disable node": false,
+            "properties": {
+                "keep in host memory": true,
+                "linear": true
+            }
+        },
+        "denoiser": {
+            "disable node": false,
+            "properties": {
+                "SVGF iterations": 5,
+                "TAA alpha": 0.5,
+                "clamping": "min-max",
+                "debug": "none",
+                "depth accept": 40.0,
+                "filter": "none",
+                "filter depth": 40.0,
+                "filter luminance": 3.0,
+                "filter normals": 0.5235987901687622,
+                "filter type": "subsampled",
+                "filter variance": false,
+                "mv sampling": "center",
+                "normal reject": 0.5235987901687622,
+                "spatial bias": 8.0,
+                "spatial falloff": 3.0,
+                "z-bias depth": 0.0,
+                "z-bias normals": 3000.0
+            }
+        },
+        "exposure": {
+            "disable node": false,
+            "properties": {
+                "ISO": 50.0,
+                "K": 8.0,
+                "aperature": 1.1200000047683716,
+                "autoexposure": true,
+                "max exposure": 10000.0,
+                "max log luminance": 12.0,
+                "metering": "center-weighted",
+                "min exposure": 1.0,
+                "min log luminance": -15.0,
+                "q": 0.6499999761581421,
+                "shutter time (ms)": 768.0,
+                "speed down": 5.099999904632568,
+                "speed up": 3.0999999046325684
+            }
+        },
+        "fxaa": {
+            "disable node": false,
+            "properties": {
+                "enable": true
+            }
+        },
+        "hud": {
+            "disable node": false
+        },
+        "image writer": {
+            "disable node": false,
+            "properties": {
+                "advanced": {
+                    "callback after capture": false,
+                    "callback on record": false,
+                    "concurrency": 16,
+                    "enable run": -1,
+                    "exit after seconds": -1.0,
+                    "exit at iteration": -1,
+                    "exit at run": -1,
+                    "rebuild on record": false,
+                    "scale": 1.0,
+                    "stop after seconds": -1.0,
+                    "stop at iteration": -1,
+                    "stop at run": -1
+                },
+                "enable": false,
+                "filename": "image",
+                "format": "HDR",
+                "iteration": 8192,
+                "iteration offset": 0,
+                "iteration power": 2,
+                "rebuild after capture": false,
+                "trigger": "iteration"
+            }
+        },
+        "one": {
+            "disable node": false,
+            "properties": {
+                "color": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "format": "R16G16B16A16Sfloat"
+            }
+        },
+        "output": {
+            "disable node": false,
+            "properties": {
+                "blit mode": "FIT",
+                "mode": "windowed",
+                "rebuild on recreate": false,
+                "vsync": false
+            }
+        },
+        "render_markovchain": {
+            "disable node": false,
+            "properties": {
+                "BSDF Prob": 0.10000000149011612,
+                "LC buf size": 4000000,
+                "LC levels": 32.0,
+                "LC tan(alpha/2)": 0.004999999888241291,
+                "ML Prior": 0.30000001192092896,
+                "Phase Prob": 0.10000000149011612,
+                "adaptive grid buf size": 32777259,
+                "adaptive grid prob": 0.699999988079071,
+                "dist guide p": 0.8999999761581421,
+                "dist mc grid width": 25,
+                "dist mc samples": 3,
+                "dist mc states per vertex": 10,
+                "max path length": 3,
+                "mc adaptive levels": 10,
+                "mc adaptive tan(alpha/2)": 0.004000000189989805,
+                "mc fast recovery": true,
+                "mc samples": 4,
+                "mc static width": 25.299999237060547,
+                "particle size": 25.0,
+                "randomize seed": true,
+                "spp": 1,
+                "static grid buf size": 800009,
+                "surf: use LC": false,
+                "volume forward project": true,
+                "volume max t": 2000.0,
+                "volume spp": 2,
+                "volume: use LC": true
+            }
+        },
+        "tonemap": {
+            "disable node": false,
+            "properties": {
+                "alpha mode": "Perceptual luminance",
+                "clamp output": true,
+                "max white": 4.949999809265137,
+                "perceptual exponent": 2.200000047683716,
+                "tonemap": "Reinhard Extended"
+            }
+        },
+        "volume accum": {
+            "disable node": false,
+            "properties": {
+                "IPR factor": 50.0,
+                "adaptivity": 0.9009900093078613,
+                "adaptivity IPR factor": 15.0,
+                "adaptivity percentile lower": 0.056106001138687134,
+                "adaptivity percentile upper": 0.9042909741401672,
+                "alpha": 0.9020000100135803,
+                "depth threshold": 0.28402701020240784,
+                "extended search": false,
+                "filter mode": "linear",
+                "firefly filter bias": 0.20000000298023224,
+                "firefly filter enable": true,
+                "firefly percentile lower": 0.25,
+                "firefly percentile upper": 0.9594060182571411,
+                "hard clamp": "inf",
+                "max history": "inf",
+                "normal threshold": 3.1415927410125732,
+                "reuse border": false
+            }
+        },
+        "volume denoiser": {
+            "disable node": false,
+            "properties": {
+                "SVGF iterations": 5,
+                "TAA alpha": 0.8109999895095825,
+                "clamping": "min-max",
+                "debug": "none",
+                "depth accept": 100.0,
+                "filter": "none",
+                "filter depth": 3968.0,
+                "filter luminance": 2.0,
+                "filter normals": 3.1415927410125732,
+                "filter type": "subsampled",
+                "filter variance": false,
+                "mv sampling": "center",
+                "normal reject": 3.1415927410125732,
+                "spatial bias": 8.0,
+                "spatial falloff": 3.0,
+                "z-bias depth": 0.0,
+                "z-bias normals": 0.0
+            }
+        },
+        "volume image writer": {
+            "disable node": false,
+            "properties": {
+                "advanced": {
+                    "callback after capture": false,
+                    "callback on record": false,
+                    "concurrency": 16,
+                    "enable run": -1,
+                    "exit after seconds": -1.0,
+                    "exit at iteration": -1,
+                    "exit at run": -1,
+                    "rebuild on record": false,
+                    "scale": 1.0,
+                    "stop after seconds": -1.0,
+                    "stop at iteration": -1,
+                    "stop at run": -1
+                },
+                "enable": false,
+                "filename": "image",
+                "format": "HDR",
+                "iteration": 0,
+                "iteration offset": 0,
+                "iteration power": 1,
+                "rebuild after capture": false,
+                "trigger": "iteration"
+            }
+        }
     },
-    "add": null,
-    "beauty image write": {
-        "callback after capture": false,
-        "callback on record": false,
-        "enable": false,
-        "filename": "image2",
-        "format": "PNG",
-        "iteration": 473,
-        "iteration offset": 1,
-        "iteration power": 1,
-        "rebuild after capture": false,
-        "rebuild on record": false,
-        "run trigger": -1
-    },
-    "blue_noise": null,
-    "connections": null,
-    "denoiser": {
-        "SVGF iterations": 5,
-        "TAA alpha": 0.5,
-        "clamping": "min-max",
-        "debug": "none",
-        "depth accept": 40.0,
-        "filter": "none",
-        "filter depth": 40.0,
-        "filter luminance": 3.0,
-        "filter normals": 0.5235987901687622,
-        "filter type": "subsampled",
-        "filter variance": false,
-        "mv sampling": "center",
-        "normal reject": 0.5235987901687622,
-        "spatial bias": 8.0,
-        "spatial falloff": 3.0,
-        "z-bias depth": 0.0,
-        "z-bias normals": 3000.0
-    },
-    "exposure": {
-        "ISO": 50.0,
-        "K": 8.0,
-        "aperature": 1.1200000047683716,
-        "autoexposure": true,
-        "max exposure": 10000.0,
-        "max log luminance": 12.0,
-        "metering": "center-weighted",
-        "min exposure": 1.0,
-        "min log luminance": -15.0,
-        "q": 0.6499999761581421,
-        "shutter time (ms)": 768.0,
-        "speed down": 5.099999904632568,
-        "speed up": 3.0999999046325684
-    },
-    "fxaa": {
-        "enable": true
-    },
-    "hud": null,
-    "image writer": {
-        "callback after capture": false,
-        "callback on record": false,
-        "enable": false,
-        "filename": "image",
-        "format": "HDR",
-        "iteration": 8192,
-        "iteration offset": 0,
-        "iteration power": 2,
-        "rebuild after capture": false,
-        "rebuild on record": false,
-        "run trigger": -1
-    },
-    "one": {
-        "color": [
-            1.0,
-            1.0,
-            1.0,
-            1.0
-        ]
-    },
-    "output": {
-        "mode": "windowed"
-    },
-    "render_markovchain": {
-        "BSDF Prob": 0.10000000149011612,
-        "LC buf size": 4000000,
-        "LC levels": 32.0,
-        "LC tan(alpha/2)": 0.004999999888241291,
-        "ML Prior": 0.30000001192092896,
-        "Phase Prob": 0.10000000149011612,
-        "adaptive grid buf size": 32777259,
-        "adaptive grid prob": 0.699999988079071,
-        "dist guide p": 0.8999999761581421,
-        "dist mc grid width": 25,
-        "dist mc samples": 3,
-        "dist mc states per vertex": 10,
-        "force timediff (ms)": -43.0,
-        "gamestate update": true,
-        "max path length": 3,
-        "mc adaptive levels": 10,
-        "mc adaptive tan(alpha/2)": 0.004000000189989805,
-        "mc fast recovery": true,
-        "mc samples": 4,
-        "mc static states per vertex": 2,
-        "mc static width": 25.299999237060547,
-        "overwrite mu_t/s": false,
-        "overwrite sun": false,
-        "particle size": 25.0,
-        "player model": "gun only",
-        "randomize seed": true,
-        "rebuild after stop": true,
-        "render height": 1080,
-        "render width": 1920,
-        "reproducible renders": false,
-        "sound": true,
-        "spp": 1,
-        "startup commands": "# game ad\n#map e1m1\n# map ad_tears\n# map ad_azad\n#playdemo ref_tears_0\n#playdemo ref_azad_1\n# map e1m1",
-        "static grid buf size": 800009,
-        "stop after worldspawn": -1,
-        "surf: use LC": false,
-        "volume forward project": true,
-        "volume max t": 2000.0,
-        "volume spp": 2,
-        "volume: use LC": true
-    },
-    "tonemap": {
-        "alpha mode": "Perceptual luminance",
-        "clamp output": true,
-        "max white": 4.949999809265137,
-        "perceptual exponent": 2.200000047683716,
-        "tonemap": "Reinhard Extended"
-    },
-    "volume accum": {
-        "IPR factor": 50.0,
-        "adaptivity": 0.9009900093078613,
-        "adaptivity IPR factor": 15.0,
-        "adaptivity percentile lower": 0.056106001138687134,
-        "adaptivity percentile upper": 0.9042909741401672,
-        "alpha": 0.9020000100135803,
-        "depth threshold": 0.28402701020240784,
-        "extended search": false,
-        "filter mode": "linear",
-        "firefly filter bias": 0.20000000298023224,
-        "firefly filter enable": true,
-        "firefly percentile lower": 0.25,
-        "firefly percentile upper": 0.9594060182571411,
-        "hard clamp": "inf",
-        "max history": "inf",
-        "normal threshold": 3.1415927410125732,
-        "reuse border": false
-    },
-    "volume denoiser": {
-        "SVGF iterations": 5,
-        "TAA alpha": 0.8109999895095825,
-        "clamping": "min-max",
-        "debug": "none",
-        "depth accept": 100.0,
-        "filter": "none",
-        "filter depth": 3968.0,
-        "filter luminance": 2.0,
-        "filter normals": 3.1415927410125732,
-        "filter type": "subsampled",
-        "filter variance": false,
-        "mv sampling": "center",
-        "normal reject": 3.1415927410125732,
-        "spatial bias": 8.0,
-        "spatial falloff": 3.0,
-        "z-bias depth": 0.0,
-        "z-bias normals": 0.0
-    },
-    "volume image writer": {
-        "callback after capture": false,
-        "callback on record": false,
-        "enable": false,
-        "filename": "image",
-        "format": "HDR",
-        "iteration": 0,
-        "iteration offset": 0,
-        "iteration power": 1,
-        "rebuild after capture": false,
-        "rebuild on record": false,
-        "run trigger": -1
+    "profiler": {
+        "profiling": true,
+        "report intervall": 50,
+        "run": {
+            "cpu max ms": 20.0,
+            "gpu max ms": 20.0
+        }
     }
 }

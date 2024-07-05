@@ -30,10 +30,7 @@ class ProcessingGraph {
         auto blue_noise = std::make_shared<merian_nodes::LDRImageRead>(
             alloc->getStaging(), loader.find_file("blue_noise/1024_1024/LDR_RGBA_0.png").value(),
             true, true);
-        const std::array<float, 4> white_color = {1., 1., 1., 1.};
-        auto one = std::make_shared<merian_nodes::ColorImage>(vk::Format::eR16G16B16A16Sfloat,
-                                                              vk::Extent3D{1920, 1080, 1},
-                                                              vk::ClearColorValue(white_color));
+        auto one = std::make_shared<merian_nodes::ColorImage>();
         auto mc_render = std::make_shared<RendererMarkovChain>(context, alloc);
         auto quake = std::make_shared<QuakeNode>(context, alloc, controller, argc - 1, argv + 1);
         auto accum = std::make_shared<merian_nodes::Accumulate>(context, alloc);
@@ -78,6 +75,7 @@ class ProcessingGraph {
         graph.add_connection(quake, tlas_builder, "idx", "idx");
         graph.add_connection(tlas_builder, mc_render, "tlas", "tlas");
         graph.add_connection(quake, mc_render, "resolution", "resolution");
+        graph.add_connection(quake, one, "resolution", "resolution");
         graph.add_connection(quake, mc_render, "textures", "textures");
         graph.add_connection(quake, mc_render, "vtx", "vtx");
         graph.add_connection(quake, mc_render, "prev_vtx", "prev_vtx");
