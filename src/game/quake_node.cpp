@@ -934,7 +934,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
 
             uint32_t old_idx_size = idx.size();
             idx.resize(old_idx_size + thread_dynamic_idx[i].size());
-            for (uint j = 0; j < thread_dynamic_idx[i].size(); j++) {
+            for (uint32_t j = 0; j < thread_dynamic_idx[i].size(); j++) {
                 idx[old_idx_size + j] = old_vtx_count + thread_dynamic_idx[i][j];
             }
         }
