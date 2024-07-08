@@ -436,87 +436,15 @@ QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& all
 
 QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
                      const merian::ResourceAllocatorHandle allocator,
-                     const std::shared_ptr<merian::InputController>& controller,
                      const int quakespasm_argc,
                      const char** quakespasm_argv)
-    : Node("Quake"), context(context), allocator(allocator), controller(controller) {
+    : Node(), context(context), allocator(allocator) {
 
     // reserve roughly 1GB for all vectors
     vtx.reserve(256 * 1024 * 1024 / sizeof(float));
     prev_vtx.reserve(256 * 1024 * 1024 / sizeof(float));
     idx.reserve(256 * 1024 * 1024 / sizeof(uint32_t));
     ext.reserve(256 * 1024 * 1024 / sizeof(VertexExtraData));
-
-    // clang-format off
-    controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
-        static const std::map<int, int> keymap = {
-            {GLFW_KEY_TAB, K_TAB},
-            {GLFW_KEY_ENTER, K_ENTER},
-            {GLFW_KEY_ESCAPE, K_ESCAPE},
-            {GLFW_KEY_SPACE, K_SPACE},
-
-            {GLFW_KEY_BACKSPACE, K_BACKSPACE},
-            {GLFW_KEY_UP, K_UPARROW},
-            {GLFW_KEY_DOWN, K_DOWNARROW},
-            {GLFW_KEY_LEFT, K_LEFTARROW},
-            {GLFW_KEY_RIGHT, K_RIGHTARROW},
-
-            {GLFW_KEY_LEFT_ALT, K_ALT},
-            {GLFW_KEY_LEFT_CONTROL, K_CTRL},
-            {GLFW_KEY_LEFT_SHIFT, K_SHIFT},
-            {GLFW_KEY_F1, K_F1},
-            {GLFW_KEY_F2, K_F2},
-            {GLFW_KEY_F3, K_F3},
-            {GLFW_KEY_F4, K_F4},
-            {GLFW_KEY_F5, K_F5},
-            {GLFW_KEY_F6, K_F6},
-            {GLFW_KEY_F7, K_F7},
-            {GLFW_KEY_F8, K_F8},
-            {GLFW_KEY_F9, K_F9},
-            {GLFW_KEY_F10, K_F10},
-            {GLFW_KEY_F11, K_F11},
-            {GLFW_KEY_F12, K_F12},
-        };
-
-        // normal keys sould be passed as lowercased ascii
-        if (key >= 65 && key <= 90) key |= 32;
-        else if (keymap.contains(key)) key = keymap.at(key);
-
-        if (action == merian::InputController::PRESS) {
-            Key_Event(key, true);
-        } else if (action == merian::InputController::RELEASE) {
-            Key_Event(key, false);
-        }
-    });
-    controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
-        const bool raw = controller.get_raw_mouse_input();
-
-        if (raw) {
-            this->mouse_x = xpos;
-            this->mouse_y = ypos;
-        }
-
-        if (raw != raw_mouse_was_enabled || !raw) {
-            this->mouse_x = this->mouse_oldx = xpos;
-            this->mouse_y = this->mouse_oldy = ypos;
-        }
-   
-        raw_mouse_was_enabled = raw;
-    });
-    controller->set_mouse_button_callback([&](merian::InputController&, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
-        const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
-        Key_Event(remap[button], status == merian::InputController::PRESS);
-    });
-    controller->set_scroll_event_callback([&](merian::InputController&, double xoffset, double yoffset){
-        if (yoffset > 0) {
-            Key_Event(K_MWHEELUP, true);
-            Key_Event(K_MWHEELUP, false);
-        } else if (xoffset < 0) {
-            Key_Event(K_MWHEELDOWN, true);
-            Key_Event(K_MWHEELDOWN, false);
-        }
-    });
-    // clang-format on
 
     // INIT QUAKE
     if (quake_data.quake_node) {
@@ -669,6 +597,79 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
         pending_uploads.erase(glt->texnum);
     }
     pending_uploads.try_emplace(glt->texnum, glt, data);
+}
+
+void QuakeNode::set_controller(const merian::InputControllerHandle& controller) {
+    // clang-format off
+    controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
+        static const std::map<int, int> keymap = {
+            {GLFW_KEY_TAB, K_TAB},
+            {GLFW_KEY_ENTER, K_ENTER},
+            {GLFW_KEY_ESCAPE, K_ESCAPE},
+            {GLFW_KEY_SPACE, K_SPACE},
+
+            {GLFW_KEY_BACKSPACE, K_BACKSPACE},
+            {GLFW_KEY_UP, K_UPARROW},
+            {GLFW_KEY_DOWN, K_DOWNARROW},
+            {GLFW_KEY_LEFT, K_LEFTARROW},
+            {GLFW_KEY_RIGHT, K_RIGHTARROW},
+
+            {GLFW_KEY_LEFT_ALT, K_ALT},
+            {GLFW_KEY_LEFT_CONTROL, K_CTRL},
+            {GLFW_KEY_LEFT_SHIFT, K_SHIFT},
+            {GLFW_KEY_F1, K_F1},
+            {GLFW_KEY_F2, K_F2},
+            {GLFW_KEY_F3, K_F3},
+            {GLFW_KEY_F4, K_F4},
+            {GLFW_KEY_F5, K_F5},
+            {GLFW_KEY_F6, K_F6},
+            {GLFW_KEY_F7, K_F7},
+            {GLFW_KEY_F8, K_F8},
+            {GLFW_KEY_F9, K_F9},
+            {GLFW_KEY_F10, K_F10},
+            {GLFW_KEY_F11, K_F11},
+            {GLFW_KEY_F12, K_F12},
+        };
+
+        // normal keys sould be passed as lowercased ascii
+        if (key >= 65 && key <= 90) key |= 32;
+        else if (keymap.contains(key)) key = keymap.at(key);
+
+        if (action == merian::InputController::PRESS) {
+            Key_Event(key, true);
+        } else if (action == merian::InputController::RELEASE) {
+            Key_Event(key, false);
+        }
+    });
+    controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
+        const bool raw = controller.get_raw_mouse_input();
+
+        if (raw) {
+            this->mouse_x = xpos;
+            this->mouse_y = ypos;
+        }
+
+        if (raw != raw_mouse_was_enabled || !raw) {
+            this->mouse_x = this->mouse_oldx = xpos;
+            this->mouse_y = this->mouse_oldy = ypos;
+        }
+   
+        raw_mouse_was_enabled = raw;
+    });
+    controller->set_mouse_button_callback([&](merian::InputController&, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
+        const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
+        Key_Event(remap[button], status == merian::InputController::PRESS);
+    });
+    controller->set_scroll_event_callback([&](merian::InputController&, double xoffset, double yoffset){
+        if (yoffset > 0) {
+            Key_Event(K_MWHEELUP, true);
+            Key_Event(K_MWHEELUP, false);
+        } else if (xoffset < 0) {
+            Key_Event(K_MWHEELDOWN, true);
+            Key_Event(K_MWHEELDOWN, false);
+        }
+    });
+    // clang-format on
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>

@@ -1,8 +1,341 @@
 {
+    "connections": [
+        {
+            "dst": "volume denoiser",
+            "dst_input": "prev_out",
+            "src": "volume denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "add",
+            "dst_input": "a",
+            "src": "volume denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "volume image writer",
+            "dst_input": "src",
+            "src": "volume denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "fxaa",
+            "dst_input": "src",
+            "src": "tonemap",
+            "src_output": "out"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "idx",
+            "src": "Quake 0",
+            "src_output": "idx"
+        },
+        {
+            "dst": "TLAS builder",
+            "dst_input": "vtx",
+            "src": "Quake 0",
+            "src_output": "vtx"
+        },
+        {
+            "dst": "TLAS builder",
+            "dst_input": "idx",
+            "src": "Quake 0",
+            "src_output": "idx"
+        },
+        {
+            "dst": "one",
+            "dst_input": "resolution",
+            "src": "Quake 0",
+            "src_output": "resolution"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "textures",
+            "src": "Quake 0",
+            "src_output": "textures"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "vtx",
+            "src": "Quake 0",
+            "src_output": "vtx"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "ext",
+            "src": "Quake 0",
+            "src_output": "ext"
+        },
+        {
+            "dst": "TLAS builder",
+            "dst_input": "tlas_info",
+            "src": "Quake 0",
+            "src_output": "tlas_info"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "resolution",
+            "src": "Quake 0",
+            "src_output": "resolution"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "prev_vtx",
+            "src": "Quake 0",
+            "src_output": "prev_vtx"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "render_info",
+            "src": "Quake 0",
+            "src_output": "render_info"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "tlas",
+            "src": "TLAS builder",
+            "src_output": "tlas"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "prev_accum",
+            "src": "accum",
+            "src_output": "out_irr"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "moments",
+            "src": "accum",
+            "src_output": "out_moments"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "irr",
+            "src": "accum",
+            "src_output": "out_irr"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "prev_moments",
+            "src": "accum",
+            "src_output": "out_moments"
+        },
+        {
+            "dst": "hud",
+            "dst_input": "src",
+            "src": "fxaa",
+            "src_output": "out"
+        },
+        {
+            "dst": "beauty image write",
+            "dst_input": "src",
+            "src": "fxaa",
+            "src_output": "out"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "prev_filtered",
+            "src": "denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "prev_out",
+            "src": "denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "image writer",
+            "dst_input": "src",
+            "src": "denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "add",
+            "dst_input": "b",
+            "src": "denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "albedo",
+            "src": "one",
+            "src_output": "out"
+        },
+        {
+            "dst": "exposure",
+            "dst_input": "src",
+            "src": "add",
+            "src_output": "out"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "blue_noise",
+            "src": "blue_noise",
+            "src_output": "out"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "prev_accum",
+            "src": "volume accum",
+            "src_output": "out_irr"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "irr",
+            "src": "volume accum",
+            "src_output": "out_irr"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "prev_moments",
+            "src": "volume accum",
+            "src_output": "out_moments"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "moments",
+            "src": "volume accum",
+            "src_output": "out_moments"
+        },
+        {
+            "dst": "tonemap",
+            "dst_input": "src",
+            "src": "exposure",
+            "src_output": "out"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "mv",
+            "src": "render_markovchain",
+            "src_output": "volume_mv"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "albedo",
+            "src": "render_markovchain",
+            "src_output": "albedo"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "prev_gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "moments_in",
+            "src": "render_markovchain",
+            "src_output": "volume_moments"
+        },
+        {
+            "dst": "hud",
+            "dst_input": "gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "gbuffer",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "irr",
+            "src": "render_markovchain",
+            "src_output": "volume"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "prev_gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "mv",
+            "src": "render_markovchain",
+            "src_output": "mv"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "prev_gbuffer",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "prev_gbuffer",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "gbuffer",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "moments_in",
+            "src": "render_markovchain",
+            "src_output": "moments"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "irr",
+            "src": "render_markovchain",
+            "src_output": "irradiance"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "mv",
+            "src": "render_markovchain",
+            "src_output": "volume_mv"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "prev_gbuf",
+            "src": "render_markovchain",
+            "src_output": "gbuffer"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "mv",
+            "src": "render_markovchain",
+            "src_output": "mv"
+        },
+        {
+            "dst": "render_markovchain",
+            "dst_input": "prev_volume_depth",
+            "src": "render_markovchain",
+            "src_output": "volume_depth"
+        },
+        {
+            "dst": "output",
+            "dst_input": "src",
+            "src": "hud",
+            "src_output": "output"
+        }
+    ],
     "nodes": {
         "Quake 0": {
             "disable node": false,
             "properties": {
+                "command": "",
                 "force timediff (ms)": 0.0,
                 "gamestate update": true,
                 "overwrite mu_t/s": false,
@@ -12,10 +345,12 @@
                 "reproducible renders": false,
                 "startup commands": "",
                 "stop after worldspawn": -1
-            }
+            },
+            "type": "Quake"
         },
         "TLAS builder": {
-            "disable node": false
+            "disable node": false,
+            "type": "Acceleration Structure Builder"
         },
         "accum": {
             "disable node": false,
@@ -37,10 +372,12 @@
                 "max history": "inf",
                 "normal threshold": 0.645771861076355,
                 "reuse border": true
-            }
+            },
+            "type": "Accumulate"
         },
         "add": {
-            "disable node": false
+            "disable node": false,
+            "type": "Add"
         },
         "beauty image write": {
             "disable node": false,
@@ -67,14 +404,17 @@
                 "iteration power": 1,
                 "rebuild after capture": false,
                 "trigger": "iteration"
-            }
+            },
+            "type": "Image Write"
         },
         "blue_noise": {
             "disable node": false,
             "properties": {
                 "keep in host memory": true,
-                "linear": true
-            }
+                "linear": true,
+                "path": "blue_noise/1024_1024/LDR_RGBA_0.png"
+            },
+            "type": "LDR Image"
         },
         "denoiser": {
             "disable node": false,
@@ -96,7 +436,8 @@
                 "spatial falloff": 3.0,
                 "z-bias depth": 0.0,
                 "z-bias normals": 3000.0
-            }
+            },
+            "type": "Denoiser (SVGF)"
         },
         "exposure": {
             "disable node": false,
@@ -114,16 +455,19 @@
                 "shutter time (ms)": 768.0,
                 "speed down": 5.099999904632568,
                 "speed up": 3.0999999046325684
-            }
+            },
+            "type": "Exposure"
         },
         "fxaa": {
             "disable node": false,
             "properties": {
                 "enable": true
-            }
+            },
+            "type": "FXAA"
         },
         "hud": {
-            "disable node": false
+            "disable node": false,
+            "type": "Hud"
         },
         "image writer": {
             "disable node": false,
@@ -150,7 +494,8 @@
                 "iteration power": 2,
                 "rebuild after capture": false,
                 "trigger": "iteration"
-            }
+            },
+            "type": "Image Write"
         },
         "one": {
             "disable node": false,
@@ -162,7 +507,8 @@
                     1.0
                 ],
                 "format": "R16G16B16A16Sfloat"
-            }
+            },
+            "type": "Color"
         },
         "output": {
             "disable node": false,
@@ -171,7 +517,8 @@
                 "mode": "windowed",
                 "rebuild on recreate": false,
                 "vsync": false
-            }
+            },
+            "type": "Window (GLFW)"
         },
         "render_markovchain": {
             "disable node": false,
@@ -203,7 +550,8 @@
                 "volume max t": 2000.0,
                 "volume spp": 2,
                 "volume: use LC": true
-            }
+            },
+            "type": "Renderer (Markov Chain Raytracer)"
         },
         "tonemap": {
             "disable node": false,
@@ -213,7 +561,8 @@
                 "max white": 4.949999809265137,
                 "perceptual exponent": 2.200000047683716,
                 "tonemap": "Reinhard Extended"
-            }
+            },
+            "type": "Tonemap"
         },
         "volume accum": {
             "disable node": false,
@@ -235,7 +584,8 @@
                 "max history": "inf",
                 "normal threshold": 3.1415927410125732,
                 "reuse border": false
-            }
+            },
+            "type": "Accumulate"
         },
         "volume denoiser": {
             "disable node": false,
@@ -257,7 +607,8 @@
                 "spatial falloff": 3.0,
                 "z-bias depth": 0.0,
                 "z-bias normals": 0.0
-            }
+            },
+            "type": "Denoiser (SVGF)"
         },
         "volume image writer": {
             "disable node": false,
@@ -284,15 +635,12 @@
                 "iteration power": 1,
                 "rebuild after capture": false,
                 "trigger": "iteration"
-            }
+            },
+            "type": "Image Write"
         }
     },
     "profiler": {
         "profiling": true,
-        "report intervall": 50,
-        "run": {
-            "cpu max ms": 20.0,
-            "gpu max ms": 20.0
-        }
+        "report intervall": 50
     }
 }

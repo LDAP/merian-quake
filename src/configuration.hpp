@@ -3,7 +3,7 @@
 #include "merian/utils/properties_json_dump.hpp"
 #include "merian/utils/properties_json_load.hpp"
 
-#include "processing_graph.hpp"
+#include "merian-nodes/graph/graph.hpp"
 
 static const char* CONFIG_NAME = "merian-quake.json";
 static const char* FALLBACK_CONFIG_NAME = "default_config.json";
@@ -12,7 +12,7 @@ static const char* CONFIG_PATH_ENV_VAR = "MERIAN_QUAKE_CONFIG_PATH";
 
 class ConfigurationManager {
   public:
-    ConfigurationManager(ProcessingGraph& graph, merian::FileLoader& loader)
+    ConfigurationManager(merian_nodes::Graph<>& graph, merian::FileLoader& loader)
         : graph(graph), loader(loader) {}
 
     void load() {
@@ -28,17 +28,17 @@ class ConfigurationManager {
         }
 
         auto load = merian::JSONLoadProperties(std::filesystem::path(config_path));
-        graph.get().properties(load);
+        graph.properties(load);
     }
     void store() {
         auto dump = merian::JSONDumpProperties(CONFIG_NAME);
-        graph.get().properties(dump);
+        graph.properties(dump);
     }
     void get(merian::Properties& config) {
-        graph.get().properties(config);
+        graph.properties(config);
     }
 
   private:
-    ProcessingGraph& graph;
+    merian_nodes::Graph<>& graph;
     merian::FileLoader& loader;
 };

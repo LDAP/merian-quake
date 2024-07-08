@@ -2,11 +2,10 @@
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 
 #include "merian-nodes/graph/graph.hpp"
-#include "merian-nodes/graph/node.hpp"
 #include "merian/io/file_loader.hpp"
-#include "merian/utils/properties_imgui.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
+#include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
@@ -19,7 +18,10 @@
 #include <merian/vk/window/imgui_context.hpp>
 
 #include "configuration.hpp"
-#include "processing_graph.hpp"
+
+#include "game/quake_node.hpp"
+#include "hud/hud.hpp"
+#include "render_mc/render_markovchain.hpp"
 
 std::atomic_bool stop(false);
 ImFont* quake_font_sm;
@@ -128,7 +130,6 @@ static void signal_handler(int signal) {
 
 int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::trace);
-    merian::FileLoader loader{{"./res", "../res", MERIAN_QUAKE_RESOURCES}};
 
     std::shared_ptr<merian::ExtensionVkGLFW> extGLFW;
     auto resources = std::make_shared<merian::ExtensionResources>();
@@ -137,7 +138,7 @@ int main(const int argc, const char** argv) {
     std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
-    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
+    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
     extensions.push_back(debug_utils);
 #endif
 
@@ -150,29 +151,52 @@ int main(const int argc, const char** argv) {
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
-    std::shared_ptr<merian::InputController> controller;
-    std::shared_ptr<merian_nodes::GLFWWindow> output;
-    if (extGLFW) {
-        output = std::make_shared<merian_nodes::GLFWWindow>(context);
+    context->loader.add_search_path("./res");
+    context->loader.add_search_path("../res");
+    context->loader.add_search_path(MERIAN_QUAKE_RESOURCES);
+
+    merian_nodes::Graph<> graph(context, alloc);
+
+    graph.get_registry().register_node<QuakeNode>(merian_nodes::NodeRegistry::NodeInfo{
+        "Quake", "Extract geometry info from Quake",
+        [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
+    graph.get_registry().register_node<merian::QuakeHud>(merian_nodes::NodeRegistry::NodeInfo{
+        "Hud", "Show gamestate and apply screen effects.",
+        [=]() { return std::make_shared<merian::QuakeHud>(context); }});
+    graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
+        "Renderer (Markov Chain Raytracer)", "Renders a scene using Markov Chain Path Guiding.",
+        [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
+
+    // this also creates all nodes in the graph.
+    ConfigurationManager config_manager(graph, context->loader);
+    config_manager.load();
+
+    std::shared_ptr<merian_nodes::GLFWWindow> output =
+        std::dynamic_pointer_cast<merian_nodes::GLFWWindow>(graph.get_node_for_name("output"));
+    std::shared_ptr<QuakeNode> quake =
+        std::dynamic_pointer_cast<QuakeNode>(graph.get_node_for_name("Quake 0"));
+
+    merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
+    if (output && quake) {
         controller = std::make_shared<merian::GLFWInputController>(output->get_window());
-    } else {
-        controller = std::make_shared<merian::DummyInputController>();
+        quake->set_controller(controller);
     }
 
-    ProcessingGraph graph(argc, argv, context, alloc, loader, controller);
-    ConfigurationManager config_manager(graph, loader);
+    // TODO!
+    // image_writer->set_callback([accum]() { accum->request_clear(); });
+    // image_writer_volume->set_callback([volume_accum]() { volume_accum->request_clear(); });
+
     merian::ImGuiProperties config;
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
-    quake_font_sm =
-        io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 26);
-    quake_font_lg =
-        io.Fonts->AddFontFromFileTTF(loader.find_file("dpquake.ttf")->string().c_str(), 46);
+    quake_font_sm = io.Fonts->AddFontFromFileTTF(
+        context->loader.find_file("dpquake.ttf")->string().c_str(), 26);
+    quake_font_lg = io.Fonts->AddFontFromFileTTF(
+        context->loader.find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
-        graph.add_beauty_output("output", output, "src");
         output->set_on_blit_completed(
             [&](const vk::CommandBuffer& cmd, merian::SwapchainAcquireResult& aquire_result) {
                 imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
@@ -196,14 +220,12 @@ int main(const int argc, const char** argv) {
             });
     }
 
-    config_manager.load();
-
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
     while (!(stop || (output && output->get_window()->should_close()))) {
         glfwPollEvents();
-        graph.get().run();
+        graph.run();
     }
 
     config_manager.store();

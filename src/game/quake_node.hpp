@@ -13,6 +13,7 @@
 
 #include "config.h"
 #include "merian/utils/input_controller.hpp"
+#include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/string.hpp"
 
 #include <queue>
@@ -120,11 +121,12 @@ class QuakeNode : public merian_nodes::Node {
   public:
     QuakeNode(const merian::SharedContext& context,
               const merian::ResourceAllocatorHandle allocator,
-              const std::shared_ptr<merian::InputController>& controller,
               const int quakespasm_argc,
               const char** quakespasm_argv);
 
     ~QuakeNode();
+
+    void set_controller(const merian::InputControllerHandle& controller);
 
     std::vector<merian_nodes::OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input);
@@ -206,7 +208,8 @@ class QuakeNode : public merian_nodes::Node {
     uint64_t last_worldspawn_frame = 0;
 
     // Input processing
-    const std::shared_ptr<merian::InputController> controller;
+    std::shared_ptr<merian::InputController> controller =
+        std::make_shared<merian::DummyInputController>();
     double mouse_oldx = 0;
     double mouse_oldy = 0;
     double mouse_x = 0;

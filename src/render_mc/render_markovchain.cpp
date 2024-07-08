@@ -23,7 +23,7 @@
 
 RendererMarkovChain::RendererMarkovChain(const merian::SharedContext& context,
                                          const merian::ResourceAllocatorHandle& allocator)
-    : Node("MarkovChain Renderer"), context(context), allocator(allocator) {
+    : Node(), context(context), allocator(allocator) {
 
     // PIPELINE CREATION
     rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(),
