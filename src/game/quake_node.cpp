@@ -600,6 +600,8 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
 }
 
 void QuakeNode::set_controller(const merian::InputControllerHandle& controller) {
+    this->controller = controller;
+
     // clang-format off
     controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
         static const std::map<int, int> keymap = {
