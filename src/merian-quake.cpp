@@ -138,7 +138,7 @@ int main(const int argc, const char** argv) {
     std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
-    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
     extensions.push_back(debug_utils);
 #endif
 
