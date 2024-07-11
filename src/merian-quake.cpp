@@ -172,9 +172,9 @@ int main(const int argc, const char** argv) {
     config_manager.load();
 
     std::shared_ptr<merian_nodes::GLFWWindow> output =
-        std::dynamic_pointer_cast<merian_nodes::GLFWWindow>(graph.get_node_for_name("output"));
+        std::dynamic_pointer_cast<merian_nodes::GLFWWindow>(graph.get_node_for_identifier("output"));
     std::shared_ptr<QuakeNode> quake =
-        std::dynamic_pointer_cast<QuakeNode>(graph.get_node_for_name("Quake 0"));
+        std::dynamic_pointer_cast<QuakeNode>(graph.get_node_for_identifier("Quake 0"));
 
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
     if (output && quake) {
