@@ -113,10 +113,10 @@ class RendererMarkovChain : public merian_nodes::Node {
     int32_t spp = 1;
     int32_t volume_spp = 0;
     int32_t max_path_length = 3;
-    int32_t use_light_cache_tail = 0;
+    VkBool32 use_light_cache_tail = false;
     int32_t adaptive_sampling = 0;
 
-    int32_t volume_use_light_cache = 0;
+    VkBool32 volume_use_light_cache = 0;
     float volume_particle_size_um = 25.0;
     float volume_max_t = 1000.;
 
@@ -126,7 +126,7 @@ class RendererMarkovChain : public merian_nodes::Node {
     float mc_samples_adaptive_prob = 0.7;
     int32_t distance_mc_samples = 3;
 
-    int32_t mc_fast_recovery = 1;
+    VkBool32 mc_fast_recovery = true;
 
     float light_cache_levels = 32.0;
     float light_cache_tan_alpha_half = 0.002;

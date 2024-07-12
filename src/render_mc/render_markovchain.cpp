@@ -304,15 +304,15 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Properties& config) {
     const int32_t old_spp = spp;
     const int32_t old_max_path_lenght = max_path_length;
-    const int32_t old_use_light_cache_tail = use_light_cache_tail;
+    const VkBool32 old_use_light_cache_tail = use_light_cache_tail;
     const int32_t old_adaptive_sampling = adaptive_sampling;
     const int32_t old_volume_spp = volume_spp;
-    const int32_t old_volume_use_light_cache = volume_use_light_cache;
+    const VkBool32 old_volume_use_light_cache = volume_use_light_cache;
     const float old_volume_particle_size_um = volume_particle_size_um;
     const int32_t old_mc_samples = mc_samples;
     const int32_t old_distance_mc_samples = distance_mc_samples;
     const float old_mc_samples_adaptive_prob = mc_samples_adaptive_prob;
-    const int32_t old_mc_fast_recovery = mc_fast_recovery;
+    const VkBool32 old_mc_fast_recovery = mc_fast_recovery;
     const float old_light_cache_levels = light_cache_levels;
     const float old_light_cache_tan_alpha_half = light_cache_tan_alpha_half;
     const uint32_t old_mc_adaptive_buffer_size = mc_adaptive_buffer_size;

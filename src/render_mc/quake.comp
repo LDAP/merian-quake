@@ -153,7 +153,7 @@ void main() {
                 const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), wo, vec2(current_hit.roughness)) * wodotn);
                 
                 current_throughput *= microfacet_bsdf;
-                if (USE_LIGHT_CACHE_TAIL == 1) {
+                if (USE_LIGHT_CACHE_TAIL) {
                     f = current_throughput * (segment < MAX_PATH_LENGTH - 1 ? incident : lc_incident);
                 } else {
                     f = current_throughput * incident;
@@ -168,11 +168,12 @@ void main() {
                     if (!isinf(mc_f)) {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
 
-                        if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
+                        if (XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES) {
+                            // == XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)
                             mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                             mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                             mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                        } else if (MC_FAST_RECOVERY > 0 && mc_f < 1e-12 * mc_state.sum_w) {
+                        } else if (MC_FAST_RECOVERY && mc_f < 1e-12 * mc_state.sum_w) {
                             // fix slow recovery after light source disappears
                             mc_state = mc_state_new(current_hit.pos, current_hit.normal);
                             mc_static_save(mc_state, current_hit.pos, current_hit.normal);
