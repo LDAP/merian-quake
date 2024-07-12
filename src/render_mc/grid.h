@@ -3,6 +3,7 @@
 struct MCState {
     vec3 w_tgt;
     float sum_w;
+    float sum_w_sq;
     uint N;
     float w_cos;
 

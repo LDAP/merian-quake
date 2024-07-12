@@ -92,6 +92,7 @@ void main() {
                 MCState mc_state;
                 // SAMPLE NEXT OUTGOING DIRECTION
                 float score_sum = 0;
+                float weight_sum = 0;
                 {
                     float scores[MC_SAMPLES];
                     vec4 vmfs[MC_SAMPLES];
@@ -105,7 +106,8 @@ void main() {
                                 mc_static_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
                             }
 
-                            scores[i] = state.sum_w;
+                            weight_sum += state.sum_w;
+                            scores[i] = max(state.sum_w - max(state.sum_w_sq - state.sum_w * state.sum_w, 0), 0.);
                             score_sum += scores[i];
                             vmfs[i] = mc_state_get_vmf(state, current_hit.pos);
                             if (XorShift32(rng_state) < scores[i] / score_sum) {
@@ -168,8 +170,8 @@ void main() {
                     if (!isinf(mc_f)) {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
 
-                        if (XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES) {
-                            // == XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)
+                        if (XorShift32(rng_state) * weight_sum < mc_f * MC_SAMPLES) {
+                            // == XorShift32(rng_state) < mc_f / (weight_sum / MC_SAMPLES)
                             mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                             mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                             mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
