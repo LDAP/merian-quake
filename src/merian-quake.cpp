@@ -172,12 +172,13 @@ int main(const int argc, const char** argv) {
     config_manager.load();
 
     std::shared_ptr<merian_nodes::GLFWWindow> output =
-        std::dynamic_pointer_cast<merian_nodes::GLFWWindow>(graph.get_node_for_identifier("output"));
+        std::dynamic_pointer_cast<merian_nodes::GLFWWindow>(
+            graph.get_node_for_identifier("output"));
     std::shared_ptr<QuakeNode> quake =
         std::dynamic_pointer_cast<QuakeNode>(graph.get_node_for_identifier("Quake 0"));
 
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
-    if (output && quake) {
+    if (output && quake && output->get_window()) {
         controller = std::make_shared<merian::GLFWInputController>(output->get_window());
         quake->set_controller(controller);
     }
@@ -223,7 +224,7 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    while (!(stop || (output && output->get_window()->should_close()))) {
+    while (!(stop || (output && output->get_window() && output->get_window()->should_close()))) {
         glfwPollEvents();
         graph.run();
     }

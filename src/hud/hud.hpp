@@ -28,18 +28,22 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     std::vector<merian_nodes::OutputConnectorHandle>
     describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
 
-    SpecializationInfoHandle get_specialization_info() const noexcept override;
+    SpecializationInfoHandle get_specialization_info(
+        [[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept override;
 
-    const void* get_push_constant(merian_nodes::GraphRun& run) override;
+    const void* get_push_constant(merian_nodes::GraphRun& run,
+                                  const merian_nodes::NodeIO& io) override;
 
-    std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
+    std::tuple<uint32_t, uint32_t, uint32_t>
+    get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian_nodes::ManagedVkImageInHandle con_src = merian_nodes::ManagedVkImageIn::compute_read("src");
+    merian_nodes::ManagedVkImageInHandle con_src =
+        merian_nodes::ManagedVkImageIn::compute_read("src");
 
     SpecializationInfoHandle spec_info;
 

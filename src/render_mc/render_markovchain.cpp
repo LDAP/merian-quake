@@ -53,8 +53,8 @@ std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_in
 std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_outputs(
     [[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input) {
 
-    uint32_t render_width = output_for_input[con_resolution]->value().width;
-    uint32_t render_height = output_for_input[con_resolution]->value().height;
+    const uint32_t render_width = output_for_input[con_resolution]->value().width;
+    const uint32_t render_height = output_for_input[con_resolution]->value().height;
 
     con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
