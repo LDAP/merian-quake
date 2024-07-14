@@ -1,3 +1,4 @@
+#include "gbuffer/gbuffer.hpp"
 #include "imgui.h"
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 
@@ -166,6 +167,9 @@ int main(const int argc, const char** argv) {
     graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
         "Renderer (Markov Chain Raytracer)", "Renders a scene using Markov Chain Path Guiding.",
         [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
+    graph.get_registry().register_node<GBuffer>(
+        merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
+                                             [=]() { return std::make_shared<GBuffer>(context); }});
 
     // this also creates all nodes in the graph.
     ConfigurationManager config_manager(graph, context->loader);

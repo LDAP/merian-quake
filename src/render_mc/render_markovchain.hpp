@@ -1,8 +1,8 @@
 #pragma once
 
-#include "merian-nodes/connectors/any_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 #include "merian-nodes/connectors/vk_texture_array_in.hpp"
@@ -10,6 +10,7 @@
 
 #include "merian-nodes/graph/node.hpp"
 
+#include "game/quake_node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
@@ -64,7 +65,8 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
     merian_nodes::ManagedVkBufferInHandle con_prev_gbuf =
         merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuf", 1);
-    merian_nodes::AnyInHandle con_render_info = merian_nodes::AnyIn::create("render_info");
+    merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
+        merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
     merian_nodes::VkTextureArrayInHandle con_textures =
         merian_nodes::VkTextureArrayIn::compute_read("textures");
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
@@ -118,7 +120,6 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     VkBool32 volume_use_light_cache = 0;
     float volume_particle_size_um = 25.0;
-    float volume_max_t = 1000.;
 
     bool dump_mc = false;
 

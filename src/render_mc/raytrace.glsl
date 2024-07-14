@@ -1,3 +1,4 @@
+#include "common/normal_encode.glsl"
 #include "common/transmittance.glsl"
 #include "common/von_mises_fisher.glsl"
 #include "common/cubemap.glsl"

@@ -150,8 +150,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
                                   const vk::CommandBuffer& cmd,
                                   const merian::DescriptorSetHandle& graph_descriptor_set,
                                   const merian_nodes::NodeIO& io) {
-    const QuakeNode::QuakeRenderInfo& render_info =
-        std::any_cast<const QuakeNode::QuakeRenderInfo&>(io[con_render_info]);
+    const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     // (RE-) CREATE PIPELINE
     if (render_info.constant_data_update || !pipe || !clear_pipe || !volume_pipe ||
@@ -176,8 +175,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             mc_fast_recovery, light_cache_levels, light_cache_tan_alpha_half,
             light_cache_buffer_size, mc_adaptive_buffer_size, mc_static_buffer_size,
             mc_adaptive_grid_tan_alpha_half, mc_static_grid_width, mc_adaptive_grid_levels,
-            distance_mc_grid_width, volume_max_t, surf_bsdf_p, volume_phase_p, dir_guide_prior,
-            dist_guide_p, distance_mc_vertex_state_count, seed);
+            distance_mc_grid_width, render_info.constant.volume_max_t, surf_bsdf_p, volume_phase_p,
+            dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed);
 
         auto spec = spec_builder.build();
 
@@ -322,7 +321,6 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const float old_mc_static_grid_width = mc_static_grid_width;
     const float old_distance_mc_grid_width = distance_mc_grid_width;
     const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
-    const float old_volume_max_t = volume_max_t;
     const float old_surf_bsdf_p = surf_bsdf_p;
     const float old_volume_phase_p = volume_phase_p;
     const float old_dir_guide_prior = dir_guide_prior;
@@ -374,7 +372,6 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "number of markov chain states per vertex");
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
-    config.config_float("volume max t", volume_max_t);
     config.config_percent("Phase Prob", volume_phase_p,
                           "the probability to use phase function sampling");
     config.config_bool("volume forward project", volume_forward_project);
@@ -406,8 +403,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
         old_light_cache_tan_alpha_half != light_cache_tan_alpha_half ||
         old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
-        old_mc_adaptive_grid_levels != mc_adaptive_grid_levels ||
-        old_volume_max_t != volume_max_t || old_surf_bsdf_p != surf_bsdf_p ||
+        old_mc_adaptive_grid_levels != mc_adaptive_grid_levels || old_surf_bsdf_p != surf_bsdf_p ||
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
         old_dist_guide_p != dist_guide_p || old_seed != seed ||
         old_randomize_seed != randomize_seed) {

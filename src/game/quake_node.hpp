@@ -3,7 +3,6 @@
 #include "game/quake_helpers.hpp"
 #include "glm/ext/vector_float4.hpp"
 
-#include "merian-nodes/connectors/any_out.hpp"
 #include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian-nodes/connectors/special_static_out.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_out.hpp"
@@ -66,6 +65,7 @@ class QuakeNode : public merian_nodes::Node {
 
         float fov;
         float fov_tan_alpha_half;
+        float volume_max_t = 1000;
     };
 
     struct QuakeRenderInfo {
@@ -181,7 +181,7 @@ class QuakeNode : public merian_nodes::Node {
     // Graph outputs
     // clang-format off
     merian_nodes::SpecialStaticOutHandle<vk::Extent3D> con_resolution;
-    merian_nodes::AnyOutHandle con_render_info = merian_nodes::AnyOut::create("render_info");
+    merian_nodes::PtrOutHandle<QuakeRenderInfo> con_render_info = merian_nodes::PtrOut<QuakeRenderInfo>::create("render_info");
     merian_nodes::VkTextureArrayOutHandle con_textures = merian_nodes::VkTextureArrayOut::create("textures", MAX_GLTEXTURES);
 
     merian_nodes::VkBufferArrayOutHandle con_vtx = merian_nodes::VkBufferArrayOut::create("vtx", MAX_GEOMETRIES);

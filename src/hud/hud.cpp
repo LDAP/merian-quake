@@ -42,7 +42,7 @@ QuakeHud::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input)
 }
 
 SpecializationInfoHandle
-QuakeHud::get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept {
+QuakeHud::get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io) noexcept {
     return spec_info;
 }
 

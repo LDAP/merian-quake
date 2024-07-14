@@ -834,7 +834,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
             run.request_reconnect();
     }
 
-    io[con_render_info] = render_info;
+    io[con_render_info] = std::make_shared<QuakeRenderInfo>(render_info);
     if (render_info.constant_data_update) {
         render_info.constant_data_update = false;
     }
@@ -1032,6 +1032,9 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     if (overwrite_sun) {
         config.config_float3("sun dir", &overwrite_sun_dir.x);
         config.config_float3("sun col", &overwrite_sun_col.x);
+    }
+    if (config.config_float("volume max t", render_info.constant.volume_max_t)) {
+        render_info.constant_data_update = true;
     }
     config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
     if (mu_t_s_overwrite) {
