@@ -8,11 +8,11 @@
 #include "merian-nodes/connectors/vk_texture_array_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
-#include "merian-nodes/nodes/compute_node/compute_node.hpp"
-
 #include "game/quake_node.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/shader/shader_module.hpp"
 
-class GBuffer : public merian_nodes::AbstractCompute {
+class GBuffer : public merian_nodes::Node {
 
   private:
     static constexpr uint32_t local_size_x = 8;
@@ -28,20 +28,22 @@ class GBuffer : public merian_nodes::AbstractCompute {
     std::vector<merian_nodes::OutputConnectorHandle>
     describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
 
-    merian::SpecializationInfoHandle get_specialization_info(
-        [[maybe_unused]] const merian_nodes::NodeIO& io) noexcept override;
-
-    const void* get_push_constant(merian_nodes::GraphRun& run,
-                                  const merian_nodes::NodeIO& io) override;
-
     std::tuple<uint32_t, uint32_t, uint32_t>
-    get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
+    get_group_count(const merian_nodes::NodeIO& io) const noexcept;
 
-    merian::ShaderModuleHandle get_shader_module() override;
+    virtual NodeStatusFlags
+    on_connected(const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
+
+    virtual void process(merian_nodes::GraphRun& run,
+                         const vk::CommandBuffer& cmd,
+                         const merian::DescriptorSetHandle& descriptor_set,
+                         const merian_nodes::NodeIO& io) override;
 
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
+    const merian::SharedContext context;
+
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
     merian_nodes::VkTextureArrayInHandle con_textures =
@@ -65,10 +67,12 @@ class GBuffer : public merian_nodes::AbstractCompute {
     merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
     merian_nodes::ManagedVkBufferOutHandle con_hits;
 
-    merian::SpecializationInfoHandle spec_info;
-
     vk::Extent3D extent;
     merian::ShaderModuleHandle shader;
+
+    merian::DescriptorSetLayoutHandle descriptor_set_layout;
+    merian::PipelineHandle pipe;
+    merian::PipelineHandle clear_pipe;
 
     bool hide_sun = false;
 };

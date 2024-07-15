@@ -8,14 +8,15 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-layout (constant_id = 2) const float FOV_TAN_ALPHA_HALF = 0;
-layout (constant_id = 3) const float SUN_W_X = 0;
-layout (constant_id = 4) const float SUN_W_Y = 0;
-layout (constant_id = 5) const float SUN_W_Z = 0;
-layout (constant_id = 6) const float SUN_COLOR_R = 0;
-layout (constant_id = 7) const float SUN_COLOR_G = 0;
-layout (constant_id = 8) const float SUN_COLOR_B = 0;
-layout (constant_id = 9) const float VOLUME_MAX_T = 1000.;
+layout (constant_id = 2) const bool CLEAR = true;
+layout (constant_id = 3) const float FOV_TAN_ALPHA_HALF = 0;
+layout (constant_id = 4) const float SUN_W_X = 0;
+layout (constant_id = 5) const float SUN_W_Y = 0;
+layout (constant_id = 6) const float SUN_W_Z = 0;
+layout (constant_id = 7) const float SUN_COLOR_R = 0;
+layout (constant_id = 8) const float SUN_COLOR_G = 0;
+layout (constant_id = 9) const float SUN_COLOR_B = 0;
+layout (constant_id = 10) const float VOLUME_MAX_T = 1000.;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"
@@ -72,12 +73,17 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_albedo));
 
-    //rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
-    //moments = vec2(0);
-    //irr = vec3(0);
-
-    Hit first_hit;
-    {
+    if (CLEAR) {
+        if (all(lessThan(pixel, resolution))) {
+            imageStore(img_mv, pixel, vec4(0));
+            imageStore(img_albedo, pixel, vec4(0));
+            imageStore(img_irradiance, pixel, vec4(0));
+            const GBuffer gbuf = {0, 0, vec2(0), 0};
+            gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
+        }
+        return;
+    } else {
+        Hit first_hit;
         const vec2 jitter = vec2(0);/* pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/
 
         first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
