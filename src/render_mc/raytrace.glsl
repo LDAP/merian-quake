@@ -39,8 +39,9 @@ f16vec3 get_sky(const vec3 w) {
             case 4: { side = params.sky_up_dn & 0xffff; st = 0.5 + 0.5 * vec2(-w.y,  w.x) / abs(w.z); break; } // up
             case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5 * vec2(-w.y, -w.x) / abs(w.z); break; } // dn
         }
-        if (side < MAX_GLTEXTURES)
-            emm += f16vec3(texture(img_tex[nonuniformEXT(side)], st).rgb);
+        if (side < MAX_GLTEXTURES) {
+            emm += (exp2(1.5hf * f16vec3(texture(img_tex[nonuniformEXT(side)], st).rgb)) - 1.0hf);
+        }
     }
 
     return emm;
