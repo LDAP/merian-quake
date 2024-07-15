@@ -69,4 +69,6 @@ class GBuffer : public merian_nodes::AbstractCompute {
 
     vk::Extent3D extent;
     merian::ShaderModuleHandle shader;
+
+    bool hide_sun = false;
 };

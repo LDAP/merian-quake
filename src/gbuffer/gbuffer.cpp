@@ -67,9 +67,10 @@ GBuffer::get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io
         spec_builder.add_entry(render_info.constant.sun_direction.y);
         spec_builder.add_entry(render_info.constant.sun_direction.z);
 
-        spec_builder.add_entry(render_info.constant.sun_color.r);
-        spec_builder.add_entry(render_info.constant.sun_color.g);
-        spec_builder.add_entry(render_info.constant.sun_color.b);
+        const glm::vec3 sun_color = hide_sun ? glm::vec3(0) : render_info.constant.sun_color;
+        spec_builder.add_entry(sun_color.r);
+        spec_builder.add_entry(sun_color.g);
+        spec_builder.add_entry(sun_color.b);
 
         spec_builder.add_entry(render_info.constant.volume_max_t);
         spec_info = spec_builder.build();
@@ -93,6 +94,12 @@ merian::ShaderModuleHandle GBuffer::get_shader_module() {
     return shader;
 }
 
-GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& config) {
+GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& props) {
+    bool spec_changed = props.config_bool("hide sun", hide_sun);
+
+    if (spec_changed) {
+        spec_info.reset();
+    }
+
     return {};
 }

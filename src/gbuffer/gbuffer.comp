@@ -85,12 +85,7 @@ void main() {
         f16vec3 incident = f16vec3(0);
         f16vec3 camera_throughput = f16vec3(1);
         trace_ray(camera_throughput, incident, first_hit);
-        // if (MAX_PATH_LENGTH > 0) {
-        //     irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
-        //     const float l = yuv_luminance(irr);
-        //     moments = vec2(l, l * l);
-        // }
-        
+
         first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
 
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
