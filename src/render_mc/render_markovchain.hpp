@@ -57,20 +57,6 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian::ShaderModuleHandle volume_shader;
     merian::ShaderModuleHandle volume_forward_project_shader;
 
-    merian_nodes::ManagedVkImageInHandle con_blue_noise =
-        merian_nodes::ManagedVkImageIn::compute_read("blue_noise", 0);
-    merian_nodes::ManagedVkImageInHandle con_prev_filtered =
-        merian_nodes::ManagedVkImageIn::compute_read("prev_filtered", 1);
-    merian_nodes::ManagedVkImageInHandle con_prev_volume_depth =
-        merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
-    merian_nodes::ManagedVkBufferInHandle con_prev_gbuf =
-        merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuf", 1);
-    merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian_nodes::VkTextureArrayInHandle con_textures =
-        merian_nodes::VkTextureArrayIn::compute_read("textures");
-    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
     merian_nodes::VkBufferArrayInHandle con_vtx =
         merian_nodes::VkBufferArrayIn::compute_read("vtx");
     merian_nodes::VkBufferArrayInHandle con_prev_vtx =
@@ -79,11 +65,25 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::VkBufferArrayIn::compute_read("idx");
     merian_nodes::VkBufferArrayInHandle con_ext =
         merian_nodes::VkBufferArrayIn::compute_read("ext");
+    merian_nodes::ManagedVkBufferInHandle con_gbuffer =
+        merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
+    merian_nodes::ManagedVkBufferInHandle con_hits =
+        merian_nodes::ManagedVkBufferIn::compute_read("hits");
+
+    merian_nodes::VkTextureArrayInHandle con_textures =
+        merian_nodes::VkTextureArrayIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
+    merian_nodes::ManagedVkImageInHandle con_prev_volume_depth =
+        merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
+    merian_nodes::ManagedVkImageInHandle con_mv =
+        merian_nodes::ManagedVkImageIn::transfer_src("mv");
+
+    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
+        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
+    merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
+        merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
-    merian_nodes::ManagedVkImageOutHandle con_albedo;
-    merian_nodes::ManagedVkImageOutHandle con_mv;
     merian_nodes::ManagedVkImageOutHandle con_debug;
     merian_nodes::ManagedVkImageOutHandle con_moments;
     merian_nodes::ManagedVkImageOutHandle con_volume;
@@ -93,7 +93,6 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     merian_nodes::ManagedVkBufferOutHandle con_markovchain;
     merian_nodes::ManagedVkBufferOutHandle con_lightcache;
-    merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
     merian_nodes::ManagedVkBufferOutHandle con_volume_distancemc;
 
     //-----------------------------------------------------

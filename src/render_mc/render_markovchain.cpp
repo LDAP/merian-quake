@@ -43,10 +43,10 @@ RendererMarkovChain::~RendererMarkovChain() {}
 
 std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
     return {
-        con_blue_noise, con_prev_filtered, con_prev_volume_depth,
-        con_prev_gbuf,  con_render_info,   con_textures,
-        con_resolution, con_vtx,           con_prev_vtx,
-        con_idx,        con_ext,           con_tlas,
+        con_vtx,      con_prev_vtx,   con_idx,
+        con_ext,      con_gbuffer,    con_hits,
+        con_textures, con_tlas,       con_prev_volume_depth,
+        con_mv,       con_resolution, con_render_info,
     };
 }
 
@@ -58,12 +58,6 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
 
     con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
-        "albedo", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
-    con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
-                                                            render_width, render_height);
-    con_debug = merian_nodes::ManagedVkImageOut::compute_write(
-        "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
     con_moments = merian_nodes::ManagedVkImageOut::compute_write(
         "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_volume = merian_nodes::ManagedVkImageOut::compute_write(
@@ -72,8 +66,11 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
         "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR32Sfloat, render_width, render_height);
-    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_write(
-        "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height);
+    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_read_write_transfer_dst(
+        "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height, 1,
+        vk::ImageLayout::eTransferDstOptimal);
+    con_debug = merian_nodes::ManagedVkImageOut::compute_write(
+        "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
 
     con_markovchain = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
@@ -95,15 +92,6 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
-    con_gbuffer = std::make_shared<merian_nodes::ManagedVkBufferOut>(
-        "gbuffer", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
-        vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo{{},
-                             render_width * render_height * sizeof(merian_nodes::GBuffer),
-                             vk::BufferUsageFlagBits::eStorageBuffer |
-                                 vk::BufferUsageFlagBits::eTransferDst |
-                                 vk::BufferUsageFlagBits::eTransferSrc});
     con_volume_distancemc = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "volume_distancemc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
@@ -118,20 +106,11 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
         true);
 
     return {
-        con_irradiance,
-        con_albedo,
-        con_mv,
+        con_irradiance,     con_moments,      con_volume,
+        con_volume_moments, con_volume_depth, con_volume_mv,
         con_debug,
-        con_moments,
-        con_volume,
-        con_volume_moments,
-        con_volume_depth,
-        con_volume_mv,
 
-        con_markovchain,
-        con_lightcache,
-        con_gbuffer,
-        con_volume_distancemc,
+        con_markovchain,    con_lightcache,   con_volume_distancemc,
     };
 }
 
@@ -202,7 +181,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         // ZERO markov chains and light cache
         io[con_markovchain]->fill(cmd);
         io[con_lightcache]->fill(cmd);
-        io[con_gbuffer]->fill(cmd);
         io[con_volume_distancemc]->fill(cmd);
 
         std::vector<vk::BufferMemoryBarrier> barriers = {
@@ -210,8 +188,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
                                                 vk::AccessFlagBits::eShaderRead),
             io[con_lightcache]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                vk::AccessFlagBits::eShaderRead),
-            io[con_gbuffer]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                            vk::AccessFlagBits::eShaderRead),
             io[con_volume_distancemc]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                       vk::AccessFlagBits::eShaderRead),
         };
@@ -235,8 +211,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
     // BIND PIPELINE
     {
-        // Surfaces and GBuffer
-
+        // Surfaces
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
         pipe->bind(cmd);
         pipe->bind_descriptor_set(cmd, graph_descriptor_set);
@@ -247,21 +222,37 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
     if (volume_forward_project && volume_spp > 0) {
         // Forward project motion vectors for volumes
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
-        volume_forward_project_pipe->bind(cmd);
-        volume_forward_project_pipe->bind_descriptor_set(cmd, graph_descriptor_set);
-        volume_forward_project_pipe->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
-                     (render_height + local_size_y - 1) / local_size_y, 1);
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy mv for volume");
+            cmd.copyImage(*io[con_mv], vk::ImageLayout::eTransferSrcOptimal, *io[con_volume_mv],
+                          vk::ImageLayout::eTransferDstOptimal,
+                          vk::ImageCopy{merian::first_layer(),
+                                        {},
+                                        merian::first_layer(),
+                                        {},
+                                        io[con_mv]->get_extent()});
+            auto volume_mv_bar = io[con_volume_mv]->barrier(
+                vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
+                vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
+            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                vk::PipelineStageFlagBits::eComputeShader, {}, {}, {},
+                                volume_mv_bar);
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
+            volume_forward_project_pipe->bind(cmd);
+            volume_forward_project_pipe->bind_descriptor_set(cmd, graph_descriptor_set);
+            volume_forward_project_pipe->push_constant(cmd, render_info.uniform);
+            cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                         (render_height + local_size_y - 1) / local_size_y, 1);
+        }
     }
 
     auto volume_mv_bar =
         io[con_volume_mv]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
                                    vk::AccessFlagBits::eShaderRead);
-    auto gbuf_bar = io[con_gbuffer]->buffer_barrier(vk::AccessFlagBits::eMemoryWrite,
-                                                    vk::AccessFlagBits::eMemoryRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, gbuf_bar, volume_mv_bar);
+                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, volume_mv_bar);
     {
         // Volumes
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume");

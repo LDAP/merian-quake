@@ -18,12 +18,7 @@ main() {
   if(any(greaterThanEqual(ipos, imageSize(img_irradiance)))) return;
 
   imageStore(img_irradiance, ipos, vec4(0));
-  imageStore(img_albedo, ipos, vec4(0));
-  imageStore(img_mv, ipos, vec4(0));
   imageStore(img_debug, ipos, vec4(0));
   imageStore(img_volume, ipos, vec4(0));
   imageStore(img_volume_moments, ipos, vec4(0));
-
-  const GBuffer gbuf = {0, 0., vec2(0), 0.};
-  gbuffer[gbuffer_index(ipos, imageSize(img_irradiance))] = gbuf;
 }

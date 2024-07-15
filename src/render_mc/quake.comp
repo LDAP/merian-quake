@@ -35,53 +35,19 @@ void main() {
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     moments = vec2(0);
     irr = vec3(0);
-    f16vec3 camera_throughput = f16vec3(1);
-
-    Hit first_hit;
-    {
-        const vec2 jitter = vec2(0);/* pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/
-
-        first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        first_hit.pos = params.cam_x.xyz;
-        f16vec3 incident = f16vec3(0);
-        trace_ray(camera_throughput, incident, first_hit);
-        if (MAX_PATH_LENGTH > 0) {
-            irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
-            const float l = yuv_luminance(irr);
-            moments = vec2(l, l * l);
-        }
-
-        const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
-
-        // Calculate depth gradient
-        const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        // use geo normal?
-        const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
-        gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
-
-        // Store motion vector
-        const vec3 old_dir = first_hit.prev_pos - params.prev_cam_x.xyz;
-        const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        
-        if (all(lessThan(pixel, resolution))) {
-            imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-            imageStore(img_volume_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-            imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
-            gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
-        }
-    }
 
     if (MAX_SPP > 0) {
-        vec3 indirect = vec3(0);
-        vec2 indirect_moments = vec2(0);
+        Hit current_hit = hits[gbuffer_index(pixel, resolution)];
 
-        // Evaluate indirect light (if light can be transported and the material is not emissive)
-        if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))) && !any(greaterThanEqual(irr, vec3(1e-7))))
+        if (any(greaterThanEqual(current_hit.albedo, f16vec3(1e-7))))
         for (int s = 0; s < MAX_SPP; s++) {
-            Hit current_hit = first_hit;
-            vec3 current_throughput = camera_throughput;
+
+            if (s != 0) {
+                current_hit = hits[gbuffer_index(pixel, resolution)];
+            }
+
+            // Camera throughput encoded in albedo
+            vec3 current_throughput = vec3(1);
             vec3 f = vec3(0);
             float p = 1.0;
 
@@ -195,15 +161,16 @@ void main() {
 
             const vec3 contrib = f / p;
             if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-                indirect += contrib;
+                irr += contrib;
                 const float l = yuv_luminance(contrib);
-                indirect_moments += vec2(l, l * l);
+                moments += vec2(l, l * l);
             }
         }
 
-        irr += indirect / MAX_SPP;
-        moments += indirect_moments / MAX_SPP;
+        irr /= MAX_SPP;
+        moments /= MAX_SPP;
     }
+
     // irr = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
     if (all(lessThan(pixel, resolution))) {

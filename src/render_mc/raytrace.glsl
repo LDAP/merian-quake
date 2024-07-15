@@ -46,18 +46,6 @@ f16vec3 get_sky(const vec3 w) {
     return emm;
 }
 
-struct Hit {
-    vec3 pos;
-    vec3 prev_pos;
-    vec3 wi;
-    vec3 normal;
-    uint enc_geonormal;
-
-    // Material
-    f16vec3 albedo;
-    float16_t roughness;
-};
-
 #define _get_t(ray_query, commited) rayQueryGetIntersectionTEXT(ray_query, commited)
 #define _instance_id(ray_query, commited) rayQueryGetIntersectionInstanceIdEXT(ray_query, commited)
 #define _primitive_index(ray_query, commited) rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, commited)

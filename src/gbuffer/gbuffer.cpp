@@ -6,6 +6,7 @@
 
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
+#include "hit.glsl.h"
 #include "merian-nodes/common/gbuffer.glsl.h"
 
 GBuffer::GBuffer(const merian::SharedContext context)
@@ -30,19 +31,28 @@ GBuffer::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) 
 
     con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
         "albedo", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
+    con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
+        "irradiance", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
     con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
                                                             extent.width, extent.height);
     con_gbuffer = std::make_shared<merian_nodes::ManagedVkBufferOut>(
-        "gbuffer", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        "gbuffer", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
                              extent.width * extent.height * sizeof(merian_nodes::GBuffer),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc});
+    con_hits = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+        "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo{{},
+                             extent.width * extent.height * sizeof(Hit),
+                             vk::BufferUsageFlagBits::eStorageBuffer |
+                                 vk::BufferUsageFlagBits::eTransferDst |
+                                 vk::BufferUsageFlagBits::eTransferSrc});
 
-    return {con_albedo, con_mv, con_gbuffer};
+    return {con_albedo, con_irradiance, con_mv, con_gbuffer, con_hits};
 }
 
 merian::SpecializationInfoHandle

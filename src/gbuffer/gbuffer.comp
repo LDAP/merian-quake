@@ -19,6 +19,7 @@ layout (constant_id = 9) const float VOLUME_MAX_T = 1000.;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"
+#include "../hit.glsl.h"
 
 layout(push_constant) uniform PushConstant { 
     UniformData params;
@@ -53,10 +54,14 @@ layout(set = 0, binding = 5) uniform accelerationStructureEXT tlas;
 
 // GRAPH OUTPUTS
 layout(set = 0, binding = 6) uniform writeonly restrict image2D img_albedo;
-layout(set = 0, binding = 7) uniform writeonly restrict image2D img_mv;
+layout(set = 0, binding = 7) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 8) uniform writeonly restrict image2D img_mv;
 
-layout(set = 0, binding = 8, scalar) buffer writeonly restrict buf_gbuf {
+layout(set = 0, binding = 9, scalar) buffer writeonly restrict buf_gbuf {
     GBuffer gbuffer[];
+};
+layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
+    Hit hits[];
 };
 
 #include "../render_mc/raytrace.glsl"
@@ -70,7 +75,6 @@ void main() {
     //rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     //moments = vec2(0);
     //irr = vec3(0);
-    f16vec3 camera_throughput = f16vec3(1);
 
     Hit first_hit;
     {
@@ -79,12 +83,15 @@ void main() {
         first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
+        f16vec3 camera_throughput = f16vec3(1);
         trace_ray(camera_throughput, incident, first_hit);
         // if (MAX_PATH_LENGTH > 0) {
         //     irr = incident / mix(f16vec3(1.), first_hit.albedo.rgb, greaterThan(first_hit.albedo.rgb, f16vec3(1e-4)));
         //     const float l = yuv_luminance(irr);
         //     moments = vec2(l, l * l);
         // }
+        
+        first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
 
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
@@ -103,7 +110,9 @@ void main() {
         if (all(lessThan(pixel, resolution))) {
             imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
             imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
+            imageStore(img_irradiance, pixel, vec4(incident, 1));
             gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
+            hits[gbuffer_index(pixel, resolution)] = first_hit;
         }
     }
 }

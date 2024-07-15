@@ -59,9 +59,11 @@ class GBuffer : public merian_nodes::AbstractCompute {
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
 
     merian_nodes::ManagedVkImageOutHandle con_albedo;
+    merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_mv;
 
     merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
+    merian_nodes::ManagedVkBufferOutHandle con_hits;
 
     merian::SpecializationInfoHandle spec_info;
 
