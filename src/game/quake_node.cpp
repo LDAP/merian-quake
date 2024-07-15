@@ -783,8 +783,10 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         AngleVectors(r_refdef.viewangles, &render_info.uniform.cam_w.x, rgt,
                      &render_info.uniform.cam_u.x);
         render_info.uniform.cam_x_mu_t = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
-        render_info.uniform.sky.fill(0);
-        if (skybox_name[0]) {
+        render_info.uniform.sky.fill(notexture->texnum);
+        if (!render_info.render) {
+            render_info.uniform.sky.fill(notexture->texnum);
+        } else if (skybox_name[0]) {
             for (int i = 0; i < 6; i++)
                 render_info.uniform.sky[i] = skybox_textures[i]->texnum;
         } else if (solidskytexture) {
