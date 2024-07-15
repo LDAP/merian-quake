@@ -27,6 +27,7 @@ struct QuakeData {
     // updated in parse_worldspawn
     glm::vec3 current_sun_color{};
     glm::vec3 current_sun_direction{};
+    std::string skyname{};
 };
 // Quake uses lots of static global variables,
 // so we need to do that to
@@ -291,6 +292,10 @@ void parse_worldspawn() {
         AngleVectors(angles, &quake_sun_dir.x, right, up);
     } else {
         quake_sun_dir = glm::vec3(1, 1, 1);
+    }
+
+    if (worldspawn_props.contains("sky")) {
+        quake_data.skyname = worldspawn_props["sky"];
     }
 
     // Some patches for maps
@@ -688,10 +693,12 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap&
 
 void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
     for (const auto& [texnum, tex] : pending_uploads) {
+        vk::Filter filter = tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest;
+        if (tex.name.find(quake_data.skyname) != tex.name.npos) {
+            filter = vk::Filter::eLinear;
+        }
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
-            cmd, tex.cpu_tex.data(), tex.width, tex.height,
-            tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest, !tex.linear,
-            tex.name);
+            cmd, tex.cpu_tex.data(), tex.width, tex.height, filter, !tex.linear, tex.name);
         io[con_textures].set(texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
                              vk::PipelineStageFlagBits2::eTransfer);
     }
