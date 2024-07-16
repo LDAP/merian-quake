@@ -40,7 +40,7 @@ GBuffer::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) 
         "gbuffer", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
-                             extent.width * extent.height * sizeof(merian_nodes::GBuffer),
+                             gbuffer_size_bytes(extent.width, extent.height),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc});
@@ -48,7 +48,7 @@ GBuffer::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) 
         "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
-                             extent.width * extent.height * sizeof(Hit),
+                             gbuffer_size(extent.width, extent.height) * sizeof(Hit),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc});
