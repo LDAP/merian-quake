@@ -73,14 +73,17 @@ void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);
     const ivec2 resolution = ivec2(imageSize(img_albedo));
 
+    if (any(greaterThanEqual(pixel, resolution))) {
+        return;
+    }
+
     if (CLEAR) {
-        if (all(lessThan(pixel, resolution))) {
-            imageStore(img_mv, pixel, vec4(0));
-            imageStore(img_albedo, pixel, vec4(0));
-            imageStore(img_irradiance, pixel, vec4(0));
-            const GBuffer gbuf = {0, 0, vec2(0), 0};
-            gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
-        }
+        imageStore(img_mv, pixel, vec4(0));
+        imageStore(img_albedo, pixel, vec4(0));
+        imageStore(img_irradiance, pixel, vec4(0));
+        const GBuffer gbuf = {0, 0, vec2(0), 0};
+        gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
+
         return;
     } else {
         Hit first_hit;
@@ -91,8 +94,12 @@ void main() {
         f16vec3 incident = f16vec3(0);
         f16vec3 camera_throughput = f16vec3(1);
         trace_ray(camera_throughput, incident, first_hit);
+        imageStore(img_irradiance, pixel, vec4(incident, 1));
 
         first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
+
+        imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
+        hits[gbuffer_index(pixel, resolution)] = first_hit;
 
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
@@ -103,17 +110,11 @@ void main() {
         // use geo normal?
         const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
         gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
+        gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
 
         // Store motion vector
         const vec3 old_dir = first_hit.prev_pos - params.prev_cam_x.xyz;
         const vec2 old_pixel = get_camera_pixel(old_dir, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        
-        if (all(lessThan(pixel, resolution))) {
-            imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
-            imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
-            imageStore(img_irradiance, pixel, vec4(incident, 1));
-            gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
-            hits[gbuffer_index(pixel, resolution)] = first_hit;
-        }
+        imageStore(img_mv, pixel, vec4(old_pixel - pixel, 0, 0));
     }
 }

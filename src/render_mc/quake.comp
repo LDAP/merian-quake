@@ -28,10 +28,10 @@ vec3 irr;
 #include "mc.glsl"
 #include "raytrace.glsl"
 
-void main() {
-    const ivec2 pixel = ivec2(gl_GlobalInvocationID);
-    const ivec2 resolution = ivec2(imageSize(img_irradiance));
+#define pixel ivec2(gl_GlobalInvocationID)
+#define resolution ivec2(imageSize(img_irradiance))
 
+void main() {
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     moments = vec2(0);
     irr = vec3(0);
