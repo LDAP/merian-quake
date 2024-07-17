@@ -119,7 +119,7 @@ class QuakeNode : public merian_nodes::Node {
     };
 
   public:
-    QuakeNode(const merian::SharedContext& context,
+    QuakeNode(const merian::ContextHandle& context,
               const merian::ResourceAllocatorHandle allocator,
               const int quakespasm_argc,
               const char** quakespasm_argv);
@@ -175,7 +175,7 @@ class QuakeNode : public merian_nodes::Node {
     void update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
 
   private:
-    const merian::SharedContext context;
+    const merian::ContextHandle context;
     const merian::ResourceAllocatorHandle allocator;
 
     // Graph outputs

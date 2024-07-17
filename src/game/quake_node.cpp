@@ -434,7 +434,7 @@ QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& all
     return geo;
 }
 
-QuakeNode::QuakeNode([[maybe_unused]] const merian::SharedContext& context,
+QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
                      const merian::ResourceAllocatorHandle allocator,
                      const int quakespasm_argc,
                      const char** quakespasm_argv)

@@ -21,7 +21,7 @@
 // QuakeNode
 // --------------------------------------------------------------------------------------
 
-RendererMarkovChain::RendererMarkovChain(const merian::SharedContext& context,
+RendererMarkovChain::RendererMarkovChain(const merian::ContextHandle& context,
                                          const merian::ResourceAllocatorHandle& allocator)
     : Node(), context(context), allocator(allocator) {
 

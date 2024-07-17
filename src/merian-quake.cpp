@@ -148,7 +148,7 @@ int main(const int argc, const char** argv) {
         extensions.push_back(extGLFW);
     }
 
-    merian::SharedContext context = merian::Context::make_context(extensions, "Quake");
+    merian::ContextHandle context = merian::Context::create(extensions, "Quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 

@@ -19,7 +19,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     };
 
   public:
-    QuakeHud(const SharedContext context);
+    QuakeHud(const ContextHandle context);
 
     ~QuakeHud();
 

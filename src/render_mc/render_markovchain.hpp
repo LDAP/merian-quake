@@ -26,7 +26,7 @@ class RendererMarkovChain : public merian_nodes::Node {
     };
 
   public:
-    RendererMarkovChain(const merian::SharedContext& context,
+    RendererMarkovChain(const merian::ContextHandle& context,
                         const merian::ResourceAllocatorHandle& allocator);
 
     ~RendererMarkovChain();
@@ -49,7 +49,7 @@ class RendererMarkovChain : public merian_nodes::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
-    const merian::SharedContext context;
+    const merian::ContextHandle context;
     const merian::ResourceAllocatorHandle allocator;
 
     merian::ShaderModuleHandle rt_shader;

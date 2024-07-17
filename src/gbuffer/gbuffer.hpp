@@ -19,7 +19,7 @@ class GBuffer : public merian_nodes::Node {
     static constexpr uint32_t local_size_y = 8;
 
   public:
-    GBuffer(const merian::SharedContext context);
+    GBuffer(const merian::ContextHandle context);
 
     ~GBuffer();
 
@@ -42,7 +42,7 @@ class GBuffer : public merian_nodes::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
-    const merian::SharedContext context;
+    const merian::ContextHandle context;
 
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
