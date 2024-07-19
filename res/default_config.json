@@ -524,6 +524,9 @@
         },
         "gbuf": {
             "disable": false,
+            "properties": {
+                "hide sun": true
+            },
             "type": "GBuffer"
         },
         "hud": {

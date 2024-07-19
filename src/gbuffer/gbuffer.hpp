@@ -74,5 +74,5 @@ class GBuffer : public merian_nodes::Node {
     merian::PipelineHandle pipe;
     merian::PipelineHandle clear_pipe;
 
-    bool hide_sun = false;
+    bool hide_sun = true;
 };
