@@ -26,7 +26,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
 
     std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
+    describe_outputs(const merian_nodes::NodeIOLayout& io_layout) override;
 
     SpecializationInfoHandle
     get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io) noexcept override;

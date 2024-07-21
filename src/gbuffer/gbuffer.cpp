@@ -26,9 +26,9 @@ std::vector<merian_nodes::InputConnectorHandle> GBuffer::describe_inputs() {
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>
-GBuffer::describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) {
-    extent.width = output_for_input[con_resolution]->value().width;
-    extent.height = output_for_input[con_resolution]->value().height;
+GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
+    extent.width = io_layout[con_resolution]->value().width;
+    extent.height = io_layout[con_resolution]->value().height;
 
     con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
         "albedo", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
@@ -73,7 +73,8 @@ GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties
 }
 
 GBuffer::NodeStatusFlags
-GBuffer::on_connected(const merian::DescriptorSetLayoutHandle& descriptor_set_layout) {
+GBuffer::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+                      const merian::DescriptorSetLayoutHandle& descriptor_set_layout) {
     this->descriptor_set_layout = descriptor_set_layout;
     this->pipe.reset();
 

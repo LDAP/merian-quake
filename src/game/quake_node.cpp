@@ -675,7 +675,7 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>
-QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input) {
+QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout) {
     con_resolution = merian_nodes::SpecialStaticOut<vk::Extent3D>::create(
         "resolution",
         vk::Extent3D{static_cast<uint32_t>(vid.width), static_cast<uint32_t>(vid.height), 1});
@@ -699,6 +699,7 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes
 }
 
 QuakeNode::NodeStatusFlags QuakeNode::on_connected(
+    [[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
     [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout) {
     render_info.constant_data_update = true;
     return {};
@@ -1002,19 +1003,19 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.config_bool("gamestate update", update_gamestate);
     update_gamestate |= frame == 0;
 
-    std::array<char, 128> cmd_buffer = {0};
-    if (config.config_text("command", cmd_buffer.size(), cmd_buffer.data(), true)) {
-        queue_command(cmd_buffer.data());
+    std::string cmd;
+    if (config.config_text("command", cmd, true)) {
+        queue_command(cmd);
         if (!update_gamestate) {
             SPDLOG_WARN("command unpaused gamestate update");
             update_gamestate = true;
         }
     }
     bool changed = config.config_text_multiline(
-        "startup commands", startup_commands_buffer.size(), startup_commands_buffer.data(), false,
+        "startup commands", startup_commands, false,
         "multiple commands separated by newline, lines starting with # are ignored");
     if (changed && frame == 0) {
-        merian::split(startup_commands_buffer.data(), "\n", [&](const std::string& cmd) {
+        merian::split(startup_commands, "\n", [&](const std::string& cmd) {
             if (!cmd.starts_with("#"))
                 queue_command(cmd);
         });

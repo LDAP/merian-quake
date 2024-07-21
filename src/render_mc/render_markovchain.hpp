@@ -36,10 +36,11 @@ class RendererMarkovChain : public merian_nodes::Node {
     std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
 
     std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs(const merian_nodes::ConnectorIOMap& output_for_input) override;
+    describe_outputs(const merian_nodes::NodeIOLayout& io_layout) override;
 
     NodeStatusFlags
-    on_connected(const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    on_connected(const merian_nodes::NodeIOLayout& io_layout,
+                 const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(merian_nodes::GraphRun& run,
                  const vk::CommandBuffer& cmd,

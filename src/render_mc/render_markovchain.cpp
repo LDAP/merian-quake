@@ -50,11 +50,11 @@ std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_in
     };
 }
 
-std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_outputs(
-    [[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input) {
+std::vector<merian_nodes::OutputConnectorHandle>
+RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
 
-    const uint32_t render_width = output_for_input[con_resolution]->value().width;
-    const uint32_t render_height = output_for_input[con_resolution]->value().height;
+    const uint32_t render_width = io_layout[con_resolution]->value().width;
+    const uint32_t render_height = io_layout[con_resolution]->value().height;
 
     con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
@@ -115,7 +115,8 @@ std::vector<merian_nodes::OutputConnectorHandle> RendererMarkovChain::describe_o
 }
 
 RendererMarkovChain::NodeStatusFlags
-RendererMarkovChain::on_connected(const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
+RendererMarkovChain::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+                                  const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
     pipe_layout = merian::PipelineLayoutBuilder(context)
                       .add_descriptor_set_layout(graph_desc_set_layout)
                       .add_push_constant<QuakeNode::UniformData>()

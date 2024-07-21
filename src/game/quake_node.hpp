@@ -129,10 +129,11 @@ class QuakeNode : public merian_nodes::Node {
     void set_controller(const merian::InputControllerHandle& controller);
 
     std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const merian_nodes::ConnectorIOMap& output_for_input);
+    describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout);
 
     NodeStatusFlags
-    on_connected([[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout);
+    on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+                 [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout);
 
     NodeStatusFlags pre_process(merian_nodes::GraphRun& run, const merian_nodes::NodeIO& io);
 
@@ -217,7 +218,7 @@ class QuakeNode : public merian_nodes::Node {
     bool raw_mouse_was_enabled = false;
 
     // Quake commands
-    std::array<char, 512> startup_commands_buffer = {0};
+    std::string startup_commands = {0};
     std::queue<std::string> pending_commands;
 
     // Helpers for image generation
