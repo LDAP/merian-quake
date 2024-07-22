@@ -131,7 +131,7 @@ void main() {
                 {
                     // multiply albedo?
                     const float mc_f = yuv_luminance(lc_incident * microfacet_bsdf / wo_p);
-                    if (!isinf(mc_f)) {
+                    if (!isinf(mc_f) && !isnan(mc_f)) {
                         light_cache_update(current_hit.pos, current_hit.normal, lc_incident * bsdf_diffuse_eval(current_hit.albedo) * wodotn / wo_p);
 
                         if (XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES) {
