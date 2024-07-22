@@ -41,6 +41,8 @@ layout (constant_id = 33) const float DIR_GUIDE_PRIOR = 0.2;
 layout (constant_id = 34) const float DIST_GUIDE_P = 0.0;
 layout (constant_id = 35) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
 layout (constant_id = 36) const uint SEED = 0;
+layout (constant_id = 37) const bool DEBUG_OUTPUT_CONNECTED = false;
+layout (constant_id = 38) const int DEBUG_OUTPUT_SELECTOR = 0;
 
 #include "grid.h"
 #include "../scene_info.glsl.h"

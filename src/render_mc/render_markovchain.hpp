@@ -152,4 +152,5 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     uint32_t seed = 0;
     bool randomize_seed = true;
+    int debug_output_selector = 0;
 };

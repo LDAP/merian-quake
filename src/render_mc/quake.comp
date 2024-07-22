@@ -30,6 +30,7 @@ vec3 irr;
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
+#define first_hit hits[gbuffer_index(pixel, resolution)]
 
 void main() {
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
@@ -37,13 +38,13 @@ void main() {
     irr = vec3(0);
 
     if (MAX_SPP > 0) {
-        Hit current_hit = hits[gbuffer_index(pixel, resolution)];
+        Hit current_hit = first_hit;
 
         if (any(greaterThanEqual(current_hit.albedo, f16vec3(1e-7))))
         for (int s = 0; s < MAX_SPP; s++) {
 
             if (s != 0) {
-                current_hit = hits[gbuffer_index(pixel, resolution)];
+                current_hit = first_hit;
             }
 
             // Camera throughput encoded in albedo
@@ -173,38 +174,52 @@ void main() {
 
     // irr = vec3(light_cache_get(first_hit.pos, first_hit.normal));
 
-    if (all(lessThan(pixel, resolution))) {
-        imageStore(img_irradiance, pixel, vec4(irr, 0));
-        imageStore(img_moments, pixel, vec4(moments, 0, 0));
+    if (any(greaterThanEqual(pixel, resolution))) {
+        return;
     }
 
-    // irr = filtered;
-    // if (all(lessThan(pixel, resolution))) {
-    //     imageStore(img_debug, pixel, vec4(SPP) / MAX_SPP);
-    // }
+    imageStore(img_irradiance, pixel, vec4(irr, 0));
+    imageStore(img_moments, pixel, vec4(moments, 0, 0));
 
-    // show light cache
-    
-    
-    // MCState mc_state = mc_state_new();
-    // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
-    // irr = vec3(mc_state.level / float(MC_LEVELS));
 
-    // MCState mc_state = mc_state_new();
-    // mc_state_load_adaptive_resample(mc_state, first_mat.pos, first_mat.normal, rng_state);
-    // irr = vec3(mc_state.sum_w);
-
-    // imageStore(img_debug, pixel, vec4(light_cache_get(first_hit.pos, first_hit.normal), 1));
-
-    // {
-    //     const ivec3 grid_idx = grid_idx_closest(first_mat.pos, GRID_WIDTH);
-    //     uint buf_idx = hash_grid(grid_idx, BUFFER_SIZE);
-    //     imageStore(img_albedo, pixel, XorShift32Vec4(buf_idx));
-    // }
-
-    // {
-    //     MCState mc_state = mc_state_load_adaptive(first_mat.pos, rng_state);
-    //     const vec4 vmf = mc_state_get_vmf(mc_state, first_mat.pos);
-    //     imageStore(img_albedo, pixel, vec4(mc_state.f));
-    // }
+    if (DEBUG_OUTPUT_CONNECTED) {
+        switch(DEBUG_OUTPUT_SELECTOR) {
+            case 0: {
+                // -- show light cache -- 
+                imageStore(img_debug, pixel, vec4(light_cache_get(first_hit.pos, first_hit.normal) * vec3(5), 1));
+                break;
+            }
+            case 1: {
+                // -- MC learned irradiance --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w * 0.1), 1));
+                break;
+            }
+            case 2: {
+                // -- MC learned directions --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(vec3(mc_state_get_vmf(mc_state, first_hit.pos)), 1));
+                break;
+            }
+            case 3: {
+                // -- MC grid --
+                const uint level = clamp(mc_adaptive_level_for_pos(first_hit.pos), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
+                uint seed = hash_grid(mc_adpative_grid_idx_for_level_closest(level, first_hit.pos), 256 * 256 * 256);
+                imageStore(img_debug, pixel, vec4(vec3(XorShift32Vec4(seed)), 1));
+                break;
+            }
+            case 4: {
+                // -- irradiance --
+                imageStore(img_debug, pixel, vec4(irr, 1));
+                break;
+            }
+            case 5: {
+                // -- moments --
+                imageStore(img_debug, pixel, vec4(moments, 0, 1));
+                break;
+            }
+        }
+    }
 }

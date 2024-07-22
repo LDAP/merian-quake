@@ -156,7 +156,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             light_cache_buffer_size, mc_adaptive_buffer_size, mc_static_buffer_size,
             mc_adaptive_grid_tan_alpha_half, mc_static_grid_width, mc_adaptive_grid_levels,
             distance_mc_grid_width, render_info.constant.volume_max_t, surf_bsdf_p, volume_phase_p,
-            dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed);
+            dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed,
+            io.is_connected(con_debug), debug_output_selector);
 
         auto spec = spec_builder.build();
 
@@ -320,6 +321,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const uint32_t old_distance_mc_vertex_state_count = distance_mc_vertex_state_count;
     const uint32_t old_seed = seed;
     const bool old_randomize_seed = randomize_seed;
+    const int old_debug_output_selector = debug_output_selector;
 
     config.st_separate("General");
     config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
@@ -380,6 +382,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "Size of buffer backing the hash grid");
 
     config.st_separate("Debug");
+    config.config_options("debug output", debug_output_selector,
+                          {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments"});
 
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
@@ -398,7 +402,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_mc_adaptive_grid_levels != mc_adaptive_grid_levels || old_surf_bsdf_p != surf_bsdf_p ||
         old_volume_phase_p != volume_phase_p || old_dir_guide_prior != dir_guide_prior ||
         old_dist_guide_p != dist_guide_p || old_seed != seed ||
-        old_randomize_seed != randomize_seed) {
+        old_randomize_seed != randomize_seed ||
+        old_debug_output_selector != debug_output_selector) {
         pipe.reset();
     }
 
