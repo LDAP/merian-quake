@@ -152,9 +152,9 @@ int main(const int argc, const char** argv) {
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
-    context->loader.add_search_path("./res");
-    context->loader.add_search_path("../res");
-    context->loader.add_search_path(MERIAN_QUAKE_RESOURCES);
+    context->file_loader.add_search_path("./res");
+    context->file_loader.add_search_path("../res");
+    context->file_loader.add_search_path(MERIAN_QUAKE_RESOURCES);
 
     merian_nodes::Graph<> graph(context, alloc);
 
@@ -172,7 +172,7 @@ int main(const int argc, const char** argv) {
                                              [=]() { return std::make_shared<GBuffer>(context); }});
 
     // this also creates all nodes in the graph.
-    ConfigurationManager config_manager(graph, context->loader);
+    ConfigurationManager config_manager(graph, context->file_loader);
     config_manager.load();
 
     std::shared_ptr<merian_nodes::GLFWWindow> output =
@@ -196,9 +196,9 @@ int main(const int argc, const char** argv) {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
     quake_font_sm = io.Fonts->AddFontFromFileTTF(
-        context->loader.find_file("dpquake.ttf")->string().c_str(), 26);
+        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 26);
     quake_font_lg = io.Fonts->AddFontFromFileTTF(
-        context->loader.find_file("dpquake.ttf")->string().c_str(), 46);
+        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed(
