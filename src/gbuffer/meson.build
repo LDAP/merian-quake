@@ -1,5 +1,6 @@
 shaders = [
     'gbuffer.comp',
+    'gbuffer.frag',
 ]
 included_files = files(
     # Not working currently..

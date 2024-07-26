@@ -10,6 +10,8 @@
 
 #include "game/quake_node.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/renderpass/framebuffer.hpp"
+#include "merian/vk/renderpass/renderpass.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
 class GBuffer : public merian_nodes::Node {
@@ -48,18 +50,18 @@ class GBuffer : public merian_nodes::Node {
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
     merian_nodes::VkTextureArrayInHandle con_textures =
-        merian_nodes::VkTextureArrayIn::compute_read("textures");
+        merian_nodes::VkTextureArrayIn::fragment_read("textures");
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
     merian_nodes::VkBufferArrayInHandle con_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("vtx");
+        merian_nodes::VkBufferArrayIn::fragment_read("vtx");
     merian_nodes::VkBufferArrayInHandle con_prev_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("prev_vtx");
+        merian_nodes::VkBufferArrayIn::fragment_read("prev_vtx");
     merian_nodes::VkBufferArrayInHandle con_idx =
-        merian_nodes::VkBufferArrayIn::compute_read("idx");
+        merian_nodes::VkBufferArrayIn::fragment_read("idx");
     merian_nodes::VkBufferArrayInHandle con_ext =
-        merian_nodes::VkBufferArrayIn::compute_read("ext");
-    merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
+        merian_nodes::VkBufferArrayIn::fragment_read("ext");
+    merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::fragment_read("tlas");
 
     merian_nodes::ManagedVkImageOutHandle con_albedo;
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
@@ -72,8 +74,14 @@ class GBuffer : public merian_nodes::Node {
     merian::ShaderModuleHandle shader;
 
     merian::DescriptorSetLayoutHandle descriptor_set_layout;
-    merian::PipelineHandle pipe;
     merian::PipelineHandle clear_pipe;
+
+    merian::RenderPassHandle renderpass;
+    merian::PipelineHandle gfx_pipeline;
+    merian::FramebufferHandle framebuffer;
+
+    merian::ShaderModuleHandle vertex_shader;
+    merian::ShaderModuleHandle fragment_shader;
 
     bool hide_sun = true;
 };
