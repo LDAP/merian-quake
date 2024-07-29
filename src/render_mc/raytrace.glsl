@@ -6,6 +6,37 @@
 // assert(alpha != 0)
 #define decode_alpha(enc_alpha) (float16_t(alpha - 1) / 14.hf)
 
+// sanitizes mipmapping accross texture borders because:
+// 
+// If the image or sampler object used by an implicit derivative image instruction
+// is not uniform across the quad and quadDivergentImplicitLod is not supported,
+// then the derivative and LOD values are undefined.
+// Implicit derivatives are well-defined when the image and sampler and
+// control flow are uniform across the quad, even if they
+// diverge between different quads.
+// https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#textures-derivative-image-operations
+f16vec4 texture(const uint texnum, const vec2 st) {
+#ifdef FRAGMENT
+    // add the texnum so that a difference results in a gradient > 1.
+    vec2 grad_x = dFdx(st + 2 * texnum);
+    vec2 grad_y = dFdy(st + 2 * texnum);
+    if (any(greaterThan(abs(grad_x), vec2(2)))) {
+        if (any(greaterThan(abs(grad_y), vec2(2)))) {
+            grad_y = vec2(0);
+            grad_x = vec2(0);
+        } else {
+            grad_x = grad_y;
+        }
+    } else if (any(greaterThan(abs(grad_y), vec2(2)))) {
+        grad_y = grad_x;
+    }
+
+    return f16vec4(textureGrad(img_tex[nonuniformEXT(texnum)], st, grad_x, grad_y));
+#else
+    return f16vec4(textureLod(img_tex[nonuniformEXT(texnum)], st, 0));
+#endif
+}
+
 f16vec3 get_sky(const vec3 w) {
     f16vec3 emm = f16vec3(0);
 
@@ -23,8 +54,8 @@ f16vec3 get_sky(const vec3 w) {
         // classic quake sky
         const vec2 st = 0.5 + 1. * vec2(w.x , w.y) / abs(w.z);
         const vec2 t = params.cl_time * vec2(0.12, 0.12);
-        const vec4 bck = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1))], st + 0.5 * t);
-        const vec4 fnt = texture(img_tex[nonuniformEXT(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1))], st + t);
+        const f16vec3 bck = texture(min(params.sky_rt_bk & 0xffff, MAX_GLTEXTURES - 1), st + 0.5 * t).rgb;
+        const f16vec4 fnt = texture(min(params.sky_rt_bk >> 16   , MAX_GLTEXTURES - 1), st + t);
         const vec3 tex = mix(bck.rgb, fnt.rgb, fnt.a);
         emm = 10.0hf * (exp2(3.5hf * f16vec3(tex)) - 1.0hf);
     } else {
@@ -40,7 +71,7 @@ f16vec3 get_sky(const vec3 w) {
             case 5: { side = params.sky_up_dn >> 16   ; st = 0.5 + 0.5 * vec2(-w.y, -w.x) / abs(w.z); break; } // dn
         }
         if (side < MAX_GLTEXTURES)
-            emm += f16vec3(texture(img_tex[nonuniformEXT(side)], st).rgb);
+            emm += f16vec3(texture(side, st).rgb);
     }
 
     return emm;
@@ -181,7 +212,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
 
             if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
-                const vec3 tangent_normal = texture(img_tex[nonuniformEXT(texnum_normal)], st).rgb;
+                const vec3 tangent_normal = textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb;
                 const f16vec2 duv1 = extra_data.st[2] - extra_data.st[0], duv2 = extra_data.st[1] - extra_data.st[0];
                 const float16_t det = duv1.x * duv2.y - duv2.x * duv1.y;
 
@@ -201,7 +232,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
 
             if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
-                hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(texture(img_tex[nonuniformEXT(texnum_gloss)], st).r));
+                hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st, 0).r));
             }
         } else if (flags == MAT_FLAGS_SOLID) {
             hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
@@ -215,20 +246,24 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             //                             geo_decode_normal(extra_data.n2)) * barycentrics(ray_query));
         }
 
-        const f16vec4 albedo_texture = f16vec4(texture(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st));
+#ifdef FRAGMENT
+        const f16vec3 albedo_texture = texture(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1), st).rgb;
+#else
+        const f16vec3 albedo_texture = f16vec3(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0).rgb);
+#endif
 
         // MATERIAL
         if (flags == MAT_FLAGS_WATERFALL) {
-            contribution += throughput * albedo_texture.rgb;
-            hit.albedo = albedo_texture.rgb;
+            contribution += throughput * albedo_texture;
+            hit.albedo = albedo_texture;
         } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
-            hit.albedo = ldr_to_hdr(albedo_texture.rgb);
+            hit.albedo = ldr_to_hdr(albedo_texture);
             contribution += throughput * hit.albedo;
         } else {
             const uint16_t texnum_fb = extra_data.texnum_fb_flags & 0xfffs;
-            hit.albedo = albedo_texture.rgb;
+            hit.albedo = albedo_texture;
             if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
-                const f16vec3 emission = ldr_to_hdr(f16vec3(texture(img_tex[nonuniformEXT(texnum_fb)], st).rgb));
+                const f16vec3 emission = ldr_to_hdr(f16vec3(textureLod(img_tex[nonuniformEXT(texnum_fb)], st, 0).rgb));
                 if (any(greaterThan(emission, f16vec3(0)))) {
                     contribution += throughput * emission;
                     hit.albedo = emission;

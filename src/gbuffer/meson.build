@@ -3,6 +3,7 @@ shaders = [
     'gbuffer.frag',
 ]
 included_files = files(
+    '../render_mc/raytrace.glsl'
     # Not working currently..
     # merian_shaders + 'common/normal_encode.glsl',
     # merian_shaders + 'common/microfacet_sampling.glsl',

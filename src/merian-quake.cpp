@@ -14,6 +14,7 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/extension/extension_vk_ray_query.hpp"
 #include "merian/vk/extension/extension_vk_robustness_2.hpp"
+#include "merian/vk/extension/extension_vk_shader_maximal_reconvergence.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
 #include <csignal>
@@ -137,8 +138,7 @@ int main(const int argc, const char** argv) {
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
-    auto robust2 = std::make_shared<merian::ExtensionVkRobustnessAccess2>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ, robust2};
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
     debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);

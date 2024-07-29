@@ -72,7 +72,7 @@ layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
 
 #include "common/camera.glsl"
 
-void main () {
+void main() {
     const ivec2 pixel = ivec2(gl_FragCoord.xy - .5);
     const ivec2 resolution = ivec2(imageSize(img_albedo));
 
