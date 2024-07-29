@@ -13,6 +13,7 @@
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/extension/extension_vk_ray_query.hpp"
+#include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
 #include <csignal>
@@ -136,7 +137,9 @@ int main(const int argc, const char** argv) {
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ};
+    auto extRTPos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ,
+                                                                  extRTPos};
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
     debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);

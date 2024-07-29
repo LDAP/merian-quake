@@ -862,7 +862,8 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
         RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
         static_geo.emplace_back(
             get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                                vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
         static_geo.back().instance_flags =
             vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise |
             vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
@@ -880,7 +881,8 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
         RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
         static_geo.emplace_back(
             get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace));
+                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+                                vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
         static_geo.back().instance_flags =
             vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
     }
@@ -963,7 +965,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
             RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
             dynamic_geo.emplace_back(
                 get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo,
-                                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild));
+                                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild |
+                                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
             dynamic_geo.back().instance_flags =
                 vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
@@ -973,7 +976,8 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
 void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
     std::shared_ptr<merian_nodes::DeviceASBuilder::TlasBuildInfo> tlas_info =
         std::make_shared<merian_nodes::DeviceASBuilder::TlasBuildInfo>(
-            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
+            vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess);
 
     assert(static_geo.size() + dynamic_geo.size() < MAX_GEOMETRIES);
 

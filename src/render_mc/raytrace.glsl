@@ -160,20 +160,19 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         // NORMALS AND GLOSS
         vec3 du, dv;
         {
-            const uvec3 prim_indexes = buf_idx[nonuniformEXT(instance_id(ray_query))].i[primitive_index(ray_query)];
-            const mat3 verts = mat3(buf_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.x],
-                                    buf_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.y],
-                                    buf_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.z]);
-            hit.pos = verts * barycentrics(ray_query);
+            vec3 verts[3];
+            rayQueryGetIntersectionTriangleVertexPositionsEXT(ray_query, true, verts);
+            hit.pos = mat3(verts[0], verts[1], verts[2]) * barycentrics(ray_query);
             du = verts[2] - verts[0];
             dv = verts[1] - verts[0];
             hit.normal = normalize(cross(du, dv));
             hit.enc_geonormal = geo_encode_normal(hit.normal);
 
-            const mat3 prev_verts = mat3(buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.x],
-                                         buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.y],
-                                         buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.z]);
-            hit.prev_pos = prev_verts * barycentrics(ray_query);
+            const uvec3 prim_indexes = buf_idx[nonuniformEXT(instance_id(ray_query))].i[primitive_index(ray_query)];
+            hit.prev_pos = mat3(buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.x],
+                                buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.y],
+                                buf_prev_vtx[nonuniformEXT(instance_id(ray_query))].v[prim_indexes.z])
+                         * barycentrics(ray_query);
         }
 
         if (extra_data.n1_brush == 0xffffffff) {
