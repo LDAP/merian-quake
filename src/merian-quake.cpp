@@ -138,8 +138,12 @@ int main(const int argc, const char** argv) {
     auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
     auto extRTPos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, extAS, extRQ,
-                                                                  extRTPos};
+    std::vector<std::shared_ptr<merian::Extension>> extensions = {
+        resources,
+        extAS,
+        extRQ,
+        extRTPos,
+    };
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
     debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);

@@ -64,6 +64,7 @@ GBuffer::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const 
 
 GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& props) {
     bool spec_changed = props.config_bool("hide sun", hide_sun);
+    spec_changed |= props.config_bool("enable mipmap", enable_mipmap);
 
     if (spec_changed) {
         pipe.reset();
@@ -112,6 +113,7 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         spec_builder.add_entry(sun_color.b);
 
         spec_builder.add_entry(render_info.constant.volume_max_t);
+        spec_builder.add_entry(enable_mipmap);
 
         pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader, spec_builder.build());
 

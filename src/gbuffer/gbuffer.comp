@@ -18,6 +18,7 @@ layout (constant_id = 7) const float SUN_COLOR_R = 0;
 layout (constant_id = 8) const float SUN_COLOR_G = 0;
 layout (constant_id = 9) const float SUN_COLOR_B = 0;
 layout (constant_id = 10) const float VOLUME_MAX_T = 1000.;
+layout (constant_id = 11) const bool ENABLE_MIPMAP = false;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"
@@ -66,12 +67,14 @@ layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
     Hit hits[];
 };
 
+#include "common/random.glsl"
+#define MERIAN_QUAKE_FIRST_HIT
 #include "../render_mc/raytrace.glsl"
 
 #include "common/camera.glsl"
 
 void main() {
-    const ivec2 pixel = ivec2(gl_GlobalInvocationID);
+    const ivec2 pixel = ivec2(gl_GlobalInvocationID); 
     const ivec2 resolution = ivec2(imageSize(img_albedo));
 
     if (any(greaterThanEqual(pixel, resolution))) {
@@ -90,11 +93,14 @@ void main() {
         Hit first_hit;
         const vec2 jitter = vec2(0);/* pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/
 
+        const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+        const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
+
         first_hit.wi = get_camera_ray_dir(pixel + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
         first_hit.pos = params.cam_x.xyz;
         f16vec3 incident = f16vec3(0);
         f16vec3 camera_throughput = f16vec3(1);
-        trace_ray(camera_throughput, incident, first_hit);
+        trace_ray(camera_throughput, incident, first_hit, r_x - first_hit.wi, r_y - first_hit.wi);
         imageStore(img_irradiance, pixel, vec4(incident, 1));
 
         first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
@@ -106,9 +112,7 @@ void main() {
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
 
         // Calculate depth gradient
-        const vec3 r_x = get_camera_ray_dir(pixel + ivec2(1, 0) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        const vec3 r_y = get_camera_ray_dir(pixel + ivec2(0, 1) + jitter, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        // use geo normal?
+        // use geo normal for depth gradient?
         const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
         gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
         gbuffer[gbuffer_index(pixel, resolution)] = gbuf;

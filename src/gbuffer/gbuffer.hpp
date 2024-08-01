@@ -76,4 +76,5 @@ class GBuffer : public merian_nodes::Node {
     merian::PipelineHandle clear_pipe;
 
     bool hide_sun = true;
+    bool enable_mipmap = true;
 };
