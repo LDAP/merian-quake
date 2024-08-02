@@ -242,6 +242,8 @@ class QuakeNode : public merian_nodes::Node {
     uint32_t texnum_blood = 0;
     uint32_t texnum_explosion = 0;
 
+    int default_filtering = 0;
+
     // Debug overwrites
     bool overwrite_sun = false;
     glm::vec3 overwrite_sun_dir{0, 0, 1};

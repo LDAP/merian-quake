@@ -687,11 +687,18 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& i
 }
 
 void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
+
     for (const auto& [texnum, tex] : pending_uploads) {
+        vk::Filter mag_filter;
+        if (default_filtering == 0) {
+            mag_filter = tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest;
+        } else {
+            mag_filter = tex.flags & TEXPREF_NEAREST ? vk::Filter::eNearest : vk::Filter::eLinear;
+        }
+
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
-            cmd, tex.cpu_tex.data(), tex.width, tex.height,
-            tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest,
-            vk::Filter::eLinear, !tex.linear, tex.name, tex.flags & TEXPREF_MIPMAP);
+            cmd, tex.cpu_tex.data(), tex.width, tex.height, mag_filter, vk::Filter::eLinear,
+            !tex.linear, tex.name, tex.flags & TEXPREF_MIPMAP);
         io[con_textures].set(texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
                              vk::PipelineStageFlagBits2::eTransfer);
     }
@@ -1024,6 +1031,10 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
                 queue_command(cmd);
         });
     }
+
+    config.config_options("filtering", default_filtering, {"nearest", "linear"},
+                          merian::Properties::OptionsStyle::COMBO,
+                          "requires a level reload to show any effect.");
 
     config.st_separate("Reproducibility");
     config.config_int("stop after worldspawn", stop_after_worldspawn,
