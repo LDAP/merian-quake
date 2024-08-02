@@ -1,12 +1,12 @@
 #include "render_markovchain.hpp"
 
-#include "ext/json.hpp"
 #include "game/quake_node.hpp"
 #include "merian-nodes/common/gbuffer.glsl.h"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "nlohmann/json.hpp"
 
 #include "grid.h"
 
@@ -382,8 +382,9 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "Size of buffer backing the hash grid");
 
     config.st_separate("Debug");
-    config.config_options("debug output", debug_output_selector,
-                          {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments"});
+    config.config_options(
+        "debug output", debug_output_selector,
+        {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments"});
 
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");

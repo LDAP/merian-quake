@@ -3,7 +3,6 @@
 *.sublime-workspace
 
 /subprojects/*
-!/subprojects/*.wrap
 !/subprojects/packagefiles
 
 vgcore.*
