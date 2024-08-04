@@ -9,16 +9,16 @@
 #extension GL_KHR_shader_subgroup_ballot            : enable
 #extension GL_KHR_shader_subgroup_arithmetic        : enable
 
-#include "common/camera.glsl"
-#include "common/random.glsl"
-#include "common/normal_encode.glsl"
-#include "common/raytrace.glsl"
-#include "common/phase_isotropic.glsl"
-#include "common/grid.glsl"
-#include "common/colors_yuv.glsl"
-#include "common/hash.glsl"
-#include "common/phase_draine.glsl"
-#include "common/transmittance.glsl"
+#include "merian-shaders/camera.glsl"
+#include "merian-shaders/random.glsl"
+#include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/raytrace.glsl"
+#include "merian-shaders/phase_isotropic.glsl"
+#include "merian-shaders/grid.glsl"
+#include "merian-shaders/colors_yuv.glsl"
+#include "merian-shaders/hash.glsl"
+#include "merian-shaders/phase_draine.glsl"
+#include "merian-shaders/transmittance.glsl"
 
 uint rng_state;
 vec3 irr;

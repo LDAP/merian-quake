@@ -1,5 +1,5 @@
 #include "../config.h"
-#include "merian-nodes/common/gbuffer.glsl.h"
+#include "merian-shaders/gbuffer.glsl.h"
 
 #extension GL_EXT_scalar_block_layout       : require
 #extension GL_EXT_shader_16bit_storage      : enable

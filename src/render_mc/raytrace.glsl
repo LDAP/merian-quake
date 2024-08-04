@@ -1,10 +1,10 @@
-#include "common/normal_encode.glsl"
-#include "common/transmittance.glsl"
-#include "common/von_mises_fisher.glsl"
-#include "common/cubemap.glsl"
-#include "common/linalg.glsl"
-#include "common/ray_differential.glsl"
-#include "common/raytrace.glsl"
+#include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/transmittance.glsl"
+#include "merian-shaders/von_mises_fisher.glsl"
+#include "merian-shaders/cubemap.glsl"
+#include "merian-shaders/linalg.glsl"
+#include "merian-shaders/ray_differential.glsl"
+#include "merian-shaders/raytrace.glsl"
 
 // assert(alpha != 0)
 #define decode_alpha(enc_alpha) (float16_t(alpha - 1) / 14.hf)

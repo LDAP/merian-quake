@@ -9,7 +9,7 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "hit.glsl.h"
-#include "merian-nodes/common/gbuffer.glsl.h"
+#include "merian-shaders/gbuffer.glsl.h"
 
 GBuffer::GBuffer(const merian::ContextHandle context) : context(context) {
     shader = std::make_shared<merian::ShaderModule>(context, merian_gbuffer_comp_spv_size(),

@@ -28,7 +28,9 @@ if get_option('performance_profiling')
 endif
 
 # Dependencies
-merian = dependency('merian', fallback: ['merian', 'merian_dep'])
+merian_subp = subproject('merian')
+merian = merian_subp.get_variable('merian_dep')
+
 quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'], default_options: {'snd_extern': true})
 
 # Shaders
@@ -42,6 +44,8 @@ inc_dirs = [
 project_source_root = meson.project_source_root()
 merian_shaders = project_source_root + '/subprojects/merian/src/merian-nodes'
 merian_include = project_source_root + '/subprojects/merian/src'
+
+shader_generator = merian_subp.get_variable('shader_generator')
 
 subdir('src')
 

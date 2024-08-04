@@ -9,7 +9,7 @@
 #extension GL_KHR_shader_subgroup_ballot            : enable
 #extension GL_KHR_shader_subgroup_arithmetic        : enable
 
-#include "common/camera.glsl"
+#include "merian-shaders/camera.glsl"
 
 #include "../config.h"
 #include "layout.glsl"

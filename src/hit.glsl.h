@@ -1,7 +1,7 @@
 #ifndef _HIT_H_
 #define _HIT_H_
 
-#include "merian-nodes/common/types.glsl.h"
+#include "merian-shaders/types.glsl.h"
 
 struct Hit {
     vec3 pos;

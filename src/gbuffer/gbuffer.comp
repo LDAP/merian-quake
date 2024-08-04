@@ -67,11 +67,11 @@ layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
     Hit hits[];
 };
 
-#include "common/random.glsl"
+#include "merian-shaders/random.glsl"
 #define MERIAN_QUAKE_FIRST_HIT
 #include "../render_mc/raytrace.glsl"
 
-#include "common/camera.glsl"
+#include "merian-shaders/camera.glsl"
 
 void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID); 

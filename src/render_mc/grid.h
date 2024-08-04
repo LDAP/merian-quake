@@ -1,4 +1,4 @@
-#include "merian-nodes/common/types.glsl.h"
+#include "merian-shaders/types.glsl.h"
 
 struct MCState {
     vec3 w_tgt;

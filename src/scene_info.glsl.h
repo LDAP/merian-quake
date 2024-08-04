@@ -1,7 +1,7 @@
 #ifndef _SCENE_INFO_H
 #define _SCENE_INFO_H
 
-#include "merian-nodes/common/gbuffer.glsl.h"
+#include "merian-shaders/gbuffer.glsl.h"
 
 // See quake_node.hpp
 struct VertexExtraData {

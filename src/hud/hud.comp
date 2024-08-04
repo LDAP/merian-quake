@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive  : enable
 #extension GL_EXT_scalar_block_layout   : require
 
-#include "common/gbuffer.glsl.h"
+#include "merian-shaders/gbuffer.glsl.h"
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
