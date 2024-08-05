@@ -29,7 +29,7 @@ vec2 moments;
 #include "light_cache.glsl"
 #include "mc.glsl"
 #include "mc_distance.glsl"
-#include "raytrace.glsl"
+#include "../raytrace.glsl"
 
 void main() {
     const ivec2 pixel = ivec2(gl_GlobalInvocationID);

@@ -1,6 +1,9 @@
 #ifndef _MERIAN_QUAKE_RT_
 #define _MERIAN_QUAKE_RT_
 
+#extension GL_EXT_ray_tracing                       : enable
+#extension GL_EXT_ray_query                         : enable
+
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/transmittance.glsl"
 #include "merian-shaders/von_mises_fisher.glsl"

@@ -69,7 +69,7 @@ layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
 
 #include "merian-shaders/random.glsl"
 #define MERIAN_QUAKE_FIRST_HIT
-#include "../render_mc/raytrace.glsl"
+#include "../raytrace.glsl"
 
 #include "merian-shaders/camera.glsl"
 

@@ -24,6 +24,7 @@
 #include "game/quake_node.hpp"
 #include "hud/hud.hpp"
 #include "render_mc/render_markovchain.hpp"
+#include "render_restir/renderer_restir.hpp"
 
 std::atomic_bool stop(false);
 ImFont* quake_font_sm;
@@ -150,7 +151,7 @@ int main(const int argc, const char** argv) {
     extensions.push_back(debug_utils);
 #endif
 
-    if (argc == 1 || strcmp(argv[1], "--headless")) {
+    if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
         extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
         extensions.push_back(extGLFW);
     }
@@ -174,6 +175,9 @@ int main(const int argc, const char** argv) {
     graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
         "Renderer (Markov Chain Raytracer)", "Renders a scene using Markov Chain Path Guiding.",
         [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
+    graph.get_registry().register_node<RendererRESTIR>(merian_nodes::NodeRegistry::NodeInfo{
+        "Renderer (RESTIR)", "Renders a scene using RESTIR.",
+        [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
     graph.get_registry().register_node<GBuffer>(
         merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
                                              [=]() { return std::make_shared<GBuffer>(context); }});
