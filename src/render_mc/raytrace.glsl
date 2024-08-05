@@ -1,3 +1,6 @@
+#ifndef _MERIAN_QUAKE_RT_
+#define _MERIAN_QUAKE_RT_
+
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/transmittance.glsl"
 #include "merian-shaders/von_mises_fisher.glsl"
@@ -241,3 +244,5 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         }
     }
 }
+
+#endif // _MERIAN_QUAKE_RT_
