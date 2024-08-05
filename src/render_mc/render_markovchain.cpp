@@ -179,7 +179,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     cur_frame.volume_forward_project_pipe = volume_forward_project_pipe;
 
     // RESET MARKOV CHAINS AT ITERATION 0
-    if (run.get_iteration() == 0ul) {
+    if (run.get_iteration() == 0UL) {
         // ZERO markov chains and light cache
         io[con_markovchain]->fill(cmd);
         io[con_lightcache]->fill(cmd);
@@ -312,7 +312,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const float old_mc_adaptive_grid_tan_alpha_half = mc_adaptive_grid_tan_alpha_half;
     const int32_t old_mc_adaptive_grid_levels = mc_adaptive_grid_levels;
     const float old_mc_static_grid_width = mc_static_grid_width;
-    const float old_distance_mc_grid_width = distance_mc_grid_width;
+    const int32_t old_distance_mc_grid_width = distance_mc_grid_width;
     const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
     const float old_surf_bsdf_p = surf_bsdf_p;
     const float old_volume_phase_p = volume_phase_p;
