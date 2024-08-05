@@ -26,15 +26,15 @@ RendererMarkovChain::RendererMarkovChain(const merian::ContextHandle& context,
     : Node(), context(context), allocator(allocator) {
 
     // PIPELINE CREATION
-    rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_comp_spv_size(),
-                                                       merian_quake_comp_spv());
-    clear_shader = std::make_shared<merian::ShaderModule>(context, merian_clear_comp_spv_size(),
-                                                          merian_clear_comp_spv());
-    volume_shader = std::make_shared<merian::ShaderModule>(context, merian_volume_comp_spv_size(),
-                                                           merian_volume_comp_spv());
+    rt_shader = std::make_shared<merian::ShaderModule>(context, merian_quake_quake_comp_spv_size(),
+                                                       merian_quake_quake_comp_spv());
+    clear_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_quake_clear_comp_spv_size(), merian_quake_clear_comp_spv());
+    volume_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_quake_volume_comp_spv_size(), merian_quake_volume_comp_spv());
     volume_forward_project_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_volume_forward_project_comp_spv_size(),
-        merian_volume_forward_project_comp_spv());
+        context, merian_quake_volume_forward_project_comp_spv_size(),
+        merian_quake_volume_forward_project_comp_spv());
 }
 
 RendererMarkovChain::~RendererMarkovChain() {}

@@ -12,8 +12,8 @@
 #include "merian-shaders/gbuffer.glsl.h"
 
 GBuffer::GBuffer(const merian::ContextHandle context) : context(context) {
-    shader = std::make_shared<merian::ShaderModule>(context, merian_gbuffer_comp_spv_size(),
-                                                    merian_gbuffer_comp_spv());
+    shader = std::make_shared<merian::ShaderModule>(context, merian_quake_gbuffer_comp_spv_size(),
+                                                    merian_quake_gbuffer_comp_spv());
 }
 
 GBuffer::~GBuffer() {}

@@ -16,8 +16,8 @@ extern mleaf_t* r_viewleaf;
 namespace merian {
 
 QuakeHud::QuakeHud(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
-    shader =
-        std::make_shared<ShaderModule>(context, merian_hud_comp_spv_size(), merian_hud_comp_spv());
+    shader = std::make_shared<ShaderModule>(context, merian_quake_hud_comp_spv_size(),
+                                            merian_quake_hud_comp_spv());
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
