@@ -46,6 +46,12 @@ merian_shaders = project_source_root + '/subprojects/merian/src/merian-nodes'
 merian_include = project_source_root + '/subprojects/merian/src'
 
 shader_generator = merian_subp.get_variable('shader_generator')
+glslc_args = []
+
+if dependency('vulkan').version().version_compare('>=1.3.290') and host_machine.system() != 'windows'
+    glslc_args += '-DENABLE_RAY_QUERY_POSITION_FETCH'
+    message('Using RAY_QUERY_POSITION_FETCH')
+endif
 
 subdir('src')
 
