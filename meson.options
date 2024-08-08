@@ -1,6 +1,0 @@
-option(
-    'performance_profiling',
-    type: 'boolean',
-    value: false,
-    description: 'Enables profiling'
-)

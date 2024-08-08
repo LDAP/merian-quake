@@ -10,7 +10,6 @@ project(
     ]
 )
 
-add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
 add_project_arguments('-DMERIAN_QUAKE_RESOURCES="@0@"'.format(join_paths(get_option('prefix'), 'res')), language : 'cpp')
 
 # Debug configuration
@@ -21,10 +20,6 @@ endif
 if get_option('buildtype') == 'debug'
   add_project_arguments('-fsanitize=address,undefined', language : 'cpp')
   add_project_link_arguments('-fsanitize=address,undefined', language : 'cpp')
-endif
-
-if get_option('performance_profiling')
-  add_project_arguments('-DMERIAN_PROFILER_ENABLE', language : 'cpp')
 endif
 
 # Dependencies
@@ -48,6 +43,7 @@ merian_include = project_source_root + '/subprojects/merian/src'
 shader_generator = merian_subp.get_variable('shader_generator')
 glslc_args = []
 
+# Extension freezes on Windows (AMD)
 if dependency('vulkan').version().version_compare('>=1.3.290') and host_machine.system() != 'windows'
     glslc_args += '-DENABLE_RAY_QUERY_POSITION_FETCH'
     message('Using RAY_QUERY_POSITION_FETCH')
