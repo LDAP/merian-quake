@@ -86,7 +86,7 @@ void main() {
                 wodotn = dot(wo, current_hit.normal);
 
                 // ray is below geometric surface
-                if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
+                if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
                     break;
 
                 // Multiple importance sampling
