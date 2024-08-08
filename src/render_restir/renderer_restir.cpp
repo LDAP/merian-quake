@@ -1,11 +1,15 @@
 #include "renderer_restir.hpp"
 
+#include "reservoir.glsl.h"
 #include "src/render_restir/clear.comp.spv.h"
 #include "src/render_restir/generate_samples.comp.spv.h"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+
+#include "merian-shaders/gbuffer.glsl.h"
+
 #include <random>
 
 RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
@@ -26,8 +30,8 @@ RendererRESTIR::~RendererRESTIR() {}
 
 std::vector<merian_nodes::InputConnectorHandle> RendererRESTIR::describe_inputs() {
     return {
-        con_vtx,  con_prev_vtx, con_idx,  con_ext,        con_gbuffer,
-        con_hits, con_textures, con_tlas, con_resolution, con_render_info,
+        con_vtx,      con_prev_vtx, con_idx,        con_ext,         con_gbuffer,       con_hits,
+        con_textures, con_tlas,     con_resolution, con_render_info, con_reservoirs_in,
     };
 }
 
@@ -43,11 +47,20 @@ RendererRESTIR::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_debug = merian_nodes::ManagedVkImageOut::compute_write(
         "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
+    con_reservoirs_out = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+        "reservoirs", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo{
+            {},
+            gbuffer_size((unsigned long)render_width, render_height) * sizeof(Reservoir),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
+                vk::BufferUsageFlagBits::eTransferSrc});
 
     return {
         con_irradiance,
         con_moments,
         con_debug,
+        con_reservoirs_out,
     };
 }
 
@@ -154,19 +167,21 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     bool rebuild_graph = false;
 
     config.st_separate("General");
-    config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
+    recreate_pipeline |=
+        config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
     if (!randomize_seed) {
-        config.config_uint("seed", seed, "");
+        recreate_pipeline |= config.config_uint("seed", seed, "");
     } else {
         config.output_text(fmt::format("seed: {}", seed));
     }
 
-    config.config_int("spp", spp, 0, 15, "samples per pixel");
+    recreate_pipeline |= config.config_int("spp", spp, 0, 15, "samples per pixel");
     // config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
-    config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
+    recreate_pipeline |=
+        config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
 
     config.st_separate("Debug");
-    config.config_options("debug output", debug_output_selector, {});
+    recreate_pipeline |= config.config_options("debug output", debug_output_selector, {});
 
     if (recreate_pipeline) {
         pipelines.recreate = true;

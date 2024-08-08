@@ -3,6 +3,8 @@
 
 #extension GL_EXT_ray_tracing                       : enable
 #extension GL_EXT_ray_query                         : enable
+#extension GL_EXT_nonuniform_qualifier              : enable
+#extension GL_EXT_ray_tracing_position_fetch        : enable
 
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/transmittance.glsl"

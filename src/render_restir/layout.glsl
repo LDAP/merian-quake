@@ -20,6 +20,7 @@ layout (constant_id = 14) const int DEBUG_OUTPUT_SELECTOR = 0;
 #include "../config.h"
 #include "../scene_info.glsl.h"
 #include "../hit.glsl.h"
+#include "reservoir.glsl.h"
 
 layout(push_constant) uniform PushConstant { 
     UniformData params;
@@ -53,8 +54,15 @@ layout(set = 0, binding = 5, scalar) buffer readonly restrict buf_hits {
 };
 layout(set = 0, binding = 6) uniform sampler2D img_tex[MAX_GLTEXTURES];
 layout(set = 0, binding = 7) uniform accelerationStructureEXT tlas;
+layout(set = 0, binding = 8, scalar) buffer readonly restrict buf_reservoirs_in {
+    Reservoir prev_reservoirs[];
+};
+
 
 // --- GRAPH out ---
-layout(set = 0, binding = 8) uniform writeonly restrict image2D img_irradiance;
-layout(set = 0, binding = 9) uniform writeonly restrict image2D img_moments;
-layout(set = 0, binding = 10) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 9) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 10) uniform writeonly restrict image2D img_moments;
+layout(set = 0, binding = 11) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 12, scalar) buffer writeonly restrict buf_reservoirs_out {
+    Reservoir reservoirs[];
+};

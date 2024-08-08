@@ -77,10 +77,13 @@ class RendererRESTIR : public merian_nodes::Node {
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
+    merian_nodes::ManagedVkBufferInHandle con_reservoirs_in =
+        merian_nodes::ManagedVkBufferIn::compute_read("reservoirs", 1);
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_moments;
     merian_nodes::ManagedVkImageOutHandle con_debug;
+    merian_nodes::ManagedVkBufferOutHandle con_reservoirs_out;
 
     //-----------------------------------------------------
 
