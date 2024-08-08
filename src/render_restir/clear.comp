@@ -4,4 +4,11 @@
 
 #include "layout.glsl"
 
-void main() {}
+void main() {
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if(any(greaterThanEqual(ipos, imageSize(img_irradiance)))) return;
+
+  imageStore(img_irradiance, ipos, vec4(0));
+  imageStore(img_moments, ipos, vec4(0));
+  imageStore(img_debug, ipos, vec4(0));
+}
