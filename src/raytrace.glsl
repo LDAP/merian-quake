@@ -13,9 +13,10 @@
 #include "merian-shaders/linalg.glsl"
 #include "merian-shaders/ray_differential.glsl"
 #include "merian-shaders/raytrace.glsl"
+#include "merian-shaders/textures.glsl"
 
 // assert(alpha != 0)
-#define decode_alpha(enc_alpha) (float16_t(alpha - 1) / 14.hf)
+#define decode_alpha(enc_alpha) (float16_t(enc_alpha - 1) / 14.hf)
 
 f16vec3 get_sky(const vec3 w) {
     f16vec3 emm = f16vec3(0);
@@ -62,39 +63,24 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
     return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.hf * sum) - 1.0hf) : f16vec3(0);
 }
 
-// adapted from gl_warp.c
-#define WARPCALC(st) 2 * (st + 0.125 * sin(vec2(3 * st.yx + 0.5 * params.cl_time)))
-#define WATER_WAVES(st) (-vec2(.1, 0) * cos(st.x * 5 + params.cl_time * 2) * pow(max(sin(st.x * 5 + params.cl_time * 2), 0), 5) \
-                         -vec2(.07, 0) * cos(-st.x * 5 + -st.y * 3 + params.cl_time * 3) * pow(max(sin(-st.x * 5 + -st.y * 3 + params.cl_time * 3), 0), 5))
-
-// Initialize pos and wi with ray origin and ray direction and
-// throughput, contribution as needed
-// 
-// Returns the troughput along the ray (without hit)
-// and contribution (with hit) multiplied with throuhput.
-// (allows for volumetric effects)
-#ifdef MERIAN_QUAKE_FIRST_HIT
-void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit, const vec3 r_x, const vec3 r_y) {
-#else
-void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
-#endif
-
-    rayQueryEXT ray_query;
-    VertexExtraData extra_data;
-    uint16_t flags;
-    vec2 st;
-
-    // FIND NEXT HIT
+void trace_ray_init(rayQueryEXT ray_query, const vec3 direction, const vec3 position) {
     rayQueryInitializeEXT(ray_query,
                           tlas,
                           gl_RayFlagsCullBackFacingTrianglesEXT,  // We need to cull backfaces
                                                                   // else we get z-fighting in Quake
                           0xFF,                  // 8-bit instance mask, here saying "trace against all instances"
-                          hit.pos,
+                          position,
                           0,                     // Minimum t-value (we set it here to 0 and pull back the ray)
                                                  // such that the ray cannot escape in corners.
-                          hit.wi,
+                          direction,
                           T_MAX);                // Maximum t-value
+}
+
+void trace_ray(rayQueryEXT ray_query) {
+    VertexExtraData extra_data;
+    uint16_t flags;
+    vec2 st;
+
     while(rayQueryProceedEXT(ray_query)) {
         extra_data = buf_ext[nonuniformEXT(rq_instance_id_uc(ray_query))].v[rq_primitive_index_uc(ray_query)];
         flags = extra_data.texnum_fb_flags >> 12;
@@ -114,6 +100,26 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
     }
+}
+
+// Initialize pos and wi with ray origin and ray direction and
+// throughput, contribution as needed
+// 
+// Returns the troughput along the ray (without hit)
+// and contribution (with hit) multiplied with throuhput.
+// (allows for volumetric effects)
+#ifdef MERIAN_QUAKE_FIRST_HIT
+void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit, const vec3 r_x, const vec3 r_y) {
+#else
+void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
+#endif
+
+    rayQueryEXT ray_query;
+
+    // FIND NEXT HIT
+    trace_ray_init(ray_query, hit.wi, hit.pos);
+
+    trace_ray(ray_query);
 
     throughput *= float16_t(transmittance3(rq_get_t(ray_query), MU_T, VOLUME_MAX_T));
     hit.roughness = 0.02hf;
@@ -131,8 +137,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     }
 
     // HIT
-    extra_data = buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)];
-    flags = extra_data.texnum_fb_flags >> 12;
+    const VertexExtraData extra_data = buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)];
+    const uint16_t flags = extra_data.texnum_fb_flags >> 12;
 
     if (flags == MAT_FLAGS_SKY) {
         const f16vec3 sky = get_sky(hit.wi);
@@ -145,11 +151,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         return;
     }
 
-    st = extra_data.st * rq_barycentrics(ray_query);
+    vec2 st = extra_data.st * rq_barycentrics(ray_query);
     if (flags > 0 && flags < 5) {
-        st = WARPCALC(st);
+        st = MERIAN_TEXTUREEFFECT_QUAKE_WARPCALC(st, params.cl_time);
         if (flags == MAT_FLAGS_WATER)
-            st += WATER_WAVES(st);
+            st += MERIAN_TEXTUREEFFECT_WAVES(st, params.cl_time);
     }
 
     // NORMALS AND GLOSS
