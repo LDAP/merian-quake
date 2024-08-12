@@ -36,10 +36,6 @@ inc_dirs = [
     include_directories('./src')
 ]
 
-project_source_root = meson.project_source_root()
-merian_shaders = project_source_root + '/subprojects/merian/src/merian-nodes'
-merian_include = project_source_root + '/subprojects/merian/src'
-
 shader_generator = merian_subp.get_variable('shader_generator')
 glslc_args = []
 
