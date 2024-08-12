@@ -118,11 +118,9 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
     cur_frame = pipelines;
 
     // RESET MARKOV CHAINS AT ITERATION 0
-    if (run.get_iteration() == 0UL) {
+    if (run.get_iteration() == 0ul) {
         // Reset buffers
-        // io[con_markovchain]->fill(cmd);
-        // io[con_lightcache]->fill(cmd);
-        // io[con_volume_distancemc]->fill(cmd);
+        // io[con_reservoirs_in]->fill(cmd);
 
         // std::vector<vk::BufferMemoryBarrier> barriers = {
         //     io[con_markovchain]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
@@ -140,7 +138,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
     const uint32_t render_width = io[con_resolution].width;
     const uint32_t render_height = io[con_resolution].height;
 
-    if (!render_info.render) {
+    if (!render_info.render || run.get_iteration() == 0ul) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         pipelines.clear->bind(cmd);
         pipelines.clear->bind_descriptor_set(cmd, graph_descriptor_set);
