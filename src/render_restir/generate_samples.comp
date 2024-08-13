@@ -3,7 +3,7 @@
 
 #include "layout.glsl"
 #include "../raytrace.glsl"
-#include "reservoir.glsl.h"
+#include "restir_di.glsl"
 
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"

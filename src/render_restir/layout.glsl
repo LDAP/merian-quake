@@ -20,7 +20,7 @@ layout (constant_id = 14) const int DEBUG_OUTPUT_SELECTOR = 0;
 #include "../config.h"
 #include "../scene_info.glsl.h"
 #include "../hit.glsl.h"
-#include "reservoir.glsl.h"
+#include "restir_di_reservoir.glsl.h"
 
 layout(push_constant) uniform PushConstant { 
     UniformData params;

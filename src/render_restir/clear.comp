@@ -3,7 +3,7 @@
 
 
 #include "layout.glsl"
-#include "reservoir.glsl.h"
+#include "restir_di.glsl"
 
 void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);

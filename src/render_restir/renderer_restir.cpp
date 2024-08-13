@@ -1,6 +1,6 @@
 #include "renderer_restir.hpp"
 
-#include "reservoir.glsl.h"
+#include "restir_di_reservoir.glsl.h"
 #include "src/render_restir/clear.comp.spv.h"
 #include "src/render_restir/generate_samples.comp.spv.h"
 
