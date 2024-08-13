@@ -15,7 +15,7 @@
 #include "merian-shaders/raytrace.glsl"
 #include "merian-shaders/bsdf_diffuse.glsl"
 #include "merian-shaders/grid.glsl"
-#include "merian-shaders/colors_yuv.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/bsdf_microfacet.glsl"
 

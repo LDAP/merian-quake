@@ -52,7 +52,7 @@ RendererRESTIR::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{
             {},
-            gbuffer_size((unsigned long)render_width, render_height) * sizeof(Reservoir),
+            gbuffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
                 vk::BufferUsageFlagBits::eTransferSrc});
 
