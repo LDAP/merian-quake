@@ -6,9 +6,9 @@
 struct ReSTIRDIReservoir {
     uint M;      // number of samples that went into the reservoir
     float w_sum; // sum of weights (w_i = target_p / p_sample).
-    
-    float p_target;     // the target function for the current sample (not really a PDF)
-    vec3 y;             // current sample
+
+    float p_target; // the target function for the current sample (not really a PDF)
+    vec3 y;         // current sample
 
     // => the current one sample estimator is <L> = (f(y) / p_target) * (w_sum / M)
     //    the second factor corrects that the distribution of y only approximates p_target
@@ -20,16 +20,51 @@ struct ReSTIRDIReservoir {
 
 #include "merian-shaders/random.glsl"
 
-ReSTIRDIReservoir reservoir_init() {
+// ReSTIR DI:
+//
+// For each pixel p:
+//
+// Reservoir r
+// for n samples x ~ p:
+//  restir_di_reservoir_add_sample(r, rng_state, x, p(x), f_p(x))
+//
+// if f_p was unshadowed contribution:
+//  if (shadowed(r.y))
+//    discard r
+//
+// // Temporal reuse
+// Reservoir o = get_reprojected_reservoir_from_previous_frame()
+// restir_di_reservoir_combine(r, rng_state, o, f_p(o.y))
+//
+// // write to share with neighbors (or use shared memory, subgroup operations,...)
+// share(r);
+//
+// // Spatial reuse
+// for n neighbors:
+//   Reservoir o = get_reservoir_from_neighbor()
+//   restir_di_reservoir_combine(r, rng_state, o, f_p(o.y))
+//   (barrier() // get new information next iteraiton)
+//
+// // write to temporal buffer for next iteration
+// store(r)
+//
+// // shade pixel...
+//
+
+ReSTIRDIReservoir restir_di_reservoir_init() {
     ReSTIRDIReservoir reservoir = {0, 0., 0., vec3(0)};
     return reservoir;
 }
 
 // Add a sample to the reservoir.
 // Note: p_sample can also be the effective PDF after MIS. (ReSTIR DI, page 3)
-// 
+//
 // (this is called update() in the ReSTIR paper)
-void reservoir_add_sample(inout ReSTIRDIReservoir reservoir, inout uint rng_state, const vec3 x, const float p_sample, const float p_target) {
+void restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
+                                    inout uint rng_state,
+                                    const vec3 x,
+                                    const float p_sample,
+                                    const float p_target) {
     const float w = p_target / p_sample;
     reservoir.w_sum += w;
     reservoir.M += 1;
@@ -43,9 +78,39 @@ void reservoir_add_sample(inout ReSTIRDIReservoir reservoir, inout uint rng_stat
     }
 }
 
+// Combine two reservoirs.
+//
+// p_target_x_y = p_target_x(other.y) i.e. the target function of the current pixel evaluated with
+// the sample of the other reservoir (needed for reweighting).
+//
+// Note: Naively combining reservoirs of neighbors is biased since each pixel uses a different
+// integration domain and target distribution! (ReSTRI DI, page 4: ReSTIR DI. chapter 4).
+//
+// Note: visibility resuse means:
+// For each pixel check if y is occluded and if so, discard the reservoir before sharing with
+// neighbors.
+void restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
+                                 inout uint rng_state,
+                                 const ReSTIRDIReservoir other,
+                                 const float p_target_x_y) {
+    reservoir.M += other.M;
+
+    if (other.w_sum == 0.)
+        return;
+
+    // Account for the fact that samples from neighbor are resampled from a different target
+    // distribution by reweighting the samples with p_target_x(other.y) / p_target_y(other.y)
+    const float w = other.w_sum * p_target_x_y / other.p_target;
+    reservoir.w_sum += w;
+    if (XorShift32(rng_state) < w / reservoir.w_sum) {
+        reservoir.p_target = other.p_target;
+        reservoir.y = other.y;
+    }
+}
+
 // The weight / inverse PDF for the current sample.
 // returns W = 1 / p_ris = (1 / p_target) * (w_sum / M)
-float reservoir_W(const ReSTIRDIReservoir reservoir) {
+float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
     return reservoir.w_sum / reservoir.p_target / reservoir.M;
 }
 

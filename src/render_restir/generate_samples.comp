@@ -23,7 +23,7 @@ void main() {
     vec2 moments = vec2(0);
     vec3 irr = vec3(0);
 
-    ReSTIRDIReservoir reservoir = read_reservoir;
+    ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
     for (int s = 0; s < MAX_SPP; s++) {
@@ -48,7 +48,7 @@ void main() {
         const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), wo, vec2(current_hit.roughness)) * wodotn);
         f += microfacet_bsdf * incident;
 
-        reservoir_add_sample(reservoir, rng_state, next_hit.pos, p, yuv_luminance_f16(microfacet_bsdf * incident));
+        restir_di_reservoir_add_sample(reservoir, rng_state, next_hit.pos, p, yuv_luminance_f16(microfacet_bsdf * incident));
         // const vec3 contrib = f / p;
         // if(!any(isinf(contrib)) && !any(isnan(contrib))) {
             
@@ -59,6 +59,7 @@ void main() {
         // }
     }
 
+    restir_di_reservoir_combine(reservoir, rng_state, read_reservoir, read_reservoir.p_target);
     write_reservoir = reservoir;
 
     Hit next_hit;
@@ -71,7 +72,7 @@ void main() {
     trace_ray(throughput, incident, next_hit);
 
     const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn);
-    irr += (microfacet_bsdf * incident) * reservoir_W(reservoir);
+    irr += (microfacet_bsdf * incident) * restir_di_reservoir_W(reservoir);
 
 
     if (any(greaterThanEqual(pixel, resolution))) {
