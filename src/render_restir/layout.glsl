@@ -57,12 +57,13 @@ layout(set = 0, binding = 7) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 8, scalar) buffer readonly restrict buf_reservoirs_in {
     ReSTIRDIReservoir prev_reservoirs[];
 };
+layout(set = 0, binding = 9) uniform sampler2D img_mv;
 
 
 // --- GRAPH out ---
-layout(set = 0, binding = 9) uniform writeonly restrict image2D img_irradiance;
-layout(set = 0, binding = 10) uniform writeonly restrict image2D img_moments;
-layout(set = 0, binding = 11) uniform writeonly restrict image2D img_debug;
-layout(set = 0, binding = 12, scalar) buffer writeonly restrict buf_reservoirs_out {
+layout(set = 0, binding = 10) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 11) uniform writeonly restrict image2D img_moments;
+layout(set = 0, binding = 12) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 13, scalar) buffer writeonly restrict buf_reservoirs_out {
     ReSTIRDIReservoir reservoirs[];
 };

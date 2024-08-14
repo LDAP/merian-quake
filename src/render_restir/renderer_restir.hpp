@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
@@ -79,6 +80,8 @@ class RendererRESTIR : public merian_nodes::Node {
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
     merian_nodes::ManagedVkBufferInHandle con_reservoirs_in =
         merian_nodes::ManagedVkBufferIn::compute_read("reservoirs", 1);
+    merian_nodes::ManagedVkImageInHandle con_mv =
+        merian_nodes::ManagedVkImageIn::compute_read("mv");
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_moments;

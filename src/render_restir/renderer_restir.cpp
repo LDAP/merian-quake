@@ -31,7 +31,7 @@ RendererRESTIR::~RendererRESTIR() {}
 std::vector<merian_nodes::InputConnectorHandle> RendererRESTIR::describe_inputs() {
     return {
         con_vtx,      con_prev_vtx, con_idx,        con_ext,         con_gbuffer,       con_hits,
-        con_textures, con_tlas,     con_resolution, con_render_info, con_reservoirs_in,
+        con_textures, con_tlas,     con_resolution, con_render_info, con_reservoirs_in, con_mv,
     };
 }
 

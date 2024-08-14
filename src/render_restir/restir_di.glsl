@@ -5,7 +5,9 @@
 
 #include "merian-shaders/random.glsl"
 
-// ReSTIR DI:
+// +------------------------+
+// |  ReSTIR DI Pseudocode  |
+// +------------------------+
 //
 // For each pixel p:
 //
@@ -45,7 +47,7 @@ ReSTIRDIReservoir restir_di_reservoir_init() {
 // Note: p_sample can also be the effective PDF after MIS. (ReSTIR DI, page 3)
 //
 // (this is called update() in the ReSTIR paper)
-void restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
+bool restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
                                     inout uint rng_state,
                                     const vec3 x,
                                     const float p_sample,
@@ -60,7 +62,9 @@ void restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
     if (XorShift32(rng_state) < w / reservoir.w_sum) {
         reservoir.p_target = p_target;
         reservoir.y = x;
+        return true;
     }
+    return false;
 }
 
 // Combine two reservoirs.
@@ -70,18 +74,22 @@ void restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
 //
 // Note: Naively combining reservoirs of neighbors is biased since each pixel uses a different
 // integration domain and target distribution! (ReSTRI DI, page 4: ReSTIR DI. chapter 4).
+// Quote: If all candidate PDFs are non-zero wherever the target function is non-zero, then |Z (y)| = M,
+// and the RIS weight becomes an unbiased estimator of the inverse RIS PDF. If, however,
+// some of the PDFs are zero for part of the integrand, then |Z (y)| M < 1,
+// and the inverse PDF is consistently underestimated. 
 //
 // Note: visibility resuse means:
 // For each pixel check if y is occluded and if so, discard the reservoir before sharing with
 // neighbors.
-void restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
+bool restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
                                  inout uint rng_state,
                                  const ReSTIRDIReservoir other,
                                  const float p_target_x_y) {
     reservoir.M += other.M;
 
     if (other.w_sum == 0.)
-        return;
+        return false;
 
     // Account for the fact that samples from neighbor are resampled from a different target
     // distribution by reweighting the samples with p_target_x(other.y) / p_target_y(other.y)
@@ -90,7 +98,9 @@ void restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
     if (XorShift32(rng_state) < w / reservoir.w_sum) {
         reservoir.p_target = other.p_target;
         reservoir.y = other.y;
+        return true;
     }
+    return false;
 }
 
 // The weight / inverse PDF for the current sample.

@@ -15,8 +15,8 @@
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
 #define first_hit hits[gbuffer_index(pixel, resolution)]
-#define read_reservoir prev_reservoirs[gbuffer_index(pixel, resolution)]
-#define write_reservoir reservoirs[gbuffer_index(pixel, resolution)]
+#define read_reservoir(pixel) prev_reservoirs[gbuffer_index((pixel), resolution)]
+#define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
 
 void main() {
     uint rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
@@ -59,7 +59,10 @@ void main() {
         // }
     }
 
-    restir_di_reservoir_combine(reservoir, rng_state, read_reservoir, read_reservoir.p_target);
+    ivec2 prev_pixel = ivec2(round(pixel + texelFetch(img_mv, pixel, 0).rg));
+    if (all(lessThan(prev_pixel, resolution)) && all(greaterThanEqual(prev_pixel, ivec2(0)))) {
+        restir_di_reservoir_combine(reservoir, rng_state, read_reservoir(prev_pixel), read_reservoir(prev_pixel).p_target);
+    }
     write_reservoir = reservoir;
 
     Hit next_hit;
