@@ -46,7 +46,7 @@ ReSTIRDIReservoir restir_di_reservoir_init() {
 // Add a sample to the reservoir.
 // Note: p_sample can also be the effective PDF after MIS. (ReSTIR DI, page 3)
 //
-// (this is called update() in the ReSTIR paper)
+// (this is called update() in the ReSTIR paper / StreamSample in RTXDI)
 bool restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
                                     inout uint rng_state,
                                     const vec3 x,
@@ -59,7 +59,7 @@ bool restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
     // Weighted Reservoir Sampling (Chao, 1982):
     // selects a sample x_i with probability w_i / sum(w_i),
     // while only storing the current sample.
-    if (XorShift32(rng_state) < w / reservoir.w_sum) {
+    if (XorShift32(rng_state) * reservoir.w_sum < w) {
         reservoir.p_target = p_target;
         reservoir.y = x;
         return true;
@@ -95,7 +95,7 @@ bool restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
     // distribution by reweighting the samples with p_target_x(other.y) / p_target_y(other.y)
     const float w = other.w_sum * p_target_x_y / other.p_target;
     reservoir.w_sum += w;
-    if (XorShift32(rng_state) < w / reservoir.w_sum) {
+    if (XorShift32(rng_state) * reservoir.w_sum < w) {
         reservoir.p_target = other.p_target;
         reservoir.y = other.y;
         return true;
