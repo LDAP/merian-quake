@@ -118,4 +118,8 @@ class RendererRESTIR : public merian_nodes::Node {
 
     bool temporal_reuse_enable = false;
     int spatial_reuse_iterations = 0;
+    bool visibility_shade = false;
+
+    float temporal_normal_reject_cos = 0.96;
+    float temporal_depth_reject_percent = 0.1;
 };

@@ -16,6 +16,9 @@ layout (constant_id = 11) const float VOLUME_MAX_T = 1000.;
 layout (constant_id = 12) const uint SEED = 0;
 layout (constant_id = 13) const bool DEBUG_OUTPUT_CONNECTED = false;
 layout (constant_id = 14) const int DEBUG_OUTPUT_SELECTOR = 0;
+layout (constant_id = 15) const bool VISIBILITY_SHADE = false;
+layout (constant_id = 16) const float TEMPORAL_NORMAL_REJECT_COS = 0.8;
+layout (constant_id = 17) const float TEMPORAL_DEPTH_REJECT = 0.1;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"

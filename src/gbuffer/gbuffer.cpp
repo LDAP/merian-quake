@@ -100,7 +100,7 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         // REGULAR PIPE
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y);
-        spec_builder.add_entry<VkBool32>(false);
+        spec_builder.add_entry(false);
         spec_builder.add_entry(render_info.constant.fov_tan_alpha_half);
 
         spec_builder.add_entry(render_info.constant.sun_direction.x);

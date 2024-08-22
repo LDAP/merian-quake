@@ -113,7 +113,8 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             render_info.constant.sun_direction.y, render_info.constant.sun_direction.z,
             render_info.constant.sun_color.r, render_info.constant.sun_color.g,
             render_info.constant.sun_color.b, render_info.constant.volume_max_t, seed,
-            io.is_connected(con_debug), debug_output_selector);
+            io.is_connected(con_debug), debug_output_selector, visibility_shade,
+            temporal_normal_reject_cos, temporal_depth_reject_percent);
 
         auto spec = spec_builder.build();
 
@@ -222,9 +223,21 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
 
     config.st_separate("Temporal Reuse");
     config.config_bool("enable temporal reuse", temporal_reuse_enable);
+    float angle = glm::acos(temporal_normal_reject_cos);
+    recreate_pipeline |= config.config_angle("temporal normal threshold", angle,
+                                             "Reject points with normals farther apart", 0, 180);
+    temporal_normal_reject_cos = glm::cos(angle);
+    recreate_pipeline |=
+        config.config_percent("temporal depth threshold", temporal_depth_reject_percent,
+                              "Reject points with depths farther apart (relative to the max)");
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
+
+    config.st_separate("Shade");
+    recreate_pipeline |=
+        config.config_bool("shade visibility", visibility_shade,
+                           "Check visibility before shading (and write that back)");
 
     config.st_separate("Debug");
     recreate_pipeline |= config.config_options("debug output", debug_output_selector, {});
