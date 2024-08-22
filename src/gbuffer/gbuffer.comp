@@ -108,6 +108,7 @@ void main() {
         imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
         hits[gbuffer_index(pixel, resolution)] = first_hit;
 
+        // use prev_pos to account for moving objects seen from the camera.
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
         GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
 
