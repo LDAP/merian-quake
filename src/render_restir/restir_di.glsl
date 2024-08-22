@@ -43,6 +43,19 @@ ReSTIRDIReservoir restir_di_reservoir_init() {
     return reservoir;
 }
 
+ReSTIRDIReservoir restir_di_reservoir_init(const vec3 x,
+                                           const float p_sample,
+                                           const float p_target) {
+    ReSTIRDIReservoir reservoir = {1, p_target / p_sample, p_target, x};
+    return reservoir;
+}
+
+// The weight / inverse PDF for the current sample.
+// returns W = 1 / p_ris = (1 / p_target) * (w_sum / M)
+float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
+    return reservoir.w_sum / reservoir.p_target / reservoir.M;
+}
+
 // Add a sample to the reservoir.
 // Note: p_sample can also be the effective PDF after MIS. (ReSTIR DI, page 3)
 //
@@ -101,12 +114,6 @@ bool restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
         return true;
     }
     return false;
-}
-
-// The weight / inverse PDF for the current sample.
-// returns W = 1 / p_ris = (1 / p_target) * (w_sum / M)
-float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
-    return reservoir.w_sum / reservoir.p_target / reservoir.M;
 }
 
 #endif // _MERIAN_RESTIR_DI_H_

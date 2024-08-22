@@ -1,8 +1,12 @@
 #include "renderer_restir.hpp"
 
 #include "restir_di_reservoir.glsl.h"
-#include "src/render_restir/clear.comp.spv.h"
-#include "src/render_restir/generate_samples.comp.spv.h"
+
+#include "src/render_restir/restir_di_clear.comp.spv.h"
+#include "src/render_restir/restir_di_generate_samples_bsdf.comp.spv.h"
+#include "src/render_restir/restir_di_shade.comp.spv.h"
+#include "src/render_restir/restir_di_spatial_reuse.comp.spv.h"
+#include "src/render_restir/restir_di_temporal_reuse.comp.spv.h"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
@@ -18,10 +22,20 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
 
     // PIPELINE CREATION
     generate_samples_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_generate_samples_comp_spv_size(),
-        merian_quake_restir_generate_samples_comp_spv());
+        context, merian_quake_restir_di_generate_samples_bsdf_comp_spv_size(),
+        merian_quake_restir_di_generate_samples_bsdf_comp_spv());
+    temporal_reuse_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_quake_restir_di_temporal_reuse_comp_spv_size(),
+        merian_quake_restir_di_temporal_reuse_comp_spv());
+    spatial_reuse_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_quake_restir_di_spatial_reuse_comp_spv_size(),
+        merian_quake_restir_di_spatial_reuse_comp_spv());
+    shade_shader = std::make_shared<merian::ShaderModule>(
+        context, merian_quake_restir_di_shade_comp_spv_size(),
+        merian_quake_restir_di_shade_comp_spv());
     clear_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_clear_comp_spv_size(), merian_quake_restir_clear_comp_spv());
+        context, merian_quake_restir_di_clear_comp_spv_size(),
+        merian_quake_restir_di_clear_comp_spv());
 }
 
 RendererRESTIR::~RendererRESTIR() {}
@@ -30,8 +44,9 @@ RendererRESTIR::~RendererRESTIR() {}
 
 std::vector<merian_nodes::InputConnectorHandle> RendererRESTIR::describe_inputs() {
     return {
-        con_vtx,      con_prev_vtx, con_idx,        con_ext,         con_gbuffer,       con_hits,
-        con_textures, con_tlas,     con_resolution, con_render_info, con_reservoirs_in, con_mv,
+        con_vtx,          con_prev_vtx,      con_idx,      con_ext,  con_gbuffer,
+        con_prev_gbuffer, con_hits,          con_textures, con_tlas, con_resolution,
+        con_render_info,  con_reservoirs_in, con_mv,
     };
 }
 
@@ -104,6 +119,12 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
 
         pipelines.generate_samples =
             std::make_shared<merian::ComputePipeline>(pipe_layout, generate_samples_shader, spec);
+        pipelines.temporal_reuse =
+            std::make_shared<merian::ComputePipeline>(pipe_layout, temporal_reuse_shader, spec);
+        pipelines.spatial_reuse =
+            std::make_shared<merian::ComputePipeline>(pipe_layout, spatial_reuse_shader, spec);
+        pipelines.shade =
+            std::make_shared<merian::ComputePipeline>(pipe_layout, shade_shader, spec);
         pipelines.clear =
             std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader, spec);
 
@@ -117,28 +138,10 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
 
     cur_frame = pipelines;
 
-    // RESET MARKOV CHAINS AT ITERATION 0
-    if (run.get_iteration() == 0ul) {
-        // Reset buffers
-        // io[con_reservoirs_in]->fill(cmd);
-
-        // std::vector<vk::BufferMemoryBarrier> barriers = {
-        //     io[con_markovchain]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-        //                                         vk::AccessFlagBits::eShaderRead),
-        //     io[con_lightcache]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-        //                                        vk::AccessFlagBits::eShaderRead),
-        //     io[con_volume_distancemc]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-        //                                               vk::AccessFlagBits::eShaderRead),
-        // };
-
-        // cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-        //                     vk::PipelineStageFlagBits::eComputeShader, {}, {}, barriers, {});
-    }
-
     const uint32_t render_width = io[con_resolution].width;
     const uint32_t render_height = io[con_resolution].height;
 
-    if (!render_info.render || run.get_iteration() == 0ul) {
+    if (!render_info.render) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         pipelines.clear->bind(cmd);
         pipelines.clear->bind_descriptor_set(cmd, graph_descriptor_set);
@@ -148,13 +151,54 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         return;
     }
 
+    auto sync_reservoirs = [&]() {
+        auto bar = io[con_reservoirs_out]->buffer_barrier(
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+    };
+
     // BIND PIPELINE
     {
-        // Surfaces
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "generate samples");
         pipelines.generate_samples->bind(cmd);
         pipelines.generate_samples->bind_descriptor_set(cmd, graph_descriptor_set);
         pipelines.generate_samples->push_constant(cmd, render_info.uniform);
+        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
+                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+    }
+
+    if (temporal_reuse_enable && run.get_iteration() > 0ul) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "temporal reuse");
+        sync_reservoirs();
+        pipelines.temporal_reuse->bind(cmd);
+        pipelines.temporal_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.temporal_reuse->push_constant(cmd, render_info.uniform);
+        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
+                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+    }
+
+    if (spatial_reuse_iterations > 0) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "spatial reuse");
+        for (int i = 0; i < spatial_reuse_iterations; i++) {
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
+                                     fmt::format("spatial reuse iteration {}", i));
+            sync_reservoirs();
+            pipelines.spatial_reuse->bind(cmd);
+            pipelines.spatial_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
+            pipelines.spatial_reuse->push_constant(cmd, render_info.uniform);
+            cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
+                         (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        }
+    }
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "shade");
+        sync_reservoirs();
+        pipelines.shade->bind(cmd);
+        pipelines.shade->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.shade->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                      (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
     }
@@ -173,13 +217,20 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.output_text(fmt::format("seed: {}", seed));
     }
 
+    config.st_separate("Generate samples");
     recreate_pipeline |= config.config_int("spp", spp, 0, 15, "samples per pixel");
-    // config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
-    recreate_pipeline |=
-        config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
+
+    config.st_separate("Temporal Reuse");
+    config.config_bool("enable temporal reuse", temporal_reuse_enable);
+
+    config.st_separate("Spatial Reuse");
+    config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
 
     config.st_separate("Debug");
     recreate_pipeline |= config.config_options("debug output", debug_output_selector, {});
+
+    // recreate_pipeline |=
+    //     config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
 
     if (recreate_pipeline) {
         pipelines.recreate = true;

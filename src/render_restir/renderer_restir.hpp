@@ -22,6 +22,9 @@ class RendererRESTIR : public merian_nodes::Node {
     struct Pipelines {
         merian::PipelineHandle clear;
         merian::PipelineHandle generate_samples;
+        merian::PipelineHandle temporal_reuse;
+        merian::PipelineHandle spatial_reuse;
+        merian::PipelineHandle shade;
 
         bool recreate = true;
     };
@@ -55,6 +58,9 @@ class RendererRESTIR : public merian_nodes::Node {
     const merian::ResourceAllocatorHandle allocator;
 
     merian::ShaderModuleHandle generate_samples_shader;
+    merian::ShaderModuleHandle temporal_reuse_shader;
+    merian::ShaderModuleHandle spatial_reuse_shader;
+    merian::ShaderModuleHandle shade_shader;
     merian::ShaderModuleHandle clear_shader;
 
     merian_nodes::VkBufferArrayInHandle con_vtx =
@@ -67,6 +73,8 @@ class RendererRESTIR : public merian_nodes::Node {
         merian_nodes::VkBufferArrayIn::compute_read("ext");
     merian_nodes::ManagedVkBufferInHandle con_gbuffer =
         merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
+    merian_nodes::ManagedVkBufferInHandle con_prev_gbuffer =
+        merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
     merian_nodes::ManagedVkBufferInHandle con_hits =
         merian_nodes::ManagedVkBufferIn::compute_read("hits");
 
@@ -107,4 +115,7 @@ class RendererRESTIR : public merian_nodes::Node {
     uint32_t seed = 0;
     bool randomize_seed = true;
     int debug_output_selector = 0;
+
+    bool temporal_reuse_enable = false;
+    int spatial_reuse_iterations = 0;
 };
