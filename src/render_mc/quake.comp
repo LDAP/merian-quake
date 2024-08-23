@@ -55,8 +55,8 @@ void main() {
             // SAMPLE NEXT OUTGOING DIRECTION
             float score_sum = 0;
             {
-                float scores[MC_SAMPLES];
-                vec4 vmfs[MC_SAMPLES];
+                float scores[MC_SAMPLES + 1];
+                vec4 vmfs[MC_SAMPLES + 1];
                 {
                     [[unroll]]
                     for (int i = 0; i < MC_SAMPLES; i++) {
@@ -78,11 +78,24 @@ void main() {
                     }
                 }
 
-                if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
-                    // BSDF Sampling
-                    wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
-                    mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                } // else {VMF Sampling // wo = set above }
+                MCState bsdf_state = mc_state_new(current_hit.pos, current_hit.normal);
+                mc_state_add_sample(bsdf_state, current_hit.pos, 0.5 * score_sum / MC_SAMPLES + 1e-3, current_hit.pos + bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state)), vec3(0));
+
+                scores[MC_SAMPLES] = bsdf_state.sum_w;
+                score_sum += scores[MC_SAMPLES];
+                vmfs[MC_SAMPLES] = mc_state_get_vmf(bsdf_state, current_hit.pos);
+                if (XorShift32(rng_state) < scores[MC_SAMPLES] / score_sum) {
+                    // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
+                    mc_state = bsdf_state;
+                    wo = vmf_sample(vmfs[MC_SAMPLES].xyz, vmfs[MC_SAMPLES].w, XorShift32Vec2(rng_state));
+                }
+
+
+                // if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
+                //     // BSDF Sampling
+                //     wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+                //     mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+                // } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 
                 // ray is below geometric surface
@@ -91,12 +104,10 @@ void main() {
 
                 // Multiple importance sampling
                 [[unroll]]
-                for (int i = 0; i < MC_SAMPLES; i++) {
+                for (int i = 0; i < MC_SAMPLES + 1; i++) {
                     // score_sum > 0 ? results in black artifacts
                     wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
                 }
-                wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_diffuse_pdf(wodotn) + (1 - SURF_BSDF_P) * wo_p;
-
             }
 
             // TRACE RAY TO NEXT SURFACE
