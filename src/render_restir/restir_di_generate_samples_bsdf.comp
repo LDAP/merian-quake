@@ -23,7 +23,7 @@ void main() {
         return;
     }
 
-    uint rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
+    uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 0, SEED));
 
     ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
 

@@ -28,7 +28,7 @@ void main() {
         return;
     }
 
-    uint rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
+    uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 1, SEED));
 
     ReSTIRDIReservoir reservoir = read_reservoir(pixel);
 
@@ -44,5 +44,5 @@ void main() {
     }
 
     restir_di_reservoir_combine(reservoir, rng_state, read_prev_reservoir(prev_pixel), read_prev_reservoir(prev_pixel).p_target);
-        write_reservoir = reservoir;
+    write_reservoir = reservoir;
 }
