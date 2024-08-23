@@ -32,17 +32,24 @@ void main() {
 
     ReSTIRDIReservoir reservoir = read_reservoir(pixel);
 
-    ivec2 prev_pixel = ivec2(round(pixel + texelFetch(img_mv, pixel, 0).rg));
+    const ivec2 prev_pixel = ivec2(round(pixel + texelFetch(img_mv, pixel, 0).rg));
+
     if (any(greaterThanEqual(prev_pixel, resolution)) || any(lessThan(prev_pixel, ivec2(0)))) {
         return;
     }
-
 
     if (!reprojection_valid(geo_decode_normal(gbuf(pixel).enc_normal), geo_decode_normal(prev_gbuf(prev_pixel).enc_normal), TEMPORAL_NORMAL_REJECT_COS,
                           gbuf(pixel).linear_z,  gbuf(pixel).vel_z, prev_gbuf(prev_pixel).linear_z, TEMPORAL_DEPTH_REJECT)) {
         return;
     }
 
-    restir_di_reservoir_combine(reservoir, rng_state, read_prev_reservoir(prev_pixel), read_prev_reservoir(prev_pixel).p_target);
+    ReSTIRDIReservoir prev_reservoir = read_prev_reservoir(prev_pixel);
+
+    if (TEMPORAL_CLAMP_M) {
+        //prev_reservoir.M = min(prev_reservoir.M, reservoir.M * 20);
+    }
+
+    restir_di_reservoir_combine(reservoir, rng_state, prev_reservoir, prev_reservoir.p_target);
+
     write_reservoir = reservoir;
 }

@@ -19,6 +19,9 @@ layout (constant_id = 14) const int DEBUG_OUTPUT_SELECTOR = 0;
 layout (constant_id = 15) const bool VISIBILITY_SHADE = false;
 layout (constant_id = 16) const float TEMPORAL_NORMAL_REJECT_COS = 0.8;
 layout (constant_id = 17) const float TEMPORAL_DEPTH_REJECT = 0.1;
+layout (constant_id = 18) const float SPATIAL_NORMAL_REJECT_COS = 0.8;
+layout (constant_id = 19) const float SPATIAL_DEPTH_REJECT = 0.1;
+layout (constant_id = 20) const bool TEMPORAL_CLAMP_M = true;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"

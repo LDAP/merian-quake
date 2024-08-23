@@ -51,9 +51,9 @@ ReSTIRDIReservoir restir_di_reservoir_init(const vec3 x,
 }
 
 // The weight / inverse PDF for the current sample.
-// returns W = 1 / p_ris = (1 / p_target) * (w_sum / M)
+// returns W = 1 / p_ris = (1 / p_target) * (w_sum_or_W / M)
 float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
-    return reservoir.w_sum / reservoir.p_target / reservoir.M;
+    return reservoir.w_sum_or_W / reservoir.p_target / reservoir.M;
 }
 
 // Add a sample to the reservoir.
@@ -66,13 +66,13 @@ bool restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
                                     const float p_sample,
                                     const float p_target) {
     const float w = p_target / p_sample;
-    reservoir.w_sum += w;
+    reservoir.w_sum_or_W += w;
     reservoir.M += 1;
 
     // Weighted Reservoir Sampling (Chao, 1982):
     // selects a sample x_i with probability w_i / sum(w_i),
     // while only storing the current sample.
-    if (XorShift32(rng_state) * reservoir.w_sum < w) {
+    if (XorShift32(rng_state) * reservoir.w_sum_or_W < w) {
         reservoir.p_target = p_target;
         reservoir.y = x;
         return true;
@@ -101,19 +101,54 @@ bool restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
                                  const float p_target_x_y) {
     reservoir.M += other.M;
 
-    if (other.w_sum == 0.)
+    if (other.p_target == 0) {
         return false;
+    }
 
     // Account for the fact that samples from neighbor are resampled from a different target
     // distribution by reweighting the samples with p_target_x(other.y) / p_target_y(other.y)
-    const float w = other.w_sum * p_target_x_y / other.p_target;
-    reservoir.w_sum += w;
-    if (XorShift32(rng_state) * reservoir.w_sum < w) {
+    const float w = p_target_x_y * other.w_sum_or_W / other.p_target;
+    reservoir.w_sum_or_W += w;
+    if (XorShift32(rng_state) * reservoir.w_sum_or_W < w) {
         reservoir.p_target = other.p_target;
         reservoir.y = other.y;
         return true;
     }
     return false;
+}
+
+// like restir_di_reservoir_combine but for other Reservoirs that were finalized (the RIS weight sum is replaced with W).
+bool restir_di_reservoir_combine_finalized(inout ReSTIRDIReservoir reservoir,
+                                           inout uint rng_state,
+                                           const ReSTIRDIReservoirFinalized other,
+                                           const float p_target_x_y) {
+    reservoir.M += other.M;
+
+    // Account for the fact that samples from neighbor are resampled from a different target
+    // distribution by reweighting the samples.
+    const float w = p_target_x_y * other.w_sum_or_W * other.M;
+    reservoir.w_sum_or_W += w;
+    if (XorShift32(rng_state) * reservoir.w_sum_or_W < w) {
+        reservoir.p_target = other.p_target;
+        reservoir.y = other.y;
+        return true;
+    }
+    return false;
+}
+
+// performs the normalization after resampling. After this method w_sum_or_W holds W.
+// equation 6 in the ReSTIR DI paper
+// Uses 1 / M
+void restir_di_reservoir_finalize(inout ReSTIRDIReservoir reservoir) {
+    const float denominator = reservoir.M * reservoir.p_target;
+    reservoir.w_sum_or_W = denominator != 0 ? reservoir.w_sum_or_W / denominator : 0.0;
+}
+
+// performs the normalization after resampling. After this method w_sum_or_W holds W.
+// equation 6 in the ReSTIR DI paper
+void restir_di_reservoir_finalize_custom(inout ReSTIRDIReservoir reservoir, const float numerator, float denominator) {
+    denominator *= reservoir.p_target;
+    reservoir.w_sum_or_W = denominator != 0 ? reservoir.w_sum_or_W * numerator / denominator : 0.0;
 }
 
 #endif // _MERIAN_RESTIR_DI_H_

@@ -39,11 +39,11 @@ void main() {
     if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y) - distance(first_hit.pos, next_hit.pos))
                         / max(distance(first_hit.pos, reservoir.y),distance(first_hit.pos, next_hit.pos)) > 0.05) {
         // not visible 
-        reservoir.w_sum = 0;
+        reservoir.w_sum_or_W = 0;
         write_reservoir = reservoir;
     }
 
-    const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn);
+    const float microfacet_bsdf = bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn;
     const float W = restir_di_reservoir_W(reservoir);
     
     const vec3 irr = !isnan(W) && !isinf(W) ? (microfacet_bsdf * incident) * W : vec3(0);
