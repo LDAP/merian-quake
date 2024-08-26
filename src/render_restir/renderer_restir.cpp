@@ -240,7 +240,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
                                              "Reject points with normals farther apart", 0, 180);
     spatial_normal_reject_cos = glm::cos(spatial_reject_angle);
     recreate_pipeline |=
-        config.config_percent("spatial depth threshold", temporal_depth_reject_percent,
+        config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
 
     config.st_separate("Shade");

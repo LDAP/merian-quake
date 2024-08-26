@@ -28,7 +28,7 @@ void main() {
     ReSTIRDIReservoir reservoir = read_reservoir(pixel);;
 
     Hit next_hit;
-    const vec3 wo = normalize(reservoir.y - first_hit.pos);
+    const vec3 wo = normalize(reservoir.y.pos - first_hit.pos);
     const float wodotn = dot(wo, first_hit.normal);
     next_hit.wi = wo;
     next_hit.pos = first_hit.pos - first_hit.wi * 1e-3;
@@ -36,17 +36,16 @@ void main() {
     f16vec3 throughput = f16vec3(1);
     trace_ray(throughput, incident, next_hit);
 
-    if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y) - distance(first_hit.pos, next_hit.pos))
-                        / max(distance(first_hit.pos, reservoir.y),distance(first_hit.pos, next_hit.pos)) > 0.05) {
+    if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y.pos) - distance(first_hit.pos, next_hit.pos))
+                        / max(distance(first_hit.pos, reservoir.y.pos),distance(first_hit.pos, next_hit.pos)) > 0.05) {
         // not visible 
         reservoir.w_sum_or_W = 0;
         write_reservoir = reservoir;
     }
 
     const float microfacet_bsdf = bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn;
-    const float W = restir_di_reservoir_W(reservoir);
     
-    const vec3 irr = !isnan(W) && !isinf(W) ? (microfacet_bsdf * incident) * W : vec3(0);
+    const vec3 irr = !isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W) ? (microfacet_bsdf * incident) * reservoir.w_sum_or_W : vec3(0);
     const float l = yuv_luminance(irr);
 
     imageStore(img_irradiance, pixel, vec4(irr, 0));

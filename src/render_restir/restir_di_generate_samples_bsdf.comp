@@ -4,6 +4,7 @@
 #include "layout.glsl"
 #include "../raytrace.glsl"
 #include "restir_di.glsl"
+#include "restir_di_common.glsl"
 
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
@@ -34,7 +35,7 @@ void main() {
         const vec3 wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
         const float wodotn = dot(wo, current_hit.normal);
         if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
-            break;
+            continue;
 
         Hit next_hit;
         next_hit.wi = wo;
@@ -43,9 +44,16 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-        const f16vec3 microfacet_bsdf = f16vec3(bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), wo, vec2(current_hit.roughness)) * wodotn);
-        restir_di_reservoir_add_sample(reservoir, rng_state, next_hit.pos, bsdf_diffuse_pdf(wodotn), yuv_luminance_f16(microfacet_bsdf * incident));
+        const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, incident);
+        restir_di_reservoir_add_sample(reservoir,
+                                       rng_state,
+                                       x,
+                                       bsdf_diffuse_pdf(wodotn),
+                                       restir_di_target_pdf(x, current_hit)
+                                       );
     }
+
+    restir_di_reservoir_finalize(reservoir);
 
     write_reservoir = reservoir;
 }

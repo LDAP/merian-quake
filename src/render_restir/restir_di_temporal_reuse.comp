@@ -4,6 +4,7 @@
 #include "layout.glsl"
 #include "../raytrace.glsl"
 #include "restir_di.glsl"
+#include "restir_di_common.glsl"
 
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
@@ -30,7 +31,10 @@ void main() {
 
     uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 1, SEED));
 
-    ReSTIRDIReservoir reservoir = read_reservoir(pixel);
+    ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
+    restir_di_reservoir_combine_finalized(reservoir, rng_state, read_reservoir(pixel), read_reservoir(pixel).p_target);
+
+    barrier();
 
     const ivec2 prev_pixel = ivec2(round(pixel + texelFetch(img_mv, pixel, 0).rg));
 
@@ -46,10 +50,15 @@ void main() {
     ReSTIRDIReservoir prev_reservoir = read_prev_reservoir(prev_pixel);
 
     if (TEMPORAL_CLAMP_M) {
-        //prev_reservoir.M = min(prev_reservoir.M, reservoir.M * 20);
+        prev_reservoir.M = min(prev_reservoir.M, reservoir.M * 20);
     }
 
-    restir_di_reservoir_combine(reservoir, rng_state, prev_reservoir, prev_reservoir.p_target);
+    restir_di_reservoir_combine_finalized(reservoir,
+                                          rng_state,
+                                          prev_reservoir,
+                                          restir_di_target_pdf(prev_reservoir.y, first_hit)
+                                          );
 
+    restir_di_reservoir_finalize(reservoir);
     write_reservoir = reservoir;
 }

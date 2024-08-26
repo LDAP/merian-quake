@@ -39,11 +39,11 @@
 //
 
 ReSTIRDIReservoir restir_di_reservoir_init() {
-    ReSTIRDIReservoir reservoir = {0, 0., 0., vec3(0)};
+    ReSTIRDIReservoir reservoir = {0, 0., 0., ReSTIRDISample(vec3(0), f16vec3(0.hf))};
     return reservoir;
 }
 
-ReSTIRDIReservoir restir_di_reservoir_init(const vec3 x,
+ReSTIRDIReservoir restir_di_reservoir_init(const ReSTIRDISample x,
                                            const float p_sample,
                                            const float p_target) {
     ReSTIRDIReservoir reservoir = {1, p_target / p_sample, p_target, x};
@@ -62,7 +62,7 @@ float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
 // (this is called update() in the ReSTIR paper / StreamSample in RTXDI)
 bool restir_di_reservoir_add_sample(inout ReSTIRDIReservoir reservoir,
                                     inout uint rng_state,
-                                    const vec3 x,
+                                    const ReSTIRDISample x,
                                     const float p_sample,
                                     const float p_target) {
     const float w = p_target / p_sample;
