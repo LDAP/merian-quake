@@ -110,7 +110,7 @@ bool restir_di_reservoir_combine(inout ReSTIRDIReservoir reservoir,
     const float w = p_target_x_y * other.w_sum_or_W / other.p_target;
     reservoir.w_sum_or_W += w;
     if (XorShift32(rng_state) * reservoir.w_sum_or_W < w) {
-        reservoir.p_target = other.p_target;
+        reservoir.p_target = p_target_x_y;
         reservoir.y = other.y;
         return true;
     }
@@ -129,7 +129,7 @@ bool restir_di_reservoir_combine_finalized(inout ReSTIRDIReservoir reservoir,
     const float w = p_target_x_y * other.w_sum_or_W * other.M;
     reservoir.w_sum_or_W += w;
     if (XorShift32(rng_state) * reservoir.w_sum_or_W < w) {
-        reservoir.p_target = other.p_target;
+        reservoir.p_target = p_target_x_y;
         reservoir.y = other.y;
         return true;
     }
