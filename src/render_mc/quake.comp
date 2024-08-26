@@ -66,6 +66,8 @@ void main() {
                         } else {
                             mc_static_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
                         }
+                        const vec3 mean_wo = mc_state_dir(state, current_hit.pos);
+                        mc_state_reweight2(state, bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), mean_wo, vec2(current_hit.roughness)) * dot(mean_wo, current_hit.normal));
 
                         scores[i] = state.sum_w;
                         score_sum += scores[i];
@@ -133,6 +135,8 @@ void main() {
                     if (XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES) {
                         // == XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
+                        const vec3 mean_wo = mc_state_dir(mc_state, current_hit.pos);
+                        mc_state.weight = bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), mean_wo, vec2(current_hit.roughness)) * dot(mean_wo, current_hit.normal);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
                     } else if (MC_FAST_RECOVERY && mc_f < 1e-12 * mc_state.sum_w) {

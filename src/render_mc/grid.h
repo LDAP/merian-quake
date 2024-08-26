@@ -9,6 +9,8 @@ struct MCState {
     vec3 mv;
     float T;
 
+    float weight;
+
     uint hash; // grid_idx and level
 };
 

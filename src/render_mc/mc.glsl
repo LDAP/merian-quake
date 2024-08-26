@@ -10,7 +10,7 @@
 // GENERAL
 
 MCState mc_state_new(const vec3 pos, const vec3 normal) {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0};
+    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0.hf, 0};
     return r;
 }
 
@@ -45,6 +45,12 @@ void mc_state_reweight(inout MCState mc_state, const float factor) {
     mc_state.w_tgt *= factor;
     mc_state.w_cos *= factor;
 }
+
+void mc_state_reweight2(inout MCState mc_state, const float weight) {
+    if (mc_state.weight != 0)
+        mc_state_reweight(mc_state, weight / mc_state.weight);
+}
+
 #define mc_state_valid(mc_state) (mc_state.sum_w > 0.0)
 
 // ADAPTIVE GRID
