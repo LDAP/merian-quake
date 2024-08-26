@@ -31,7 +31,7 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
 
-    mc_state.sum_w   = mix(mc_state.sum_w,   w,          alpha);
+    mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
     mc_state.w_tgt = mix(mc_state.w_tgt, w * target, alpha);
     mc_state.w_cos = mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha);
     //mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
@@ -40,6 +40,11 @@ void mc_state_add_sample(inout MCState mc_state,
     mc_state.T = params.cl_time;
 }
 
+void mc_state_reweight(inout MCState mc_state, const float factor) {
+    mc_state.sum_w *= factor;
+    mc_state.w_tgt *= factor;
+    mc_state.w_cos *= factor;
+}
 #define mc_state_valid(mc_state) (mc_state.sum_w > 0.0)
 
 // ADAPTIVE GRID
