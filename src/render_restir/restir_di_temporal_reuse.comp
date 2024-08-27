@@ -59,6 +59,13 @@ void main() {
                                           restir_di_target_pdf(prev_reservoir.y, first_hit)
                                           );
 
-    restir_di_reservoir_finalize(reservoir);
+    if (TEMPORAL_BIAS_CORRECTION == 0 /*NONE*/) {
+        restir_di_reservoir_finalize(reservoir);
+    } else if (TEMPORAL_BIAS_CORRECTION == 1 /*LIMITED*/) {
+
+    } else if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+        
+    }
+
     write_reservoir = reservoir;
 }
