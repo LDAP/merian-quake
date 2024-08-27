@@ -37,7 +37,7 @@ void main() {
     trace_ray(throughput, incident, next_hit);
 
     if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y.pos) - distance(first_hit.pos, next_hit.pos))
-                        / max(distance(first_hit.pos, reservoir.y.pos),distance(first_hit.pos, next_hit.pos)) > 0.05) {
+                        / max(distance(first_hit.pos, reservoir.y.pos), distance(first_hit.pos, next_hit.pos)) > 0.1) {
         // not visible 
         reservoir.w_sum_or_W = 0;
         write_reservoir = reservoir;

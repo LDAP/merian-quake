@@ -4,6 +4,7 @@
 #include "layout.glsl"
 #include "../raytrace.glsl"
 #include "restir_di.glsl"
+#include "restir_di_common.glsl"
 
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
@@ -28,9 +29,10 @@ void main() {
 
     uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 2, SEED));
 
-    ReSTIRDIReservoir reservoir = read_reservoir(pixel);
+    ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
+    restir_di_reservoir_combine_finalized(reservoir, rng_state, read_reservoir(pixel), read_reservoir(pixel).p_target);
 
-    const ivec2 neighbor = ivec2(round(pixel + 60 * XorShift32Vec2(rng_state) - 30));
+    const ivec2 neighbor = ivec2(round(pixel + SPATIAL_RADIUS * (2 * XorShift32Vec2(rng_state) - 1)));
 
     if (any(greaterThanEqual(neighbor, resolution)) || any(lessThan(neighbor, ivec2(0)))) {
         return;
@@ -41,9 +43,18 @@ void main() {
         return;
     }
 
-    restir_di_reservoir_combine(reservoir, rng_state, read_reservoir(neighbor), read_reservoir(neighbor).p_target);
-    
+    ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
     barrier();
+
+    restir_di_reservoir_combine_finalized(reservoir, rng_state, neighbor_reservoir, restir_di_target_pdf(neighbor_reservoir.y, first_hit));
+
+    if (TEMPORAL_BIAS_CORRECTION == 0 /*NONE*/) {
+        restir_di_reservoir_finalize(reservoir);
+    } else if (TEMPORAL_BIAS_CORRECTION == 1 /*LIMITED*/) {
+
+    } else if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+        
+    }
 
     write_reservoir = reservoir;
 }

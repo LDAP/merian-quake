@@ -63,6 +63,21 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
     return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.hf * sum) - 1.0hf) : f16vec3(0);
 }
 
+// Sets T_MAX and T_MIN accordingly, avoiding unnecessary intersection tests.
+// If this ray hits noting, the surface can be considered visible
+void trace_visibility_ray_init(rayQueryEXT ray_query, const vec3 from, const vec3 to, const float offset /* = 1e-3 */) {
+    const vec3 wo = to - from;
+    rayQueryInitializeEXT(ray_query,
+                          tlas,
+                          gl_RayFlagsCullBackFacingTrianglesEXT,  // We need to cull backfaces
+                                                                  // else we get z-fighting in Quake
+                          0xFF,                 // 8-bit instance mask, here saying "trace against all instances"
+                          from,
+                          offset,                                 // T_MIN
+                          normalize(wo),
+                          max(offset, length(wo) - 2 * offset));  // T_MAX
+}
+
 void trace_ray_init(rayQueryEXT ray_query, const vec3 direction, const vec3 position) {
     rayQueryInitializeEXT(ray_query,
                           tlas,
@@ -100,6 +115,22 @@ void trace_ray(rayQueryEXT ray_query) {
             }
         }
     }
+}
+
+// Returns the throughput if the surface is determined to be visible
+f16vec3 trace_visibility(const vec3 from, const vec3 to) {
+    rayQueryEXT ray_query;
+
+    trace_visibility_ray_init(ray_query, from, to, 1e-3);
+
+    trace_ray(ray_query);
+
+    if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
+        // Nothing hit. Surface should be visible!
+        return f16vec3(transmittance3(distance(from, to), MU_T, VOLUME_MAX_T));
+    }
+
+    return f16vec3(0);
 }
 
 // Initialize pos and wi with ray origin and ray direction and

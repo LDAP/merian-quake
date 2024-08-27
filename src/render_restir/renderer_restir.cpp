@@ -115,7 +115,8 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             render_info.constant.sun_color.b, render_info.constant.volume_max_t, seed,
             io.is_connected(con_debug), debug_output_selector, visibility_shade,
             temporal_normal_reject_cos, temporal_depth_reject_percent, spatial_normal_reject_cos,
-            spatial_depth_reject_percent, temporal_clamp_m);
+            spatial_depth_reject_percent, temporal_clamp_m, spatial_radius,
+            temporal_bias_correction);
 
         auto spec = spec_builder.build();
 
@@ -231,7 +232,12 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_percent("temporal depth threshold", temporal_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
-    recreate_pipeline |= config.config_bool("temporal clamp m", temporal_clamp_m);
+    recreate_pipeline |=
+        config.config_int("temporal clamp m", temporal_clamp_m,
+                          "Clamp M to limit temporal influence. In ReSTIR DI the recommendation "
+                          "was 20xNumberLightSamples (32). Set to 0 to disable.");
+    recreate_pipeline |=
+        config.config_options("temporal bias correction", temporal_bias_correction, {"none", "limited", "raytraced"});
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
@@ -242,6 +248,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
+    recreate_pipeline |= config.config_int("spatital radius", spatial_radius, 0, 100);
 
     config.st_separate("Shade");
     recreate_pipeline |=

@@ -114,15 +114,17 @@ class RendererRESTIR : public merian_nodes::Node {
 
     uint32_t seed = 0;
     bool randomize_seed = true;
-    int debug_output_selector = 0;
+    int32_t debug_output_selector = 0;
 
     bool temporal_reuse_enable = false;
-    int spatial_reuse_iterations = 0;
+    int32_t spatial_reuse_iterations = 0;
     bool visibility_shade = false;
-    bool temporal_clamp_m = true;
+    int32_t temporal_clamp_m = 32 * 20;
 
     float temporal_normal_reject_cos = 0.96;
     float temporal_depth_reject_percent = 0.1;
     float spatial_normal_reject_cos = 0.96;
     float spatial_depth_reject_percent = 0.1;
+    int32_t spatial_radius = 30;
+    int32_t temporal_bias_correction = 0;
 };

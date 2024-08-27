@@ -49,8 +49,8 @@ void main() {
 
     ReSTIRDIReservoir prev_reservoir = read_prev_reservoir(prev_pixel);
 
-    if (TEMPORAL_CLAMP_M) {
-        prev_reservoir.M = min(prev_reservoir.M, reservoir.M * 20);
+    if (TEMPORAL_CLAMP_M > 0) {
+        prev_reservoir.M = min(prev_reservoir.M, TEMPORAL_CLAMP_M);
     }
 
     restir_di_reservoir_combine_finalized(reservoir,
