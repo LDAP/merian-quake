@@ -50,12 +50,6 @@ ReSTIRDIReservoir restir_di_reservoir_init(const ReSTIRDISample x,
     return reservoir;
 }
 
-// The weight / inverse PDF for the current sample.
-// returns W = 1 / p_ris = (1 / p_target) * (w_sum_or_W / M)
-float restir_di_reservoir_W(const ReSTIRDIReservoir reservoir) {
-    return reservoir.w_sum_or_W / reservoir.p_target / reservoir.M;
-}
-
 // Add a sample to the reservoir.
 // Note: p_sample can also be the effective PDF after MIS. (ReSTIR DI, page 3)
 //
