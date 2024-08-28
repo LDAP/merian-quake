@@ -117,8 +117,7 @@ void trace_ray(rayQueryEXT ray_query) {
     }
 }
 
-// Returns the throughput if the surface is determined to be visible
-f16vec3 trace_visibility(const vec3 from, const vec3 to) {
+bool trace_visibility(const vec3 from, const vec3 to) {
     rayQueryEXT ray_query;
 
     trace_visibility_ray_init(ray_query, from, to, 1e-3);
@@ -127,10 +126,10 @@ f16vec3 trace_visibility(const vec3 from, const vec3 to) {
 
     if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
         // Nothing hit. Surface should be visible!
-        return f16vec3(transmittance3(distance(from, to), MU_T, VOLUME_MAX_T));
+        return true;// f16vec3(transmittance3(distance(from, to), MU_T, VOLUME_MAX_T));
     }
 
-    return f16vec3(0);
+    return false;
 }
 
 // Initialize pos and wi with ray origin and ray direction and

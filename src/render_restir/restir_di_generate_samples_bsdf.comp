@@ -44,7 +44,7 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-        const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, incident);
+        const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, incident, ReSTIRDISample_Flags_Valid);
         restir_di_reservoir_add_sample(reservoir,
                                        rng_state,
                                        x,

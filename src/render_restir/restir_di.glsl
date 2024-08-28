@@ -39,7 +39,7 @@
 //
 
 ReSTIRDIReservoir restir_di_reservoir_init() {
-    ReSTIRDIReservoir reservoir = {0, 0., 0., ReSTIRDISample(vec3(0), f16vec3(0.hf))};
+    ReSTIRDIReservoir reservoir = {0, 0., 0., ReSTIRDISample(vec3(0), f16vec3(0.hf), 0)};
     return reservoir;
 }
 
@@ -48,6 +48,16 @@ ReSTIRDIReservoir restir_di_reservoir_init(const ReSTIRDISample x,
                                            const float p_target) {
     ReSTIRDIReservoir reservoir = {1, p_target / p_sample, p_target, x};
     return reservoir;
+}
+
+void restir_di_reservoir_discard(inout ReSTIRDIReservoir reservoir) {
+    reservoir.w_sum_or_W = 0;
+    reservoir.y.flags = 0;
+    reservoir.y.radiance = f16vec3(0);
+}
+
+bool restir_di_light_sample_valid(const ReSTIRDISample y) {
+    return (y.flags & ReSTIRDISample_Flags_Valid) > 0;
 }
 
 // Add a sample to the reservoir.

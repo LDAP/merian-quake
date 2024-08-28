@@ -25,29 +25,34 @@ void main() {
 
     uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 3, SEED));
 
-    ReSTIRDIReservoir reservoir = read_reservoir(pixel);;
+    ReSTIRDIReservoir reservoir = read_reservoir(pixel);
 
-    Hit next_hit;
-    const vec3 wo = normalize(reservoir.y.pos - first_hit.pos);
-    const float wodotn = dot(wo, first_hit.normal);
-    next_hit.wi = wo;
-    next_hit.pos = first_hit.pos - first_hit.wi * 1e-3;
-    f16vec3 incident = f16vec3(0); // contains throughput already
-    f16vec3 throughput = f16vec3(1);
-    trace_ray(throughput, incident, next_hit);
+    vec3 irr = vec3(0);
 
-    if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y.pos) - distance(first_hit.pos, next_hit.pos))
-                        / max(distance(first_hit.pos, reservoir.y.pos), distance(first_hit.pos, next_hit.pos)) > 0.1) {
-        // not visible 
-        reservoir.w_sum_or_W = 0;
-        write_reservoir = reservoir;
-    }
+    if (restir_di_light_sample_valid(reservoir.y)) {
+        Hit next_hit;
+        const vec3 wo = normalize(reservoir.y.pos - first_hit.pos);
+        const float wodotn = dot(wo, first_hit.normal);
+        next_hit.wi = wo;
+        next_hit.pos = first_hit.pos - first_hit.wi * 1e-3;
+        f16vec3 incident = f16vec3(0); // contains throughput already
+        f16vec3 throughput = f16vec3(1);
+        trace_ray(throughput, incident, next_hit);
 
-    const float microfacet_bsdf = bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn;
-    
-    const vec3 irr = !isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W) ? (microfacet_bsdf * incident) * reservoir.w_sum_or_W : vec3(0);
-    const float l = yuv_luminance(irr);
+        if (VISIBILITY_SHADE && abs(distance(first_hit.pos, reservoir.y.pos) - distance(first_hit.pos, next_hit.pos))
+                            / max(distance(first_hit.pos, reservoir.y.pos), distance(first_hit.pos, next_hit.pos)) > 0.1) {
+            // not visible 
+            restir_di_reservoir_discard(reservoir);
+            write_reservoir = reservoir;
+        }
+
+        const float microfacet_bsdf = bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn;
+        if (!isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
+                irr = microfacet_bsdf * incident * reservoir.w_sum_or_W;
+        }
+    }    
 
     imageStore(img_irradiance, pixel, vec4(irr, 0));
+    const float l = yuv_luminance(irr);
     imageStore(img_moments, pixel, vec4(l, l * l, 0, 0));
 }

@@ -3,9 +3,12 @@
 
 #include "merian-shaders/types.glsl.h"
 
+#define ReSTIRDISample_Flags_Valid 1
+
 struct ReSTIRDISample {
     vec3 pos;
     f16vec3 radiance;
+    uint flags;
 };
 
 struct ReSTIRDIReservoir {
