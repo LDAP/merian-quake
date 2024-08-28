@@ -1,5 +1,6 @@
 #include "renderer_restir.hpp"
 
+#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "restir_di_reservoir.glsl.h"
 
 #include "src/render_restir/restir_di_clear.comp.spv.h"
@@ -15,6 +16,15 @@
 #include "merian-shaders/gbuffer.glsl.h"
 
 #include <random>
+
+vk::BufferCreateInfo make_reservoir_buffer_create_info(const uint32_t render_width,
+                                                       const uint32_t render_height) {
+    return vk::BufferCreateInfo{
+        {},
+        gbuffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eTransferSrc};
+}
 
 RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
                                const merian::ResourceAllocatorHandle& allocator)
@@ -36,6 +46,11 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
     clear_shader = std::make_shared<merian::ShaderModule>(
         context, merian_quake_restir_di_clear_comp_spv_size(),
         merian_quake_restir_di_clear_comp_spv());
+
+    reservoir_pingpong_layout = merian::DescriptorSetLayoutBuilder()
+                                    .add_binding_storage_buffer()
+                                    .add_binding_storage_buffer()
+                                    .build_layout(context);
 }
 
 RendererRESTIR::~RendererRESTIR() {}
@@ -64,12 +79,7 @@ RendererRESTIR::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
     con_reservoirs_out = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "reservoirs", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo{
-            {},
-            gbuffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
-            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
-                vk::BufferUsageFlagBits::eTransferSrc});
+        vk::ShaderStageFlags(), make_reservoir_buffer_create_info(render_width, render_height));
 
     return {
         con_irradiance,
@@ -84,10 +94,17 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& 
                              const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
     pipe_layout = merian::PipelineLayoutBuilder(context)
                       .add_descriptor_set_layout(graph_desc_set_layout)
+                      .add_descriptor_set_layout(reservoir_pingpong_layout)
                       .add_push_constant<QuakeNode::UniformData>()
                       .build_pipeline_layout();
 
     pipelines.recreate = true;
+    ping_pong_layouts.clear();
+
+    const uint32_t render_width = io_layout[con_resolution]->value().width;
+    const uint32_t render_height = io_layout[con_resolution]->value().height;
+    pong_buffer = allocator->createBuffer(make_reservoir_buffer_create_info(render_width, render_height));
+
     return {};
 }
 
@@ -96,6 +113,10 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
                              const merian::DescriptorSetHandle& graph_descriptor_set,
                              const merian_nodes::NodeIO& io) {
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
+
+    if (!ping_pong_layouts.contains(io[con_reservoirs_out])) {
+        merian::Descipo
+    }
 
     // (RE-) CREATE PIPELINE
     if (render_info.constant_data_update || pipelines.recreate) {
@@ -236,8 +257,8 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.config_int("temporal clamp m", temporal_clamp_m,
                           "Clamp M to limit temporal influence. In ReSTIR DI the recommendation "
                           "was 20xNumberLightSamples (32). Set to 0 to disable.");
-    recreate_pipeline |=
-        config.config_options("temporal bias correction", temporal_bias_correction, {"none", "limited", "raytraced"});
+    recreate_pipeline |= config.config_options("temporal bias correction", temporal_bias_correction,
+                                               {"none", "limited", "raytraced"});
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);

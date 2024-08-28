@@ -75,6 +75,13 @@ layout(set = 0, binding = 10) uniform sampler2D img_mv;
 layout(set = 0, binding = 11) uniform writeonly restrict image2D img_irradiance;
 layout(set = 0, binding = 12) uniform writeonly restrict image2D img_moments;
 layout(set = 0, binding = 13) uniform writeonly restrict image2D img_debug;
-layout(set = 0, binding = 14, scalar) buffer restrict buf_reservoirs_out {
-    ReSTIRDIReservoir reservoirs[];
+
+
+
+layout(set = 1, binding = 0, scalar) buffer readonly restrict buf_reservoirs_out {
+    ReSTIRDIReservoir reservoirs_read[];
+};
+
+layout(set = 1, binding = 1, scalar) buffer writeonly restrict buf_reservoirs_out {
+    ReSTIRDIReservoir reservoirs_write[];
 };
