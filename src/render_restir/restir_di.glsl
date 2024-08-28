@@ -135,14 +135,14 @@ bool restir_di_reservoir_combine_finalized(inout ReSTIRDIReservoir reservoir,
 // Uses 1 / M
 void restir_di_reservoir_finalize(inout ReSTIRDIReservoir reservoir) {
     const float denominator = reservoir.M * reservoir.p_target;
-    reservoir.w_sum_or_W = denominator != 0 ? reservoir.w_sum_or_W / denominator : 0.0;
+    reservoir.w_sum_or_W = denominator > 0. ? reservoir.w_sum_or_W / denominator : 0.0;
 }
 
 // performs the normalization after resampling. After this method w_sum_or_W holds W.
 // equation 6 in the ReSTIR DI paper
 void restir_di_reservoir_finalize_custom(inout ReSTIRDIReservoir reservoir, const float numerator, float denominator) {
     denominator *= reservoir.p_target;
-    reservoir.w_sum_or_W = denominator != 0 ? reservoir.w_sum_or_W * numerator / denominator : 0.0;
+    reservoir.w_sum_or_W = denominator > 0. ? reservoir.w_sum_or_W * numerator / denominator : 0.0;
 }
 
 #endif // _MERIAN_RESTIR_DI_H_
