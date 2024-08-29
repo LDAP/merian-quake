@@ -15,6 +15,7 @@
 
 #include "merian-shaders/gbuffer.glsl.h"
 
+#include <array>
 #include <random>
 
 vk::BufferCreateInfo make_reservoir_buffer_create_info(const uint32_t render_width,
@@ -47,10 +48,11 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
         context, merian_quake_restir_di_clear_comp_spv_size(),
         merian_quake_restir_di_clear_comp_spv());
 
-    reservoir_pingpong_layout = merian::DescriptorSetLayoutBuilder()
-                                    .add_binding_storage_buffer()
-                                    .add_binding_storage_buffer()
-                                    .build_layout(context);
+    reservoir_pingpong_layout =
+        merian::DescriptorSetLayoutBuilder()
+            .add_binding_storage_buffer()
+            .add_binding_storage_buffer()
+            .build_layout(context, vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR);
 }
 
 RendererRESTIR::~RendererRESTIR() {}
@@ -99,11 +101,11 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& 
                       .build_pipeline_layout();
 
     pipelines.recreate = true;
-    ping_pong_layouts.clear();
 
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
-    pong_buffer = allocator->createBuffer(make_reservoir_buffer_create_info(render_width, render_height));
+    pong_buffer =
+        allocator->createBuffer(make_reservoir_buffer_create_info(render_width, render_height));
 
     return {};
 }
@@ -114,9 +116,41 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
                              const merian_nodes::NodeIO& io) {
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
-    if (!ping_pong_layouts.contains(io[con_reservoirs_out])) {
-        merian::Descipo
-    }
+    const std::array<std::pair<vk::DescriptorBufferInfo, vk::DescriptorBufferInfo>, 2>
+        ping_pong_buffers = {
+            std::make_pair(vk::DescriptorBufferInfo{*io[con_reservoirs_out], 0, VK_WHOLE_SIZE},
+                           vk::DescriptorBufferInfo{*pong_buffer, 0, VK_WHOLE_SIZE}),
+            std::make_pair(vk::DescriptorBufferInfo{*pong_buffer, 0, VK_WHOLE_SIZE},
+                           vk::DescriptorBufferInfo{*io[con_reservoirs_out], 0, VK_WHOLE_SIZE})};
+    // start ping pong buffer such that the last write of the spatial passes goes to the graph output.
+    uint32_t ping_pong_index = (spatial_reuse_iterations + 1) & 1;
+
+    const auto get_push_descriptor_writes = [this,
+                                             &ping_pong_buffers](const uint32_t ping_pong_index) {
+        return std::vector<vk::WriteDescriptorSet>{
+            vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                0,
+                0,
+                1,
+                reservoir_pingpong_layout->get_type_for_binding(0),
+                nullptr,
+                &ping_pong_buffers[ping_pong_index].first,
+                nullptr,
+                nullptr,
+            },
+            vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                1,
+                0,
+                1,
+                reservoir_pingpong_layout->get_type_for_binding(1),
+                nullptr,
+                &ping_pong_buffers[ping_pong_index].second,
+                nullptr,
+                nullptr,
+            }};
+    };
 
     // (RE-) CREATE PIPELINE
     if (render_info.constant_data_update || pipelines.recreate) {
@@ -169,6 +203,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         pipelines.clear->bind(cmd);
         pipelines.clear->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.clear->push_descriptor_set(cmd, 1, get_push_descriptor_writes(1));
         pipelines.clear->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                      (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
@@ -176,11 +211,14 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
     }
 
     auto sync_reservoirs = [&]() {
-        auto bar = io[con_reservoirs_out]->buffer_barrier(
+        const auto bar1 = io[con_reservoirs_out]->buffer_barrier(
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
+        const auto bar2 = pong_buffer->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {bar1, bar2}, {});
     };
 
     // BIND PIPELINE
@@ -188,6 +226,8 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "generate samples");
         pipelines.generate_samples->bind(cmd);
         pipelines.generate_samples->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.generate_samples->push_descriptor_set(
+            cmd, 1, get_push_descriptor_writes(ping_pong_index));
         pipelines.generate_samples->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                      (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
@@ -198,12 +238,16 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         sync_reservoirs();
         pipelines.temporal_reuse->bind(cmd);
         pipelines.temporal_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.temporal_reuse->push_descriptor_set(cmd, 1,
+                                                      get_push_descriptor_writes(ping_pong_index));
         pipelines.temporal_reuse->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                      (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
     }
 
     if (spatial_reuse_iterations > 0) {
+        ping_pong_index ^= 1;
+
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "spatial reuse");
         for (int i = 0; i < spatial_reuse_iterations; i++) {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
@@ -211,6 +255,9 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             sync_reservoirs();
             pipelines.spatial_reuse->bind(cmd);
             pipelines.spatial_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
+            pipelines.spatial_reuse->push_descriptor_set(
+                cmd, 1, get_push_descriptor_writes(ping_pong_index));
+            ping_pong_index ^= 1;
             pipelines.spatial_reuse->push_constant(cmd, render_info.uniform);
             cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                          (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
@@ -222,6 +269,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         sync_reservoirs();
         pipelines.shade->bind(cmd);
         pipelines.shade->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.shade->push_descriptor_set(cmd, 1, get_push_descriptor_writes(1));
         pipelines.shade->push_constant(cmd, render_info.uniform);
         cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
                      (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);

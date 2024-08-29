@@ -65,8 +65,8 @@ layout(set = 0, binding = 6, scalar) buffer readonly restrict buf_hits {
 };
 layout(set = 0, binding = 7) uniform sampler2D img_tex[MAX_GLTEXTURES];
 layout(set = 0, binding = 8) uniform accelerationStructureEXT tlas;
-layout(set = 0, binding = 9, scalar) buffer readonly restrict buf_reservoirs_in {
-    ReSTIRDIReservoir prev_reservoirs[];
+layout(set = 0, binding = 9, scalar) buffer readonly restrict buf_prev_reservoirs_in {
+    ReSTIRDIReservoir reservoirs_prev_read[];
 };
 layout(set = 0, binding = 10) uniform sampler2D img_mv;
 
@@ -78,10 +78,10 @@ layout(set = 0, binding = 13) uniform writeonly restrict image2D img_debug;
 
 
 
-layout(set = 1, binding = 0, scalar) buffer readonly restrict buf_reservoirs_out {
-    ReSTIRDIReservoir reservoirs_read[];
+layout(set = 1, binding = 0, scalar) buffer readonly buf_reservoirs_in {
+    ReSTIRDIReservoir reservoirs_spatial_read[];
 };
 
-layout(set = 1, binding = 1, scalar) buffer writeonly restrict buf_reservoirs_out {
-    ReSTIRDIReservoir reservoirs_write[];
+layout(set = 1, binding = 1, scalar) buffer buf_reservoirs_out {
+    ReSTIRDIReservoir reservoirs[];
 };
