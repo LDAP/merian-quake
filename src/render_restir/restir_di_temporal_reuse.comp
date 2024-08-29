@@ -19,7 +19,7 @@
 #define resolution ivec2(imageSize(img_irradiance))
 #define first_hit hits[gbuffer_index(pixel, resolution)]
 #define read_reservoir(pixel) reservoirs[gbuffer_index((pixel), resolution)]
-#define read_prev_reservoir(pixel) prev_reservoirs[gbuffer_index((pixel), resolution)]
+#define read_prev_reservoir(pixel) reservoirs_prev_read[gbuffer_index((pixel), resolution)]
 #define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
 #define gbuf(pixel) gbuffer[gbuffer_index((pixel), resolution)]
 #define prev_gbuf(pixel) prev_gbuffer[gbuffer_index((pixel), resolution)]

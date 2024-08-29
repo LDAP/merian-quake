@@ -105,6 +105,9 @@ class RendererRESTIR : public merian_nodes::Node {
 
     // ----------------------------------------------------
 
+    merian::DescriptorSetLayoutHandle reservoir_pingpong_layout;
+    merian::BufferHandle pong_buffer;
+
     // Spec constants
     static constexpr uint32_t LOCAL_SIZE_X = 8;
     static constexpr uint32_t LOCAL_SIZE_Y = 8;

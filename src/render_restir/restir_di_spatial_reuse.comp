@@ -18,7 +18,7 @@
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
 #define first_hit hits[gbuffer_index(pixel, resolution)]
-#define read_reservoir(pixel) reservoirs[gbuffer_index((pixel), resolution)]
+#define read_reservoir(pixel) reservoirs_spatial_read[gbuffer_index((pixel), resolution)]
 #define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
 #define gbuf(pixel) gbuffer[gbuffer_index((pixel), resolution)]
 
@@ -37,23 +37,18 @@ void main() {
 
     const ivec2 neighbor = ivec2(round(pixel + SPATIAL_RADIUS * (2 * XorShift32Vec2(rng_state) - 1)));
 
-    if (any(greaterThanEqual(neighbor, resolution)) || any(lessThan(neighbor, ivec2(0)))) {
-        return;
-    }
-
-    if (!reprojection_valid(geo_decode_normal(gbuf(pixel).enc_normal), geo_decode_normal(gbuf(neighbor).enc_normal), SPATIAL_NORMAL_REJECT_COS,
+    if (all(lessThan(neighbor, resolution)) && all(greaterThanEqual(neighbor, ivec2(0)))
+        && reprojection_valid(geo_decode_normal(gbuf(pixel).enc_normal), geo_decode_normal(gbuf(neighbor).enc_normal), SPATIAL_NORMAL_REJECT_COS,
                           gbuf(pixel).linear_z,  gbuf(pixel).vel_z, gbuf(neighbor).linear_z, SPATIAL_DEPTH_REJECT)) {
-        return;
+
+        ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
+
+        restir_di_reservoir_combine_finalized(reservoir,
+                                              rng_state,
+                                              neighbor_reservoir,
+                                              restir_di_target_pdf(neighbor_reservoir.y, first_hit)
+                                              );
     }
-
-    ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
-    barrier();
-
-    restir_di_reservoir_combine_finalized(reservoir,
-                                          rng_state,
-                                          neighbor_reservoir,
-                                          restir_di_target_pdf(neighbor_reservoir.y, first_hit)
-                                          );
 
     restir_di_reservoir_finalize(reservoir);
 
