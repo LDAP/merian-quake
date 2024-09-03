@@ -62,14 +62,27 @@ void main() {
 
     if (TEMPORAL_BIAS_CORRECTION == 0 /*NONE*/) {
         restir_di_reservoir_finalize(reservoir);
-    } else if (TEMPORAL_BIAS_CORRECTION == 1 /*BASIC*/ || TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+    } else if (TEMPORAL_BIAS_CORRECTION >= 1 /*BASIC or RAYTRACED or RAYTRACED_PREV_BVH*/) {
         // called RTXDI_BIAS_CORRECTION_BASIC in rtxdi-runtime / RESTIR DI implementation
         float pi = reservoir.p_target;
         float pi_sum = reservoir.p_target * current_reservoir.M;
         float temporal_p = restir_di_target_pdf(reservoir.y, surface_at(prev_pixel));
 
-        if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/ && temporal_p > 0) {
+        if (temporal_p > 0) {
             // do this only if really necessary...
+            if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+                if (!trace_visibility(center_surface.pos, reservoir.y.pos)) {
+                    temporal_p = 0;
+                }
+            }
+
+            if (TEMPORAL_BIAS_CORRECTION == 3 /*RAYTRACED_PREV_BVH*/) {
+                // if (!trace_visibility(prev_tlas, surface_at(prev_pixel).pos, reservoir.y.pos)) {
+                //     temporal_p = 0;
+                // }
+                
+                temporal_p = 0; // prev bvh currently unsupported...
+            }
         }
 
         pi = selected_prev ? temporal_p : pi;

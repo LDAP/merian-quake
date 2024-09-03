@@ -307,7 +307,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
                           "Clamp M to limit temporal influence. In ReSTIR DI the recommendation "
                           "was 20xNumberLightSamples (32). Set to 0 to disable.");
     recreate_pipeline |= config.config_options("temporal bias correction", temporal_bias_correction,
-                                               {"none", "basic", "raytraced"});
+                                               {"none", "basic", "raytraced", "raytraced previous bvh"});
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);

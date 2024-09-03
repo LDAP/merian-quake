@@ -65,7 +65,7 @@ f16vec3 ldr_to_hdr(f16vec3 color) {
 
 // Sets T_MAX and T_MIN accordingly, avoiding unnecessary intersection tests.
 // If this ray hits noting, the surface can be considered visible
-void trace_visibility_ray_init(rayQueryEXT ray_query, const vec3 from, const vec3 to, const float offset /* = 1e-3 */) {
+void trace_visibility_ray_init(accelerationStructureEXT tlas, rayQueryEXT ray_query, const vec3 from, const vec3 to, const float offset /* = 1e-3 */) {
     const vec3 wo = to - from;
     rayQueryInitializeEXT(ray_query,
                           tlas,
@@ -117,10 +117,11 @@ void trace_ray(rayQueryEXT ray_query) {
     }
 }
 
-bool trace_visibility(const vec3 from, const vec3 to) {
+// special case: intersections with skybox do not count...
+bool trace_visibility(accelerationStructureEXT tlas, const vec3 from, const vec3 to) {
     rayQueryEXT ray_query;
 
-    trace_visibility_ray_init(ray_query, from, to, 1e-3);
+    trace_visibility_ray_init(tlas, ray_query, from, to, 1e-3);
 
     trace_ray(ray_query);
 
@@ -129,14 +130,24 @@ bool trace_visibility(const vec3 from, const vec3 to) {
         return true;// f16vec3(transmittance3(distance(from, to), MU_T, VOLUME_MAX_T));
     }
 
+    // Need this for restir, because with artificially move the position in trace ray when we hit the skybox...
+    const uint16_t flags = buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)].texnum_fb_flags >> 12;
+    if (flags == MAT_FLAGS_SKY) {
+        return true;
+    }
+
     return false;
+}
+
+bool trace_visibility(const vec3 from, const vec3 to) {
+    return trace_visibility(tlas, from, to);
 }
 
 // Initialize pos and wi with ray origin and ray direction and
 // throughput, contribution as needed
 // 
-// Returns the troughput along the ray (without hit)
-// and contribution (with hit) multiplied with throuhput.
+// Returns the throughput along the ray (without hit)
+// and contribution (with hit) multiplied with throughput.
 // (allows for volumetric effects)
 #ifdef MERIAN_QUAKE_FIRST_HIT
 void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit, const vec3 r_x, const vec3 r_y) {
