@@ -17,7 +17,8 @@
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
-#define first_hit hits[gbuffer_index(pixel, resolution)]
+#define center_surface hits[gbuffer_index(pixel, resolution)]
+#define surface_at(pixel) hits[gbuffer_index(pixel, resolution)]
 #define read_reservoir(pixel) reservoirs[gbuffer_index((pixel), resolution)]
 #define read_prev_reservoir(pixel) reservoirs_prev_read[gbuffer_index((pixel), resolution)]
 #define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
@@ -32,9 +33,8 @@ void main() {
     uint rng_state = pcg4d16(uvec4(pixel, params.frame * 4 + 1, SEED));
 
     ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
-    restir_di_reservoir_combine_finalized(reservoir, rng_state, read_reservoir(pixel), read_reservoir(pixel).p_target);
-
-    barrier();
+    const ReSTIRDIReservoir current_reservoir = read_reservoir(pixel);
+    restir_di_reservoir_combine_finalized(reservoir, rng_state, current_reservoir, current_reservoir.p_target);
 
     const ivec2 prev_pixel = ivec2(round(pixel + texelFetch(img_mv, pixel, 0).rg));
 
@@ -53,18 +53,29 @@ void main() {
         prev_reservoir.M = min(prev_reservoir.M, TEMPORAL_CLAMP_M);
     }
 
-    restir_di_reservoir_combine_finalized(reservoir,
-                                          rng_state,
-                                          prev_reservoir,
-                                          restir_di_target_pdf(prev_reservoir.y, first_hit)
-                                          );
+    const bool selected_prev = restir_di_reservoir_combine_finalized(
+        reservoir,
+        rng_state,
+        prev_reservoir,
+        restir_di_target_pdf(prev_reservoir.y, center_surface)
+    );
 
     if (TEMPORAL_BIAS_CORRECTION == 0 /*NONE*/) {
         restir_di_reservoir_finalize(reservoir);
-    } else if (TEMPORAL_BIAS_CORRECTION == 1 /*LIMITED*/) {
+    } else if (TEMPORAL_BIAS_CORRECTION == 1 /*BASIC*/ || TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+        // called RTXDI_BIAS_CORRECTION_BASIC in rtxdi-runtime / RESTIR DI implementation
+        float pi = reservoir.p_target;
+        float pi_sum = reservoir.p_target * current_reservoir.M;
+        float temporal_p = restir_di_target_pdf(reservoir.y, surface_at(prev_pixel));
 
-    } else if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
-        
+        if (TEMPORAL_BIAS_CORRECTION == 2 /*RAYTRACED*/ && temporal_p > 0) {
+            // do this only if really necessary...
+        }
+
+        pi = selected_prev ? temporal_p : pi;
+        pi_sum += temporal_p * prev_reservoir.M;
+
+        restir_di_reservoir_finalize_custom(reservoir, pi, pi_sum);
     }
 
     write_reservoir = reservoir;

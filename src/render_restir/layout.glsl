@@ -24,6 +24,7 @@ layout (constant_id = 19) const float SPATIAL_DEPTH_REJECT = 0.1;
 layout (constant_id = 20) const int TEMPORAL_CLAMP_M = 32 * 20;
 layout (constant_id = 21) const int SPATIAL_RADIUS = 30;
 layout (constant_id = 22) const int TEMPORAL_BIAS_CORRECTION = 0;
+layout (constant_id = 23) const int SPATIAL_BIAS_CORRECTION = 0;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"

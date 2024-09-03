@@ -122,7 +122,8 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
                            vk::DescriptorBufferInfo{*pong_buffer, 0, VK_WHOLE_SIZE}),
             std::make_pair(vk::DescriptorBufferInfo{*pong_buffer, 0, VK_WHOLE_SIZE},
                            vk::DescriptorBufferInfo{*io[con_reservoirs_out], 0, VK_WHOLE_SIZE})};
-    // start ping pong buffer such that the last write of the spatial passes goes to the graph output.
+    // start ping pong buffer such that the last write of the spatial passes goes to the graph
+    // output.
     uint32_t ping_pong_index = (spatial_reuse_iterations + 1) & 1;
 
     const auto get_push_descriptor_writes = [this,
@@ -171,7 +172,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             io.is_connected(con_debug), debug_output_selector, visibility_shade,
             temporal_normal_reject_cos, temporal_depth_reject_percent, spatial_normal_reject_cos,
             spatial_depth_reject_percent, temporal_clamp_m, spatial_radius,
-            temporal_bias_correction);
+            temporal_bias_correction, spatial_bias_correction);
 
         auto spec = spec_builder.build();
 
@@ -306,7 +307,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
                           "Clamp M to limit temporal influence. In ReSTIR DI the recommendation "
                           "was 20xNumberLightSamples (32). Set to 0 to disable.");
     recreate_pipeline |= config.config_options("temporal bias correction", temporal_bias_correction,
-                                               {"none", "limited", "raytraced"});
+                                               {"none", "basic", "raytraced"});
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
@@ -318,6 +319,8 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
     recreate_pipeline |= config.config_int("spatital radius", spatial_radius, 0, 100);
+    recreate_pipeline |= config.config_options("spatial bias correction", spatial_bias_correction,
+                                               {"none", "basic", "raytraced"});
 
     config.st_separate("Shade");
     recreate_pipeline |=

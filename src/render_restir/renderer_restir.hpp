@@ -130,4 +130,5 @@ class RendererRESTIR : public merian_nodes::Node {
     float spatial_depth_reject_percent = 0.1;
     int32_t spatial_radius = 30;
     int32_t temporal_bias_correction = 0;
+    int32_t spatial_bias_correction = 0;
 };
