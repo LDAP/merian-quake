@@ -17,6 +17,15 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 // return normalized direction (from pos)
 #define mc_state_dir(mc_state, pos) normalize((mc_state.w_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0)) - pos)
 
+float mc_state_mean_cos(const MCState mc_state) {
+    return (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + DIR_GUIDE_PRIOR);
+}
+
+float mc_state_kappa(const MCState mc_state) {
+    const float r = (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + DIR_GUIDE_PRIOR);
+    return (3.0 * r - r * r * r) / (1.0 - r * r);
+}
+
 // returns the vmf lobe vec4(direction, kappa) for a position
 vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     const float r = (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + DIR_GUIDE_PRIOR);
