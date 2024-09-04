@@ -108,7 +108,7 @@ void main() {
             f16vec3 throughput = f16vec3(1);
             trace_ray(throughput, incident, next_hit);
             // Full GI (infinite diffuse bounces)
-            const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+            const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) || (!USE_LIGHT_CACHE_TAIL && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
             // EVALUATE BSDF
             // without albedo (added below to skip first albedo)
