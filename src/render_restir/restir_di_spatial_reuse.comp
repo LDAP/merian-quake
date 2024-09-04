@@ -17,7 +17,8 @@
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
-#define first_hit hits[gbuffer_index(pixel, resolution)]
+#define center_surface hits[gbuffer_index(pixel, resolution)]
+#define surface_at(pixel) hits[gbuffer_index(pixel, resolution)]
 #define read_reservoir(pixel) reservoirs_spatial_read[gbuffer_index((pixel), resolution)]
 #define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
 #define gbuf(pixel) gbuffer[gbuffer_index((pixel), resolution)]
@@ -44,14 +45,40 @@ void main() {
 
         ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
 
-        restir_di_reservoir_combine_finalized(reservoir,
-                                              rng_state,
-                                              neighbor_reservoir,
-                                              restir_di_target_pdf(neighbor_reservoir.y, first_hit)
-                                              );
-    }
+        bool selected_neighbor = restir_di_reservoir_combine_finalized(
+            reservoir,
+            rng_state,
+            neighbor_reservoir,
+            restir_di_target_pdf(neighbor_reservoir.y, center_surface)
+        );
+    
 
-    restir_di_reservoir_finalize(reservoir);
+        if (SPATIAL_BIAS_CORRECTION == 0 /*NONE*/) {
+            restir_di_reservoir_finalize(reservoir);
+        } else if (SPATIAL_BIAS_CORRECTION >= 1 /*BASIC or RAYTRACED or RAYTRACED_PREV_BVH*/) {
+            // called RTXDI_BIAS_CORRECTION_BASIC in rtxdi-runtime / RESTIR DI implementation
+            float pi = reservoir.p_target;
+            float pi_sum = reservoir.p_target * current_reservoir.M;
+            float spatial_p = restir_di_target_pdf(reservoir.y, surface_at(neighbor));
+
+            if (spatial_p > 0) {
+                // do this only if really necessary...
+                if (SPATIAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
+                    if (!trace_visibility(surface_at(neighbor).pos, reservoir.y.pos)) {
+                        spatial_p = 0;
+                    }
+                }
+            }
+
+            pi = selected_neighbor ? spatial_p : pi;
+            pi_sum += spatial_p * neighbor_reservoir.M;
+
+            restir_di_reservoir_finalize_custom(reservoir, pi, pi_sum);
+        }
+    } else {
+        // no bias correction necessary
+        restir_di_reservoir_finalize(reservoir);
+    }
 
     write_reservoir = reservoir;
 }
