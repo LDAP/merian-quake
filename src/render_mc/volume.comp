@@ -195,7 +195,7 @@ void main() {
                 mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                 mc_static_save(mc_state, current_hit.pos, jittered_normal);
                 mc_adaptive_save(mc_state, current_hit.pos, jittered_normal);
-            } else if (MC_FAST_RECOVERY && mc_f < 1e-12 * mc_state.sum_w) {
+            } else if (MC_FAST_RECOVERY && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state)) {
                 // fix slow recovery after light source disappears
                 mc_state = mc_state_new(current_hit.pos, -first_wi);
                 mc_static_save(mc_state, current_hit.pos, -first_wi);
