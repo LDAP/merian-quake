@@ -77,11 +77,12 @@ ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 po
 }
 
 // returns (buffer_index, hash)
-uvec2 mc_adaptive_buffer_index(const vec3 pos, const vec3 normal) {
+void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {
     const float rand = XorShift32(rng_state);
     const uint level = clamp(mc_adaptive_level_for_pos(pos) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos);
-    return uvec2(hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE), hash2_grid_level(grid_idx, level));
+    buffer_index = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
+    hash = hash2_grid_level(grid_idx, level);
 }
 
 void mc_adaptive_finalize_load(inout MCState mc_state, const uint hash) {
@@ -90,26 +91,28 @@ void mc_adaptive_finalize_load(inout MCState mc_state, const uint hash) {
 }
 
 void mc_adaptive_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
-    const uvec2 buf_idx_hash = mc_adaptive_buffer_index(pos, normal);
-    mc_state = mc_states[buf_idx_hash.x];
-    mc_adaptive_finalize_load(mc_state, buf_idx_hash.y);
+    uint buffer_index, hash;
+    mc_adaptive_buffer_index(pos, normal, buffer_index, hash);
+    mc_state = mc_states[buffer_index];
+    mc_adaptive_finalize_load(mc_state, hash);
 }
 
 void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
-    const uvec2 buf_idx_hash = mc_adaptive_buffer_index(pos, normal);
+    uint buffer_index, hash;
+    mc_adaptive_buffer_index(pos, normal, buffer_index, hash);
 
-    mc_state.hash = buf_idx_hash.y;
-    mc_states[buf_idx_hash.x] = mc_state;
+    mc_state.hash = hash;
+    mc_states[buffer_index] = mc_state;
 }
 
 
 // STATIC GRID
 
 // returns (buffer_index, hash)
-uvec2 mc_static_buffer_index(const vec3 pos) {
+void mc_static_buffer_index(const vec3 pos, out uint buffer_index, out uint hash) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
-    return uvec2(hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE,
-                 hash2_grid(grid_idx));
+    buffer_index = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
+    hash = hash2_grid(grid_idx);
 }
 
 void mc_static_finalize_load(inout MCState mc_state, const uint hash) {
@@ -124,20 +127,23 @@ void mc_static_finalize_load(inout MCState mc_state, const uint hash, const vec3
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos) {
-    const uvec2 buf_idx_hash = mc_static_buffer_index(pos);
-    mc_state = mc_states[buf_idx_hash.x];
-    mc_static_finalize_load(mc_state, buf_idx_hash.y);
+    uint buffer_index, hash;
+    mc_static_buffer_index(pos, buffer_index, hash);
+    mc_state = mc_states[buffer_index];
+    mc_static_finalize_load(mc_state, hash);
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
-    const uvec2 buf_idx_hash = mc_static_buffer_index(pos);
-    mc_state = mc_states[buf_idx_hash.x];
-    mc_static_finalize_load(mc_state, buf_idx_hash.y, pos, normal);
+    uint buffer_index, hash;
+    mc_static_buffer_index(pos, buffer_index, hash);
+    mc_state = mc_states[buffer_index];
+    mc_static_finalize_load(mc_state, hash, pos, normal);
 }
 
 void mc_static_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
-    const uvec2 buf_idx_hash = mc_static_buffer_index(pos);
+    uint buffer_index, hash;
+    mc_static_buffer_index(pos, buffer_index, hash);
 
-    mc_state.hash = buf_idx_hash.y;
-    mc_states[buf_idx_hash.x] = mc_state;
+    mc_state.hash = hash;
+    mc_states[buffer_index] = mc_state;
 }

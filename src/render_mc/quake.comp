@@ -51,7 +51,10 @@ void main() {
             vec3 wo;
             float wodotn;
             float wo_p = 0;
+
             MCState mc_state;
+            uint mc_buffer_index;
+
             // SAMPLE NEXT OUTGOING DIRECTION
             float score_sum = 0;
             {
@@ -60,11 +63,21 @@ void main() {
                 {
                     [[unroll]]
                     for (int i = 0; i < MC_SAMPLES; i++) {
-                        MCState state;
-                        if (XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB) {
-                            mc_adaptive_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
+                        const bool adaptive_grid = XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB;
+                        
+                        uint buffer_index, hash;
+                        if (adaptive_grid) {
+                            mc_adaptive_buffer_index(s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal, buffer_index, hash);
                         } else {
-                            mc_static_load(state, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
+                            mc_static_buffer_index(s == 0 ? current_hit.prev_pos : current_hit.pos, buffer_index, hash);
+                        }
+
+                        MCState state = mc_states[buffer_index];
+
+                        if (adaptive_grid) {
+                            mc_adaptive_finalize_load(state, hash);
+                        } else {
+                            mc_static_finalize_load(state, hash, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
                         }
 
                         scores[i] = state.sum_w;
@@ -73,6 +86,7 @@ void main() {
                         if (XorShift32(rng_state) < scores[i] / score_sum) {
                             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
                             mc_state = state;
+                            mc_buffer_index = buffer_index;
                             wo = vmf_sample(vmfs[i].xyz, vmfs[i].w, XorShift32Vec2(rng_state));
                         }
                     }
@@ -137,9 +151,7 @@ void main() {
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
                     } else if (MC_FAST_RECOVERY && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state)) {
                         // fix slow recovery after light source disappears
-                        mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                        mc_static_save(mc_state, current_hit.pos, current_hit.normal);
-                        mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                        mc_states[mc_buffer_index] = mc_state_new(current_hit.pos, current_hit.normal);
                     }
                 }
             }
