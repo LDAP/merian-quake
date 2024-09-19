@@ -29,9 +29,9 @@ float mc_state_kappa(const MCState mc_state) {
 }
 
 // returns the vmf lobe vec4(direction, kappa) for a position
-vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
+vec3 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
     const float r = (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + DIR_GUIDE_PRIOR);
-    return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
+    return mc_state_dir(mc_state, pos) * (3.0 * r - r * r * r) / (1.0 - r * r);
 }
 
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average
