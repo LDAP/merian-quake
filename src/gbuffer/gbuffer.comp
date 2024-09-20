@@ -85,7 +85,7 @@ void main() {
         imageStore(img_mv, pixel, vec4(0));
         imageStore(img_albedo, pixel, vec4(0));
         imageStore(img_irradiance, pixel, vec4(0));
-        const GBuffer gbuf = {0, 0, vec2(0), 0};
+        const GBuffer gbuf = {0, 0, f16vec2(0), 0};
         gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
 
         return;
@@ -110,12 +110,12 @@ void main() {
 
         // use prev_pos to account for moving objects seen from the camera.
         const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), vec2(0), vel_z};
+        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), f16vec2(0), vel_z};
 
         // Calculate depth gradient
         // use geo normal for depth gradient?
         const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
-        gbuf.grad_z = dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z;
+        gbuf.grad_z = f16vec2(dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z);
         gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
 
         // Store motion vector
