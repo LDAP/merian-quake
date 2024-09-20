@@ -223,7 +223,7 @@ void main() {
     // distance_mc_load(s, pixel, resolution);
     // imageStore(img_debug, pixel, vec4(1 / 1000. * distance_mc_state_get_normal_dist(s).y));
 
-    imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), 0));
+    imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), VOLUME_SPP));
     imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
     
 

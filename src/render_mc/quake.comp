@@ -189,7 +189,7 @@ void main() {
         moments /= MAX_SPP;
     }
 
-    imageStore(img_irradiance, pixel, vec4(irr, 0));
+    imageStore(img_irradiance, pixel, vec4(irr, MAX_SPP));
     imageStore(img_moments, pixel, vec4(moments, 0, 0));
 
 
