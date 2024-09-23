@@ -17,6 +17,7 @@
 #include "merian-shaders/grid.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/hash.glsl"
+#include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/bsdf_microfacet.glsl"
 
 uint rng_state;
@@ -131,7 +132,7 @@ void main() {
 
             // EVALUATE BSDF
             // without albedo (added below to skip first albedo)
-            const float microfacet_bsdf = bsdf_microfacet_eval(-current_hit.wi, make_frame(current_hit.normal), wo, vec2(current_hit.roughness)) * wodotn;
+            const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(-current_hit.wi, wo, current_hit.normal, .5, 0.02);
             
             current_throughput *= microfacet_bsdf;
             if (USE_LIGHT_CACHE_TAIL) {
