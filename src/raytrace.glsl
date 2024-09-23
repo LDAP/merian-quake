@@ -163,7 +163,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     trace_ray(ray_query);
 
     throughput *= float16_t(transmittance3(rq_get_t(ray_query), MU_T, VOLUME_MAX_T));
-    hit.roughness = 0.02hf;
+    hit.roughness = 0.5hf;
 
     // NO HIT this should not happen in Quake, but it does -> treat that as sky.
     if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
@@ -269,7 +269,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         }
 
         if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
-            hit.roughness = mix(hit.roughness, 0.0001hf, float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st, 0).r));
+            hit.roughness = float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st, 0).r);;
         }
     } else if (flags == MAT_FLAGS_SOLID) {
         hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
