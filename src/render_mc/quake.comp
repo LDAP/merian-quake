@@ -22,7 +22,7 @@
 
 uint rng_state;
 vec2 moments;
-vec3 irr;
+vec4 irr;
 
 #include "../config.h"
 #include "layout.glsl"
@@ -37,7 +37,7 @@ vec3 irr;
 void main() {
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     moments = vec2(0);
-    irr = vec3(0);
+    irr = vec4(0);
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
     for (int s = 0; s < MAX_SPP; s++) {
@@ -97,6 +97,7 @@ void main() {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(-current_hit.wi, current_hit.normal, current_hit.roughness, XorShift32Vec3(rng_state));
                     mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+                    p = 0;
                 } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 
@@ -170,7 +171,7 @@ void main() {
 
         const vec3 contrib = f / p;
         if(!any(isinf(contrib)) && !any(isnan(contrib))) {
-            irr += contrib;
+            irr += vec4(contrib, 1);
             const float l = yuv_luminance(contrib);
             moments += vec2(l, l * l);
         }
@@ -180,12 +181,12 @@ void main() {
         return;
     }
 
-    if (MAX_SPP > 0) {
-        irr /= MAX_SPP;
-        moments /= MAX_SPP;
+    if (irr.a > 0) {
+        irr.rgb /= irr.a;
+        moments /= irr.a;
     }
 
-    imageStore(img_irradiance, pixel, vec4(irr, MAX_SPP));
+    imageStore(img_irradiance, pixel, irr);
     imageStore(img_moments, pixel, vec4(moments, 0, 0));
 
 
@@ -219,7 +220,7 @@ void main() {
             }
             case 4: {
                 // -- irradiance --
-                imageStore(img_debug, pixel, vec4(irr, 1));
+                imageStore(img_debug, pixel, vec4(irr.rgb, 1));
                 break;
             }
             case 5: {
