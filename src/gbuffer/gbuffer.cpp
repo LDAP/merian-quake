@@ -120,7 +120,7 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         // CLEAR PIPE
         auto clear_spec_builder = merian::SpecializationInfoBuilder();
         clear_spec_builder.add_entry(local_size_x, local_size_y);
-        clear_spec_builder.add_entry<VkBool32>(true);
+        clear_spec_builder.add_entry(true);
 
         clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader,
                                                                clear_spec_builder.build());
