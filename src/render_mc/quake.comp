@@ -69,7 +69,7 @@ void main() {
                         
                         uint buffer_index, hash;
                         if (adaptive_grid) {
-                            mc_adaptive_buffer_index(s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal, buffer_index, hash);
+                            mc_adaptive_buffer_index(s == 0 ? current_hit.prev_pos : current_hit.pos, normalize(current_hit.normal + current_hit.wi), buffer_index, hash);
                         } else {
                             mc_static_buffer_index(s == 0 ? current_hit.prev_pos : current_hit.pos, buffer_index, hash);
                         }
@@ -154,7 +154,7 @@ void main() {
                         // == XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
-                        mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
+                        mc_adaptive_save(mc_state, current_hit.pos, normalize(current_hit.normal + current_hit.wi));
                     } else if (MC_FAST_RECOVERY && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index] = mc_state_new(current_hit.pos, current_hit.normal);
