@@ -40,7 +40,7 @@ void main() {
     irr = vec3(0);
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
-    for (int8_t s = int8_t(0); s < MAX_SPP; s++) {
+    for (int s = 0; s < MAX_SPP; s++) {
         Hit current_hit = first_hit;
 
         // Camera throughput encoded in albedo
@@ -48,7 +48,7 @@ void main() {
         vec3 f = vec3(0);
         float p = 1.0;
 
-        for (int8_t segment = int8_t(1); segment < MAX_PATH_LENGTH; segment++) {
+        for (int segment = 1; segment < MAX_PATH_LENGTH; segment++) {
             vec3 wo;
             float wodotn;
             float wo_p = 0;
@@ -60,11 +60,10 @@ void main() {
             float score_sum = 0;
             {
                 float scores[MC_SAMPLES];
-                vec3 vmfs[MC_SAMPLES];
-                int8_t selected_i;
+                vec4 vmfs[MC_SAMPLES];
                 {
                     [[unroll]]
-                    for (int8_t i = int8_t(0); i < MC_SAMPLES; i++) {
+                    for (int i = 0; i < MC_SAMPLES; i++) {
                         const bool adaptive_grid = XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB;
                         
                         uint buffer_index, hash;
@@ -89,7 +88,7 @@ void main() {
                             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
                             mc_state = state;
                             mc_buffer_index = buffer_index;
-                            selected_i = i;
+                            wo = vmf_sample(vmfs[i].xyz, vmfs[i].w, XorShift32Vec2(rng_state));
                         }
                     }
                 }
@@ -98,10 +97,7 @@ void main() {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(-current_hit.wi, current_hit.normal, current_hit.roughness, XorShift32Vec3(rng_state));
                     mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                } else {
-                    const float kappa = length(vmfs[selected_i]);
-                    wo = vmf_sample(vmfs[selected_i] / kappa, kappa, XorShift32Vec2(rng_state));
-                }
+                } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 
                 // ray is below geometric surface
@@ -110,10 +106,9 @@ void main() {
 
                 // Multiple importance sampling
                 [[unroll]]
-                for (int8_t i = int8_t(0); i < MC_SAMPLES; i++) {
+                for (int i = 0; i < MC_SAMPLES; i++) {
                     // score_sum > 0 ? results in black artifacts
-                    const float kappa = length(vmfs[i]);
-                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(kappa, dot(wo, vmfs[i] / kappa))) / score_sum : 0);
+                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
                 }
                 wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_ggx_diffuse_mix_pdf(-current_hit.wi, wo, current_hit.normal, current_hit.roughness) + (1 - SURF_BSDF_P) * wo_p;
 

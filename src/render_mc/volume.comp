@@ -50,7 +50,7 @@ void main() {
     const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
     const vec2 mv = imageLoad(img_volume_mv, pixel).rg;
 
-    for (int8_t s = int8_t(0); s < VOLUME_SPP; s++) {
+    for (int s = 0; s < VOLUME_SPP; s++) {
         float p = 0.0;
         float t;
 
@@ -64,7 +64,7 @@ void main() {
             vec2 normal_dists[DISTANCE_MC_SAMPLES];
 
             [[unroll]]
-            for (int8_t i = int8_t(0); i < DISTANCE_MC_SAMPLES; i++) {
+            for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 DistanceMCState state;
                 if (s == 0) {
                     // access using motion vector
@@ -93,7 +93,7 @@ void main() {
             }
 
             [[unroll]]
-            for (int8_t i = int8_t(0); i < DISTANCE_MC_SAMPLES; i++) {
+            for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
                 p += (scores[i] > 0 ? scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum : 0);
             }
             p = (dist_score_sum > 0 ? (1.0 - DIST_GUIDE_P) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + DIST_GUIDE_P * p;
@@ -115,12 +115,11 @@ void main() {
         // SAMPLE OUTGOING DIRECTION
         {
             float scores[MC_SAMPLES];
-            vec3 vmfs[MC_SAMPLES];
-            int8_t selected_i;
+            vec4 vmfs[MC_SAMPLES];
             // SAMPLE NEXT OUTGOING DIRECTION
             {
                 [[unroll]]
-                for (int8_t i = int8_t(0); i < MC_SAMPLES; i++) {
+                for (int i = 0; i < MC_SAMPLES; i++) {
                     const bool adaptive_grid = XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB;
 
                     uint buffer_index, hash;
@@ -145,24 +144,20 @@ void main() {
                         // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
                         mc_state = state;
                         mc_buffer_index = buffer_index;
-                        selected_i = i;
+                        wo = vmf_sample(vmfs[i].xyz, vmfs[i].w, XorShift32Vec2(rng_state));
                     }
                 }
 
                 if (XorShift32(rng_state) < VOLUME_PHASE_P || score_sum == 0) {
                     wo = phase_draine_sample(XorShift32Vec2(rng_state), first_wi, DRAINE_G, DRAINE_A);
                     mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                } else {
-                    const float kappa = length(vmfs[selected_i]);
-                    wo = vmf_sample(vmfs[selected_i] / kappa, kappa, XorShift32Vec2(rng_state));
                 }
                 
                 // Multiple importance sampling
                 [[unroll]]
-                for (int8_t i = int8_t(0); i < MC_SAMPLES; i++) {
+                for (int i = 0; i < MC_SAMPLES; i++) {
                     // score_sum > 0 ? results in black artifacts
-                    const float kappa = length(vmfs[i]);
-                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(kappa, dot(wo, vmfs[i] / kappa))) / score_sum : 0);
+                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
                 }
                 wo_p = (score_sum > 0 ? VOLUME_PHASE_P : 1.0) * phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A) + (1 - VOLUME_PHASE_P) * wo_p;
             }
