@@ -163,7 +163,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     trace_ray(ray_query);
 
     throughput *= float16_t(transmittance3(rq_get_t(ray_query), MU_T, VOLUME_MAX_T));
-    hit.roughness = 0.5hf;
+    hit.roughness = 0.6hf;
 
     // NO HIT this should not happen in Quake, but it does -> treat that as sky.
     if (rayQueryGetIntersectionTypeEXT(ray_query, true) != gl_RayQueryCommittedIntersectionTriangleEXT) {
@@ -195,8 +195,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     vec2 st = extra_data.st * rq_barycentrics(ray_query);
     if (flags > 0 && flags < 5) {
         st = MERIAN_TEXTUREEFFECT_QUAKE_WARPCALC(st, params.cl_time);
-        if (flags == MAT_FLAGS_WATER)
+        if (flags == MAT_FLAGS_WATER) {
             st += MERIAN_TEXTUREEFFECT_WAVES(st, params.cl_time);
+            hit.roughness = 0.4hf;
+        }
     }
 
     // NORMALS AND GLOSS
