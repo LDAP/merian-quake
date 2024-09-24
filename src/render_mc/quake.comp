@@ -97,9 +97,11 @@ void main() {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(-current_hit.wi, current_hit.normal, current_hit.roughness, XorShift32Vec3(rng_state));
                     mc_state = mc_state_new(current_hit.pos, current_hit.normal);
-                    p = 0;
                 } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
+                if (mc_state.N < 25) {
+                    p = 0;
+                }
 
                 // ray is below geometric surface
                 if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
