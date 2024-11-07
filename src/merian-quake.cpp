@@ -156,13 +156,16 @@ int main(const int argc, const char** argv) {
         extensions.push_back(extGLFW);
     }
 
-    merian::ContextHandle context = merian::Context::create(extensions, "Quake");
+    merian::ContextHandle context = merian::Context::create(extensions, "merian-quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
-    context->file_loader.add_search_path("./res");
-    context->file_loader.add_search_path("../res");
-    context->file_loader.add_search_path(MERIAN_QUAKE_RESOURCES);
+    std::optional<std::filesystem::path> dev_data_dir =
+        merian::FileLoader::search_cwd_parents("res");
+    if (dev_data_dir) {
+        context->file_loader.add_search_path(*dev_data_dir);
+    }
+    context->file_loader.add_search_path(MERIAN_QUAKE_DATA_DIR);
 
     merian_nodes::Graph<> graph(context, alloc);
 

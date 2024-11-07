@@ -10,7 +10,8 @@ project(
     ]
 )
 
-add_project_arguments('-DMERIAN_QUAKE_RESOURCES="@0@"'.format(join_paths(get_option('prefix'), 'res')), language : 'cpp')
+data_subdir = join_paths(get_option('datadir'), meson.project_name())
+add_project_arguments('-DMERIAN_QUAKE_DATA_DIR="@0@"'.format(join_paths(join_paths(get_option('prefix'), data_subdir))), language : 'cpp')
 
 # Debug configuration
 if get_option('buildtype').startswith('debug')
@@ -37,13 +38,6 @@ inc_dirs = [
 ]
 
 shader_generator = merian_subp.get_variable('shader_generator')
-glslc_args = []
-
-# Extension freezes on Windows (AMD)
-if dependency('vulkan').version().version_compare('>=1.3.290') and host_machine.system() != 'windows'
-    glslc_args += '-DENABLE_RAY_QUERY_POSITION_FETCH'
-    message('Using RAY_QUERY_POSITION_FETCH')
-endif
 
 subdir('src')
 
@@ -58,4 +52,4 @@ exe = executable(
     install : true,
 )
 
-install_subdir('res', install_dir : '.')
+install_subdir('res', install_dir: data_subdir, strip_directory: true)

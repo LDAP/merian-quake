@@ -19,7 +19,7 @@ class GBuffer : public merian_nodes::Node {
     static constexpr uint32_t local_size_y = 8;
 
   public:
-    GBuffer(const merian::ContextHandle context);
+    GBuffer(const merian::ContextHandle& context);
 
     ~GBuffer();
 

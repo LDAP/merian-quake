@@ -1,19 +1,17 @@
 #include "gbuffer.hpp"
 
-#include "gbuffer.comp.spv.h"
-
 #include "game/quake_node.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "hit.glsl.h"
+#include "../../res/shader/hit.glsl.h"
 #include "merian-shaders/gbuffer.glsl.h"
 
-GBuffer::GBuffer(const merian::ContextHandle context) : context(context) {
-    shader = std::make_shared<merian::ShaderModule>(context, merian_quake_gbuffer_comp_spv_size(),
-                                                    merian_quake_gbuffer_comp_spv());
+GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {
+    shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/gbuffer/gbuffer.comp");
 }
 
 GBuffer::~GBuffer() {}

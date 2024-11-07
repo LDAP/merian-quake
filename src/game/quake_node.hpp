@@ -10,7 +10,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/nodes/as_builder/device_as_builder.hpp"
 
-#include "config.h"
+#include "../../res/shader/config.h"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/string.hpp"

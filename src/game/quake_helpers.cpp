@@ -5,7 +5,7 @@
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/xorshift.hpp"
-#include "config.h"
+#include "../../res/shader/config.h"
 
 #include <algorithm>
 #include <array>

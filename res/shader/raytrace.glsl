@@ -208,7 +208,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     {
         const uvec3 prim_indexes = buf_idx[nonuniformEXT(rq_instance_id(ray_query))].i[rq_primitive_index(ray_query)];
         vec3 verts[3];
-#ifdef ENABLE_RAY_QUERY_POSITION_FETCH
+#ifdef MERIAN_CONTEXT_EXT_ENABLED_ExtensionVkRayTracingPositionFetch
         rayQueryGetIntersectionTriangleVertexPositionsEXT(ray_query, true, verts);
 #else
         verts[0] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x];

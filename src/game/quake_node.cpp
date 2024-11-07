@@ -5,6 +5,7 @@
 #include "merian/utils/colors.hpp"
 #include "merian/utils/concurrent/utils.hpp"
 #include "merian/utils/glm.hpp"
+#include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -867,10 +868,13 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
 
     if (!idx.empty()) {
         RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
+        vk::BuildAccelerationStructureFlagsKHR flags =
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+        if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+            flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
+        }
         static_geo.emplace_back(
-            get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-                                vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
+            get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo, flags));
         static_geo.back().instance_flags =
             vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise |
             vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
@@ -886,10 +890,13 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
                  idx.size(), ext.size());
     if (!idx.empty()) {
         RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
+        vk::BuildAccelerationStructureFlagsKHR flags =
+            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+        if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+            flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
+        }
         static_geo.emplace_back(
-            get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo,
-                            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-                                vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
+            get_rt_geometry(allocator, cmd, vtx, vtx, idx, ext, old_geo, flags));
         static_geo.back().instance_flags =
             vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
     }
@@ -970,10 +977,13 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
         dynamic_geo.clear();
         if (!idx.empty()) {
             RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
+            vk::BuildAccelerationStructureFlagsKHR flags =
+                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
+            if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+                flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
+            }
             dynamic_geo.emplace_back(
-                get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo,
-                                vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild |
-                                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess));
+                get_rt_geometry(allocator, cmd, vtx, prev_vtx, idx, ext, old_geo, flags));
             dynamic_geo.back().instance_flags =
                 vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
         }
@@ -981,15 +991,19 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
 }
 
 void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
+    vk::BuildAccelerationStructureFlagsKHR flags =
+        vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+    if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+        flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
+    }
+
     std::shared_ptr<merian_nodes::DeviceASBuilder::TlasBuildInfo> tlas_info =
-        std::make_shared<merian_nodes::DeviceASBuilder::TlasBuildInfo>(
-            vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace |
-            vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess);
+        std::make_shared<merian_nodes::DeviceASBuilder::TlasBuildInfo>(flags);
 
     assert(static_geo.size() + dynamic_geo.size() < MAX_GEOMETRIES);
 
     uint32_t instance_index = 0;
-    for (auto& geo_vec : {static_geo, dynamic_geo}) {
+    for (const auto& geo_vec : {static_geo, dynamic_geo}) {
         for (const RTGeometry& geo : geo_vec) {
             // clang-format off
             tlas_info->add_instance(geo.blas_info, geo.instance_flags, instance_index);

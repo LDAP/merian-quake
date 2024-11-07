@@ -1,13 +1,7 @@
 #include "renderer_restir.hpp"
 
+#include "../../res/shader/render_restir/restir_di_reservoir.glsl.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "restir_di_reservoir.glsl.h"
-
-#include "src/render_restir/restir_di_clear.comp.spv.h"
-#include "src/render_restir/restir_di_generate_samples_bsdf.comp.spv.h"
-#include "src/render_restir/restir_di_shade.comp.spv.h"
-#include "src/render_restir/restir_di_spatial_reuse.comp.spv.h"
-#include "src/render_restir/restir_di_temporal_reuse.comp.spv.h"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
@@ -32,21 +26,16 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
     : Node(), context(context), allocator(allocator) {
 
     // PIPELINE CREATION
-    generate_samples_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_di_generate_samples_bsdf_comp_spv_size(),
-        merian_quake_restir_di_generate_samples_bsdf_comp_spv());
-    temporal_reuse_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_di_temporal_reuse_comp_spv_size(),
-        merian_quake_restir_di_temporal_reuse_comp_spv());
-    spatial_reuse_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_di_spatial_reuse_comp_spv_size(),
-        merian_quake_restir_di_spatial_reuse_comp_spv());
-    shade_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_di_shade_comp_spv_size(),
-        merian_quake_restir_di_shade_comp_spv());
-    clear_shader = std::make_shared<merian::ShaderModule>(
-        context, merian_quake_restir_di_clear_comp_spv_size(),
-        merian_quake_restir_di_clear_comp_spv());
+    generate_samples_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_restir/restir_di_generate_samples_bsdf.comp");
+    temporal_reuse_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_restir/restir_di_temporal_reuse.comp");
+    spatial_reuse_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_restir/restir_di_spatial_reuse.comp");
+    shade_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_restir/restir_di_shade.comp");
+    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_restir/restir_di_clear.comp");
 
     reservoir_pingpong_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -306,8 +295,9 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.config_int("temporal clamp m", temporal_clamp_m,
                           "Clamp M to limit temporal influence. In ReSTIR DI the recommendation "
                           "was 20xNumberLightSamples (32). Set to 0 to disable.");
-    recreate_pipeline |= config.config_options("temporal bias correction", temporal_bias_correction,
-                                               {"none", "basic", "raytraced", "raytraced previous bvh"});
+    recreate_pipeline |=
+        config.config_options("temporal bias correction", temporal_bias_correction,
+                              {"none", "basic", "raytraced", "raytraced previous bvh"});
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
