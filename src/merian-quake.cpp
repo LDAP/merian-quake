@@ -8,10 +8,11 @@
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
-#include "merian/vk/extension/extension_vk_glfw.hpp"
+#include "merian/vk/extension/extension_vk_float_atomics.hpp"
 #include "merian/vk/extension/extension_vk_push_descriptor.hpp"
 #include "merian/vk/extension/extension_vk_ray_query.hpp"
 #include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
@@ -135,16 +136,16 @@ static void signal_handler(int signal) {
 int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::trace);
 
-    std::shared_ptr<merian::ExtensionVkGLFW> extGLFW;
+    std::shared_ptr<merian::ExtensionGLFW> ext_glfw;
     auto resources = std::make_shared<merian::ExtensionResources>();
     auto ext_as = std::make_shared<merian::ExtensionVkAccelerationStructure>();
     auto ext_rq = std::make_shared<merian::ExtensionVkRayQuery>();
     auto ext_rt_pos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
     auto ext_push_desc = std::make_shared<merian::ExtensionVkPushDescriptor>();
     auto ext_core = std::make_shared<merian::ExtensionVkCore>();
+    auto ext_float = std::make_shared<merian::ExtensionVkFloatAtomics>();
     std::vector<std::shared_ptr<merian::Extension>> extensions = {
-        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core,
-    };
+        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core, ext_float};
 
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
@@ -153,8 +154,8 @@ int main(const int argc, const char** argv) {
 #endif
 
     if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
-        extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
-        extensions.push_back(extGLFW);
+        ext_glfw = std::make_shared<merian::ExtensionGLFW>();
+        extensions.push_back(ext_glfw);
     }
 
     merian::ContextHandle context = merian::Context::create(extensions, "merian-quake");
