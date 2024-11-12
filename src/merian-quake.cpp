@@ -137,12 +137,13 @@ int main(const int argc, const char** argv) {
 
     std::shared_ptr<merian::ExtensionVkGLFW> extGLFW;
     auto resources = std::make_shared<merian::ExtensionResources>();
-    auto extAS = std::make_shared<merian::ExtensionVkAccelerationStructure>();
-    auto extRQ = std::make_shared<merian::ExtensionVkRayQuery>();
-    auto extRTPos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
-    auto extPushDesc = std::make_shared<merian::ExtensionVkPushDescriptor>();
+    auto ext_as = std::make_shared<merian::ExtensionVkAccelerationStructure>();
+    auto ext_rq = std::make_shared<merian::ExtensionVkRayQuery>();
+    auto ext_rt_pos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
+    auto ext_push_desc = std::make_shared<merian::ExtensionVkPushDescriptor>();
+    auto ext_core = std::make_shared<merian::ExtensionVkCore>();
     std::vector<std::shared_ptr<merian::Extension>> extensions = {
-        resources, extAS, extRQ, extRTPos, extPushDesc,
+        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core,
     };
 
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
