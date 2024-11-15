@@ -28,6 +28,8 @@ struct QuakeData {
     // updated in parse_worldspawn
     glm::vec3 current_sun_color{};
     glm::vec3 current_sun_direction{};
+
+    float timediff = 0;
 };
 // Quake uses lots of static global variables,
 // so we need to do that to
@@ -405,7 +407,7 @@ QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& all
                                       const std::vector<float>& prev_vtx,
                                       const std::vector<uint32_t>& idx,
                                       const std::vector<VertexExtraData>& ext,
-                                      const QuakeNode::RTGeometry old_geo,
+                                      const QuakeNode::RTGeometry& old_geo,
                                       const vk::BuildAccelerationStructureFlagsKHR flags) {
     assert(!vtx.empty());
     assert(!prev_vtx.empty());
@@ -436,7 +438,7 @@ QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& all
 }
 
 QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
-                     const merian::ResourceAllocatorHandle allocator,
+                     const merian::ResourceAllocatorHandle& allocator,
                      const int quakespasm_argc,
                      const char** quakespasm_argv)
     : Node(), context(context), allocator(allocator) {
@@ -448,7 +450,7 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
     ext.reserve(256 * 1024 * 1024 / sizeof(VertexExtraData));
 
     // INIT QUAKE
-    if (quake_data.quake_node) {
+    if (quake_data.quake_node != nullptr) {
         throw std::runtime_error{"Only one quake node can be created."};
     }
     quake_data.quake_node = this;
@@ -467,29 +469,20 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
                 pending_commands.pop();
             }
 
-            double newtime = Sys_DoubleTime();
-            double timediff;
-            if (force_timediff > 0) {
-                timediff = force_timediff / 1000.0;
-            } else {
-                timediff = old_time == 0 ? 0. : newtime - old_time;
-            }
-
             try {
                 render_info.render = false;
-                Host_Frame(timediff);
+                Host_Frame(quake_data.timediff);
                 if (!render_info.render) {
                     // make sure we release the main thread
                     sync_gamestate.push(true, 1);
                     if (!game_running) {
                         std::runtime_error{"quit"};
                     }
-                    sync_render.pop();
+                    quake_data.timediff = sync_render.pop();
                 }
             } catch (const std::runtime_error&) {
                 // game quit, do nothing
             }
-            old_time = newtime;
 
             server_fps = 1 / sw.seconds();
             sw.reset();
@@ -501,8 +494,8 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
 QuakeNode::~QuakeNode() {
     game_running.store(false);
     // make sure to unlock
-    sync_render.push(true);
-    sync_render.push(true);
+    sync_render.push(0);
+    sync_render.push(0);
     game_thread.join();
 
     shutdown_quakespasm();
@@ -554,11 +547,11 @@ void QuakeNode::IN_Move(usercmd_t* cmd) {
 
 void QuakeNode::R_RenderScene() {
     if (!game_running) {
-        std::runtime_error{"quit"};
+        throw std::runtime_error{"quit"};
     }
     render_info.render = true;
     sync_gamestate.push(true, 1);
-    sync_render.pop();
+    quake_data.timediff = sync_render.pop();
 }
 
 void QuakeNode::VID_Changed_f([[maybe_unused]] cvar_t* var) {
@@ -724,7 +717,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
                         [[maybe_unused]] const merian_nodes::NodeIO& io) {
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
-        sync_render.push(true, 1);
+        sync_render.push((float)run.get_time_delta(), 1);
         sync_gamestate.pop();
     }
 

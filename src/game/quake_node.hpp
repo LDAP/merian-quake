@@ -120,7 +120,7 @@ class QuakeNode : public merian_nodes::Node {
 
   public:
     QuakeNode(const merian::ContextHandle& context,
-              const merian::ResourceAllocatorHandle allocator,
+              const merian::ResourceAllocatorHandle& allocator,
               const int quakespasm_argc,
               const char** quakespasm_argv);
 
@@ -197,7 +197,7 @@ class QuakeNode : public merian_nodes::Node {
     std::thread game_thread;
     std::atomic_bool game_running = true;
     merian::ConcurrentQueue<bool> sync_gamestate;
-    merian::ConcurrentQueue<bool> sync_render;
+    merian::ConcurrentQueue<float> sync_render;
 
     // Game state
     double old_time = 0;
