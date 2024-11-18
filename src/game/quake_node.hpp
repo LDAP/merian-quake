@@ -201,7 +201,6 @@ class QuakeNode : public merian_nodes::Node {
 
     // Game state
     double old_time = 0;
-    float force_timediff = 0;
     bool update_gamestate = true;
     QuakeRenderInfo render_info;
     double server_fps = 0;

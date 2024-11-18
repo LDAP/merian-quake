@@ -1047,8 +1047,6 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.config_int("stop after worldspawn", stop_after_worldspawn,
                       "Can be used for reference renders.");
     config.config_bool("rebuild after stop", rebuild_after_stop);
-    config.config_float("force timediff (ms)", force_timediff,
-                        "For reference renders and video outputs.");
     config.config_bool("reproducible renders", reproducible_renders,
                        "e.g. disables random behavior");
 
