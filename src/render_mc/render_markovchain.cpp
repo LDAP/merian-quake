@@ -21,10 +21,14 @@ RendererMarkovChain::RendererMarkovChain(const merian::ContextHandle& context,
     : Node(), context(context), allocator(allocator) {
 
     // PIPELINE CREATION
-    rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(context, "shader/render_mc/quake.comp");
-    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(context, "shader/render_mc/clear.comp");
-    volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(context, "shader/render_mc/volume.comp");
-    volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(context, "shader/render_mc/volume_forward_project.comp");
+    rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/quake.comp");
+    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/clear.comp");
+    volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/volume.comp");
+    volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/volume_forward_project.comp");
 }
 
 RendererMarkovChain::~RendererMarkovChain() {}
@@ -212,40 +216,40 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
                      (render_height + local_size_y - 1) / local_size_y, 1);
     }
 
-    if (volume_forward_project && volume_spp > 0) {
-        // Forward project motion vectors for volumes
-        {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy mv for volume");
-            cmd.copyImage(*io[con_mv], vk::ImageLayout::eTransferSrcOptimal, *io[con_volume_mv],
-                          vk::ImageLayout::eTransferDstOptimal,
-                          vk::ImageCopy{merian::first_layer(),
-                                        {},
-                                        merian::first_layer(),
-                                        {},
-                                        io[con_mv]->get_extent()});
-            auto volume_mv_bar = io[con_volume_mv]->barrier(
-                vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
-                vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                                vk::PipelineStageFlagBits::eComputeShader, {}, {}, {},
-                                volume_mv_bar);
-        }
-        {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
-            volume_forward_project_pipe->bind(cmd);
-            volume_forward_project_pipe->bind_descriptor_set(cmd, graph_descriptor_set);
-            volume_forward_project_pipe->push_constant(cmd, render_info.uniform);
-            cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
-                         (render_height + local_size_y - 1) / local_size_y, 1);
-        }
+    const bool enable_volume = io.is_connected(con_volume) || io.is_connected(con_volume_moments);
+
+    if (enable_volume) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy mv for volume");
+        cmd.copyImage(
+            *io[con_mv], vk::ImageLayout::eTransferSrcOptimal, *io[con_volume_mv],
+            vk::ImageLayout::eTransferDstOptimal,
+            vk::ImageCopy{
+                merian::first_layer(), {}, merian::first_layer(), {}, io[con_mv]->get_extent()});
+        auto volume_mv_bar = io[con_volume_mv]->barrier(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, volume_mv_bar);
     }
 
-    auto volume_mv_bar =
-        io[con_volume_mv]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
-                                   vk::AccessFlagBits::eShaderRead);
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, volume_mv_bar);
-    {
+    if (enable_volume && volume_spp > 0 && volume_forward_project) {
+        // Forward project motion vectors for volumes
+
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
+        volume_forward_project_pipe->bind(cmd);
+        volume_forward_project_pipe->bind_descriptor_set(cmd, graph_descriptor_set);
+        volume_forward_project_pipe->push_constant(cmd, render_info.uniform);
+        cmd.dispatch((render_width + local_size_x - 1) / local_size_x,
+                     (render_height + local_size_y - 1) / local_size_y, 1);
+
+        auto volume_mv_bar =
+            io[con_volume_mv]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                       vk::AccessFlagBits::eShaderRead);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, volume_mv_bar);
+    }
+
+    if (enable_volume) {
         // Volumes
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume");
         volume_pipe->bind(cmd);
