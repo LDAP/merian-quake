@@ -206,7 +206,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     }
 
     // BIND PIPELINE
-    {
+    if (io.is_connected(con_irradiance) || io.is_connected(con_moments)) {
         // Surfaces
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "quake.comp");
         pipe->bind(cmd);
