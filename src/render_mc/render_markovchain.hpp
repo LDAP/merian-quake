@@ -112,6 +112,9 @@ class RendererMarkovChain : public merian_nodes::Node {
     // https://gpuopen.com/learn/rdna-performance-guide/ recommends 8x4
     static constexpr uint32_t local_size_x = 8;
     static constexpr uint32_t local_size_y = 8;
+
+    bool reference_mode = false;
+
     int32_t spp = 1;
     int32_t volume_spp = 0;
     int32_t max_path_length = 3;

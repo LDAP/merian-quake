@@ -18,18 +18,7 @@
 
 RendererMarkovChain::RendererMarkovChain(const merian::ContextHandle& context,
                                          const merian::ResourceAllocatorHandle& allocator)
-    : Node(), context(context), allocator(allocator) {
-
-    // PIPELINE CREATION
-    rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/quake.comp");
-    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/clear.comp");
-    volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/volume.comp");
-    volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/volume_forward_project.comp");
-}
+    : Node(), context(context), allocator(allocator) {}
 
 RendererMarkovChain::~RendererMarkovChain() {}
 
@@ -98,6 +87,18 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
+
+    const std::map<std::string, std::string> additional_macro_definitions = {
+        {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))}};
+
+    rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/quake.comp", std::nullopt, {}, additional_macro_definitions);
+    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/clear.comp");
+    volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/volume.comp", std::nullopt, {}, additional_macro_definitions);
+    volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        context, "shader/render_mc/volume_forward_project.comp");
 
     return {
         con_irradiance,     con_moments,      con_volume,
@@ -317,6 +318,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const uint32_t old_seed = seed;
     const bool old_randomize_seed = randomize_seed;
     const int old_debug_output_selector = debug_output_selector;
+    const bool old_reference_mode = reference_mode;
 
     config.st_separate("General");
     config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
@@ -325,6 +327,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     } else {
         config.output_text(fmt::format("seed: {}", seed));
     }
+    config.config_bool("reference mode", reference_mode);
 
     config.st_separate("Guiding Markov chain");
     config.config_percent("ML Prior", dir_guide_prior);
@@ -409,7 +412,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
         old_light_cache_buffer_size != light_cache_buffer_size ||
-        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count) {
+        old_distance_mc_vertex_state_count != distance_mc_vertex_state_count ||
+        old_reference_mode != reference_mode) {
         return NEEDS_RECONNECT;
     }
 

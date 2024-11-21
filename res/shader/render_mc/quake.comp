@@ -53,6 +53,14 @@ void main() {
             float wodotn;
             float wo_p = 0;
 
+#if MERIAN_QUAKE_REFERENCE_MODE == 1
+            wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+            wodotn = dot(wo, current_hit.normal);
+            if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
+                break;
+            wo_p = bsdf_diffuse_pdf(wodotn);
+#else
+
             MCState mc_state;
             uint mc_buffer_index;
 
@@ -113,6 +121,7 @@ void main() {
                 wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_ggx_diffuse_mix_pdf(-current_hit.wi, wo, current_hit.normal, current_hit.roughness) + (1 - SURF_BSDF_P) * wo_p;
 
             }
+#endif
 
             // TRACE RAY TO NEXT SURFACE
             Hit next_hit;
@@ -139,6 +148,7 @@ void main() {
             current_throughput *= throughput;
 
             // UPDATE MARKOV CHAIN and LIGHT_CACHE
+#if MERIAN_QUAKE_REFERENCE_MODE != 1
             {
                 // multiply albedo?
                 const float mc_f = yuv_luminance(lc_incident * microfacet_bsdf / wo_p);
@@ -156,7 +166,7 @@ void main() {
                     }
                 }
             }
-
+#endif
             // PREPARE NEXT ITERATION
             {
                 current_throughput *= next_hit.albedo;
