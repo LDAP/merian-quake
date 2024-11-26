@@ -136,7 +136,7 @@ void main() {
 
             // EVALUATE BSDF
             // without albedo (added below to skip first albedo)
-            const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(-current_hit.wi, wo, current_hit.normal, current_hit.roughness, 0.02);
+            const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
             
             current_throughput *= microfacet_bsdf;
             if (USE_LIGHT_CACHE_TAIL) {
