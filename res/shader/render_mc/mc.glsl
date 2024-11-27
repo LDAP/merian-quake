@@ -1,8 +1,3 @@
-// ADAPTIVE GRID (sclaes with distance to camera)
-#define MC_ADAPTIVE_GRID_MAX_WIDTH 100
-#define MC_ADAPTIVE_GRID_MIN_WIDTH .01
-#define MC_ADAPTIVE_GRID_POWER 4.
-
 // Configure ML
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA .01
@@ -62,26 +57,27 @@ void mc_state_reweight(inout MCState mc_state, const float factor) {
 
 // ADAPTIVE GRID
 
-uint mc_adaptive_level_for_pos(const vec3 pos) {
-    const float target_grid_width = clamp(2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), MC_ADAPTIVE_GRID_MIN_WIDTH, MC_ADAPTIVE_GRID_MAX_WIDTH);
-    const float level = MC_ADAPTIVE_GRID_LEVELS * pow((target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH) / (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH), 1 / MC_ADAPTIVE_GRID_POWER);
+uint mc_adaptive_level_for_pos(const vec3 pos, const vec3 normal) {
+    const vec3 v = params.cam_x.xyz - pos;
+    const float target_grid_width = 2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * dot(v, v) / dot(v, normal);
+    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
     return uint(round(level));
 }
 
 ivec3 mc_adpative_grid_idx_for_level_closest(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / float(MC_ADAPTIVE_GRID_LEVELS), MC_ADAPTIVE_GRID_POWER) * (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH) + MC_ADAPTIVE_GRID_MIN_WIDTH;
+    const float grid_width = pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
     return grid_idx_closest(pos, grid_width);
 }
 
 ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / float(MC_ADAPTIVE_GRID_LEVELS), MC_ADAPTIVE_GRID_POWER) * (MC_ADAPTIVE_GRID_MAX_WIDTH - MC_ADAPTIVE_GRID_MIN_WIDTH) + MC_ADAPTIVE_GRID_MIN_WIDTH;
+    const float grid_width = pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
 // returns (buffer_index, hash)
 void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {
     const float rand = XorShift32(rng_state);
-    const uint level = clamp(mc_adaptive_level_for_pos(pos) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0)), 0, MC_ADAPTIVE_GRID_LEVELS - 1);
+    const uint level = mc_adaptive_level_for_pos(pos, normal) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0));
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos);
     buffer_index = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
     hash = hash2_grid_level(grid_idx, level);

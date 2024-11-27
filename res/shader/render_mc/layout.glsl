@@ -29,20 +29,22 @@ layout (constant_id = 21) const float LIGHT_CACHE_LEVELS = 32.;
 layout (constant_id = 22) const float LIGHT_CACHE_TAN_ALPHA_HALF = 0.002;
 layout (constant_id = 23) const uint LIGHT_CACHE_BUFFER_SIZE = 4000000;
 layout (constant_id = 24) const uint MC_ADAPTIVE_BUFFER_SIZE = 32777259;
-layout (constant_id = 25) const uint MC_STATIC_BUFFER_SIZE = 800009;
-layout (constant_id = 26) const float MC_ADAPTIVE_GRID_TAN_ALPHA_HALF = 0.003;
-layout (constant_id = 27) const float MC_STATIC_GRID_WIDTH = 25.3;
-layout (constant_id = 28) const int MC_ADAPTIVE_GRID_LEVELS = 10;
-layout (constant_id = 29) const int DISTANCE_MC_GRID_WIDTH = 25;
-layout (constant_id = 30) const float VOLUME_MAX_T = 1000.;
-layout (constant_id = 31) const float SURF_BSDF_P = 0.15;
-layout (constant_id = 32) const float VOLUME_PHASE_P = 0.3;
-layout (constant_id = 33) const float DIR_GUIDE_PRIOR = 0.2;
-layout (constant_id = 34) const float DIST_GUIDE_P = 0.0;
-layout (constant_id = 35) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
-layout (constant_id = 36) const uint SEED = 0;
-layout (constant_id = 37) const bool DEBUG_OUTPUT_CONNECTED = false;
-layout (constant_id = 38) const int DEBUG_OUTPUT_SELECTOR = 0;
+layout (constant_id = 25) const float MC_ADAPTIVE_GRID_TAN_ALPHA_HALF = 0.002;
+layout (constant_id = 26) const float MC_ADAPTIVE_GRID_MIN_WIDTH = 0.01;
+layout (constant_id = 27) const float MC_ADAPTIVE_GRID_POWER = 4.0;
+layout (constant_id = 28) const float MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE = 4.743416490252569;
+layout (constant_id = 29) const uint MC_STATIC_BUFFER_SIZE = 800009;
+layout (constant_id = 30) const float MC_STATIC_GRID_WIDTH = 25.3;
+layout (constant_id = 31) const int DISTANCE_MC_GRID_WIDTH = 25;
+layout (constant_id = 32) const float VOLUME_MAX_T = 1000.;
+layout (constant_id = 33) const float SURF_BSDF_P = 0.15;
+layout (constant_id = 34) const float VOLUME_PHASE_P = 0.3;
+layout (constant_id = 35) const float DIR_GUIDE_PRIOR = 0.2;
+layout (constant_id = 36) const float DIST_GUIDE_P = 0.0;
+layout (constant_id = 37) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
+layout (constant_id = 38) const uint SEED = 0;
+layout (constant_id = 39) const bool DEBUG_OUTPUT_CONNECTED = false;
+layout (constant_id = 40) const int DEBUG_OUTPUT_SELECTOR = 0;
 
 #include "grid.h"
 #include "../scene_info.glsl.h"
