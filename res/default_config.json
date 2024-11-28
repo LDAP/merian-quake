@@ -633,7 +633,7 @@
             "properties": {
                 "alpha mode": "Perceptual luminance",
                 "clamp output": true,
-                "max white": 4.949999809265137,
+                "max white": 15.0,
                 "perceptual exponent": 2.200000047683716,
                 "tonemap": "Reinhard Extended"
             },
