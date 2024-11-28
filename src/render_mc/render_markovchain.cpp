@@ -393,7 +393,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.st_separate("Debug");
     config.config_options(
         "debug output", debug_output_selector,
-        {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments"});
+        {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments", "mc cos", "mc N", "mc motion vectors"});
 
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");

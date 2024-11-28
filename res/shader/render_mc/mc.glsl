@@ -10,9 +10,9 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 }
 
 // return normalized direction (from pos)
-#define mc_state_dir(mc_state, pos) normalize((mc_state.w_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0)) - pos)
+#define mc_state_dir(mc_state, pos) normalize((mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt) - pos)
 
-#define mc_state_pos(mc_state) (mc_state.w_tgt / (mc_state.sum_w > 0.0 ? mc_state.sum_w : 1.0))
+#define mc_state_pos(mc_state) (mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt)
 
 #define mc_state_prior(mc_state, pos) (max(0.001, DIR_GUIDE_PRIOR / pow(distance((pos), mc_state_pos(mc_state)), 2)))
 
@@ -21,14 +21,19 @@ float mc_state_mean_cos(const MCState mc_state, const vec3 pos) {
 }
 
 float mc_state_kappa(const MCState mc_state, const vec3 pos) {
-    const float r = (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos));
+    const float r = mc_state_mean_cos(mc_state, pos);
     return (3.0 * r - r * r * r) / (1.0 - r * r);
 }
 
 // returns the vmf lobe vec4(direction, kappa) for a position
 vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
-    const float r = (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos));
-    return vec4(mc_state_dir(mc_state, pos), (3.0 * r - r * r * r) / (1.0 - r * r));
+    return vec4(mc_state_dir(mc_state, pos), mc_state_kappa(mc_state, pos));
+}
+
+void mc_state_reweight(inout MCState mc_state, const float factor) {
+    mc_state.sum_w *= factor;
+    mc_state.w_tgt *= factor;
+    mc_state.w_cos *= factor;
 }
 
 // add sample to lobe via maximum likelihood estimator and exponentially weighted average
@@ -41,18 +46,14 @@ void mc_state_add_sample(inout MCState mc_state,
 
     mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
     mc_state.w_tgt = mix(mc_state.w_tgt, w * target, alpha);
-    mc_state.w_cos = mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha);
-    //mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
+    mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), mc_state.sum_w);
+
+    // mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
 
     mc_state.mv = target_mv;
     mc_state.T = params.cl_time;
 }
 
-void mc_state_reweight(inout MCState mc_state, const float factor) {
-    mc_state.sum_w *= factor;
-    mc_state.w_tgt *= factor;
-    mc_state.w_cos *= factor;
-}
 #define mc_state_valid(mc_state) (mc_state.sum_w > 0.0)
 
 // ADAPTIVE GRID

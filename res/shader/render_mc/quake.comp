@@ -237,6 +237,27 @@ void main() {
                 imageStore(img_debug, pixel, vec4(moments, 0, 1));
                 break;
             }
+            case 6: {
+                // -- MC learned cos --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.w_cos / mc_state.sum_w > 1), 1));
+                break;
+            }
+            case 7: {
+                // -- MC N --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.N) / ML_MAX_N, 1));
+                break;
+            }
+            case 8: {
+                // -- MC MV --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(mc_state.mv, 1));
+                break;
+            }
         }
     }
 }
