@@ -14,7 +14,7 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 
 #define mc_state_pos(mc_state) (mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt)
 
-#define mc_state_prior(mc_state, pos) (max(0.001, DIR_GUIDE_PRIOR / pow(distance((pos), mc_state_pos(mc_state)), 2)))
+#define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / pow(distance((pos), mc_state_pos(mc_state)), 2)))
 
 float mc_state_mean_cos(const MCState mc_state, const vec3 pos) {
     return (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos));
@@ -46,7 +46,7 @@ void mc_state_add_sample(inout MCState mc_state,
 
     mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
     mc_state.w_tgt = mix(mc_state.w_tgt, w * target, alpha);
-    mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), 0.99999 * mc_state.sum_w);
+    mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), 0.9999999 * mc_state.sum_w);
 
     // mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
 
