@@ -46,7 +46,7 @@ void mc_state_add_sample(inout MCState mc_state,
 
     mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
     mc_state.w_tgt = mix(mc_state.w_tgt, w * target, alpha);
-    mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), mc_state.sum_w);
+    mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), 0.99999 * mc_state.sum_w);
 
     // mc_state.w_cos = length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha));
 

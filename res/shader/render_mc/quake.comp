@@ -241,7 +241,7 @@ void main() {
                 // -- MC learned cos --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
-                imageStore(img_debug, pixel, vec4(vec3(mc_state.w_cos / mc_state.sum_w > 1), 1));
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? mc_state.w_cos / mc_state.sum_w : 0), 1));
                 break;
             }
             case 7: {
