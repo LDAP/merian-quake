@@ -70,7 +70,7 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
-                             light_cache_buffer_size * sizeof(LightCacheVertex),
+                             lc_buffer_size * sizeof(LightCacheVertex),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
@@ -147,9 +147,9 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             render_info.constant.sun_color.r, render_info.constant.sun_color.g,
             render_info.constant.sun_color.b, adaptive_sampling, volume_spp, volume_use_light_cache,
             draine_g, draine_a, mc_samples, mc_samples_adaptive_prob, distance_mc_samples,
-            mc_fast_recovery, light_cache_levels, light_cache_tan_alpha_half,
-            light_cache_buffer_size, mc_adaptive_buffer_size, mc_adaptive_grid_tan_alpha_half,
-            mc_adaptive_grid_min_width, mc_adaptive_grid_power,
+            mc_fast_recovery, lc_buffer_size, lc_grid_steps_per_unit_size, lc_grid_tan_alpha_half,
+            lc_grid_min_width, lc_grid_power, mc_adaptive_buffer_size,
+            mc_adaptive_grid_tan_alpha_half, mc_adaptive_grid_min_width, mc_adaptive_grid_power,
             mc_adaptive_grid_steps_per_unit_size, mc_static_buffer_size, mc_static_grid_width,
             distance_mc_grid_width, render_info.constant.volume_max_t, surf_bsdf_p, volume_phase_p,
             dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed,
@@ -302,14 +302,12 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const int32_t old_distance_mc_samples = distance_mc_samples;
     const float old_mc_samples_adaptive_prob = mc_samples_adaptive_prob;
     const VkBool32 old_mc_fast_recovery = mc_fast_recovery;
-    const float old_light_cache_levels = light_cache_levels;
-    const float old_light_cache_tan_alpha_half = light_cache_tan_alpha_half;
     const uint32_t old_mc_adaptive_buffer_size = mc_adaptive_buffer_size;
     const uint32_t old_mc_static_buffer_size = mc_static_buffer_size;
     const float old_mc_adaptive_grid_tan_alpha_half = mc_adaptive_grid_tan_alpha_half;
     const float old_mc_static_grid_width = mc_static_grid_width;
     const int32_t old_distance_mc_grid_width = distance_mc_grid_width;
-    const uint32_t old_light_cache_buffer_size = light_cache_buffer_size;
+    const uint32_t old_light_cache_buffer_size = lc_buffer_size;
     const float old_surf_bsdf_p = surf_bsdf_p;
     const float old_volume_phase_p = volume_phase_p;
     const float old_dir_guide_prior = dir_guide_prior;
@@ -340,12 +338,12 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "buffer size backing the hash grid");
     config.config_float("adaptive grid tan(alpha/2)", mc_adaptive_grid_tan_alpha_half,
                         "the adaptive grid resolution, lower means higher resolution.", 0.0001);
+    needs_pipeline_rebuild |= config.config_float("adaptive grid steps per unit",
+                                                  mc_adaptive_grid_steps_per_unit_size, "", 0.1);
     needs_pipeline_rebuild |=
         config.config_float("adaptive grid min width", mc_adaptive_grid_min_width, "", 0.001);
     needs_pipeline_rebuild |=
         config.config_float("adaptive grid power", mc_adaptive_grid_power, "", 0.1);
-    needs_pipeline_rebuild |= config.config_float("adaptive grid steps per unit",
-                                                  mc_adaptive_grid_steps_per_unit_size, "", 0.1);
 
     config.config_uint("static grid buf size", mc_static_buffer_size,
                        "buffer size backing the hash grid");
@@ -382,11 +380,15 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "use the light cache for the path tail");
     config.config_bool("volume: use LC", volume_use_light_cache,
                        "query light cache for non-emitting surfaces");
-    config.config_float("LC levels", light_cache_levels);
-    config.config_float("LC tan(alpha/2)", light_cache_tan_alpha_half,
-                        "the light cache resolution, lower means higher resolution.", 0.0001);
-    config.config_uint("LC buf size", light_cache_buffer_size,
-                       "Size of buffer backing the hash grid");
+
+    config.config_uint("LC buf size", lc_buffer_size, "Size of buffer backing the hash grid");
+    needs_pipeline_rebuild |=
+        config.config_float("LC grid tan(alpha/2)", lc_grid_tan_alpha_half,
+                            "the light cache resolution, lower means higher resolution.", 0.0001);
+    needs_pipeline_rebuild |=
+        config.config_float("LC grid steps per unit", lc_grid_steps_per_unit_size, "", 0.1);    needs_pipeline_rebuild |=
+        config.config_float("LC grid min width", lc_grid_min_width, "", 0.001);
+    needs_pipeline_rebuild |= config.config_float("LC grid power", lc_grid_power, "", 0.1);
 
     config.st_separate("Debug");
     config.config_options(
@@ -404,8 +406,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_volume_particle_size_um != volume_particle_size_um || old_mc_samples != mc_samples ||
         old_mc_samples_adaptive_prob != mc_samples_adaptive_prob ||
         old_distance_mc_samples != distance_mc_samples ||
-        old_mc_fast_recovery != mc_fast_recovery || old_light_cache_levels != light_cache_levels ||
-        old_light_cache_tan_alpha_half != light_cache_tan_alpha_half ||
+        old_mc_fast_recovery != mc_fast_recovery ||
         old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
         old_surf_bsdf_p != surf_bsdf_p || old_volume_phase_p != volume_phase_p ||
         old_dir_guide_prior != dir_guide_prior || old_dist_guide_p != dist_guide_p ||
@@ -419,7 +420,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_mc_static_buffer_size != mc_static_buffer_size ||
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||
-        old_light_cache_buffer_size != light_cache_buffer_size ||
+        old_light_cache_buffer_size != lc_buffer_size ||
         old_distance_mc_vertex_state_count != distance_mc_vertex_state_count ||
         old_reference_mode != reference_mode) {
         return NEEDS_RECONNECT;

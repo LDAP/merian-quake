@@ -1,30 +1,19 @@
-#define LIGHT_CACHE_MAX_GRID_WIDTH 100.
-#define LIGHT_CACHE_MIN_GRID_WIDTH .01
-
 #define LIGHT_CACHE_MAX_N 128s
 #define LIGHT_CACHE_MIN_ALPHA .01
 
 uint lc_level_for_pos(const vec3 pos) {
-    const float target_grid_width = clamp(2 * LIGHT_CACHE_TAN_ALPHA_HALF * distance(pos, params.cam_x.xyz), LIGHT_CACHE_MIN_GRID_WIDTH, LIGHT_CACHE_MAX_GRID_WIDTH);
-    const float level = LIGHT_CACHE_LEVELS * pow((target_grid_width - LIGHT_CACHE_MIN_GRID_WIDTH) / (LIGHT_CACHE_MAX_GRID_WIDTH - LIGHT_CACHE_MIN_GRID_WIDTH), 1 / 9.);
+    const float target_grid_width = 2 * LC_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos);
+    const float level = LC_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - LC_GRID_MIN_WIDTH, 0), 1 / LC_GRID_POWER);
     return uint(round(level));
-
-    // const float frac = fract(level);
-    // if (frac < .4 || frac > .6) {
-    //     return uint(round(level));
-    // }
-
-    // const uint lower = uint(level);
-    // return XorShift32(rng_state) < frac ? lower + 1 : lower;
 }
 
 ivec3 lc_grid_idx_for_level_closest(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / LIGHT_CACHE_LEVELS, 9.) * (LIGHT_CACHE_MAX_GRID_WIDTH - LIGHT_CACHE_MIN_GRID_WIDTH) + LIGHT_CACHE_MIN_GRID_WIDTH;
+    const float grid_width = pow(level / LC_GRID_STEPS_PER_UNIT_SIZE, LC_GRID_POWER) + LC_GRID_MIN_WIDTH;
     return grid_idx_closest(pos, grid_width);
 }
 
 ivec3 lc_grid_idx_for_level_interpolate(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / LIGHT_CACHE_LEVELS, 9.) * (LIGHT_CACHE_MAX_GRID_WIDTH - LIGHT_CACHE_MIN_GRID_WIDTH) + LIGHT_CACHE_MIN_GRID_WIDTH;
+    const float grid_width = pow(level / LC_GRID_STEPS_PER_UNIT_SIZE, LC_GRID_POWER) + LC_GRID_MIN_WIDTH;
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
