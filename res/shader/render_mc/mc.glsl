@@ -6,7 +6,11 @@
 #define MERIAN_QUAKE_GRID_TYPE_QUADRATIC 1
 
 #ifndef MERIAN_QUAKE_ADAPTIVE_GRID_TYPE
-#define MERIAN_QUAKE_ADAPTIVE_GRID_TYPE 2
+#error "unknown grid type"
+#else
+#if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE > 1
+#error "unknown grid type"
+#endif
 #endif
 
 // GENERAL
@@ -23,9 +27,7 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 
 #define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / pow(distance((pos), mc_state_pos(mc_state)), 2)))
 
-float mc_state_mean_cos(const MCState mc_state, const vec3 pos) {
-    return (mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos));
-}
+#define mc_state_mean_cos(mc_state, pos) ((mc_state.N * mc_state.N * (mc_state.w_cos / mc_state.sum_w)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)))
 
 float mc_state_kappa(const MCState mc_state, const vec3 pos) {
     const float r = mc_state_mean_cos(mc_state, pos);
@@ -33,9 +35,7 @@ float mc_state_kappa(const MCState mc_state, const vec3 pos) {
 }
 
 // returns the vmf lobe vec4(direction, kappa) for a position
-vec4 mc_state_get_vmf(const MCState mc_state, const vec3 pos) {
-    return vec4(mc_state_dir(mc_state, pos), mc_state_kappa(mc_state, pos));
-}
+#define mc_state_get_vmf(mc_state, pos) vec4(mc_state_dir(mc_state, pos), mc_state_kappa(mc_state, pos))
 
 void mc_state_reweight(inout MCState mc_state, const float factor) {
     mc_state.sum_w *= factor;
@@ -65,43 +65,25 @@ void mc_state_add_sample(inout MCState mc_state,
 
 // ADAPTIVE GRID
 
-uint mc_adaptive_level_for_pos(const vec3 pos) {
-    const float target_grid_width = 2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos);
+#define target_grid_width(pos) (2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos))
 
 #if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
-    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * log(max(target_grid_width, MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER);
+    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * log(max(target_grid_width(pos), MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER)))
 #elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
-    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
-#else
-#error "unknown grid type"
+    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width(pos) - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER)))
 #endif
-    
-    return uint(round(level));
-}
 
-float grid_width_for_level(const uint level) {
+#define mc_adaptive_level_for_pos(pos, random) (mc_adaptive_target_level_for_pos(pos) + uint((-log2(1.0 - random))))
 
 #if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
-    return MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE);
+    #define grid_width_for_level(level) (MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE))
 #elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
-    return pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
-#else
-#error "unknown grid type"
+    #define grid_width_for_level(level) (pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH)
 #endif
 
-}
+#define mc_adpative_grid_idx_for_level_closest(level, pos) grid_idx_closest(pos, grid_width_for_level(level))
 
-ivec3 mc_adpative_grid_idx_for_level_closest(const uint level, const vec3 pos) {
-    return grid_idx_closest(pos, grid_width_for_level(level));
-}
-
-ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 pos) {
-    return grid_idx_interpolate(pos, grid_width_for_level(level), XorShift32(rng_state));
-}
-
-uint mc_adaptive_level_for_pos(const vec3 pos, const float random) {
-    return mc_adaptive_level_for_pos(pos) + uint((-log2(1.0 - random)));
-}
+#define mc_adaptive_grid_idx_for_level_interpolate(level, pos) grid_idx_interpolate(pos, grid_width_for_level(level), XorShift32(rng_state))
 
 // returns (buffer_index, hash)
 void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {
