@@ -60,18 +60,30 @@ void mc_state_add_sample(inout MCState mc_state,
 
 uint mc_adaptive_level_for_pos(const vec3 pos) {
     const float target_grid_width = 2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos);
-    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
+    
+    // quadratic
+    //const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
+    
+    // exponential
+    const float level = log(max(target_grid_width, MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER);
+    
     return uint(round(level));
 }
 
+float grid_width_for_level(const uint level) {
+    // quadratic
+    //return pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
+
+    // exponential
+    return MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level);
+}
+
 ivec3 mc_adpative_grid_idx_for_level_closest(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
-    return grid_idx_closest(pos, grid_width);
+    return grid_idx_closest(pos, grid_width_for_level(level));
 }
 
 ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
-    return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
+    return grid_idx_interpolate(pos, grid_width_for_level(level), XorShift32(rng_state));
 }
 
 uint mc_adaptive_level_for_pos(const vec3 pos, const float random) {
