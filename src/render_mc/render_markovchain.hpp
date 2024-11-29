@@ -138,6 +138,7 @@ class RendererMarkovChain : public merian_nodes::Node {
     float lc_grid_min_width = 0.01;
     float lc_grid_power = 2.0;
 
+    int mc_adaptive_grid_type = 0;
     uint32_t mc_adaptive_buffer_size = 32777259;
     float mc_adaptive_grid_tan_alpha_half = 0.003;
     float mc_adaptive_grid_min_width = .01;

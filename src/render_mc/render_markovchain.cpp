@@ -89,7 +89,9 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
         true);
 
     const std::map<std::string, std::string> additional_macro_definitions = {
-        {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))}};
+        {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))},
+        {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(static_cast<int>(mc_adaptive_grid_type))},
+    };
 
     rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_mc/quake.comp", std::nullopt, {}, additional_macro_definitions);
@@ -319,6 +321,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const bool old_reference_mode = reference_mode;
 
     bool needs_pipeline_rebuild = false;
+    bool needs_reconnect = false;
 
     config.st_separate("General");
     config.config_bool("randomize seed", randomize_seed, "randomize seed at every graph build");
@@ -334,6 +337,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.config_int("mc samples", mc_samples, 0, 30);
 
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
+    needs_reconnect |= config.config_options("adaptive grid type", mc_adaptive_grid_type,
+                                             {"exponential", "quadratic"});
     config.config_uint("adaptive grid buf size", mc_adaptive_buffer_size,
                        "buffer size backing the hash grid");
     config.config_float("adaptive grid tan(alpha/2)", mc_adaptive_grid_tan_alpha_half,
@@ -343,7 +348,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     needs_pipeline_rebuild |=
         config.config_float("adaptive grid min width", mc_adaptive_grid_min_width, "", 0.001);
     needs_pipeline_rebuild |=
-        config.config_float("adaptive grid power", mc_adaptive_grid_power, "", 0.1);
+        config.config_float("adaptive grid power", mc_adaptive_grid_power, "", 0.001);
 
     config.config_uint("static grid buf size", mc_static_buffer_size,
                        "buffer size backing the hash grid");
@@ -386,14 +391,15 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         config.config_float("LC grid tan(alpha/2)", lc_grid_tan_alpha_half,
                             "the light cache resolution, lower means higher resolution.", 0.0001);
     needs_pipeline_rebuild |=
-        config.config_float("LC grid steps per unit", lc_grid_steps_per_unit_size, "", 0.1);    needs_pipeline_rebuild |=
+        config.config_float("LC grid steps per unit", lc_grid_steps_per_unit_size, "", 0.1);
+    needs_pipeline_rebuild |=
         config.config_float("LC grid min width", lc_grid_min_width, "", 0.001);
     needs_pipeline_rebuild |= config.config_float("LC grid power", lc_grid_power, "", 0.1);
 
     config.st_separate("Debug");
-    config.config_options(
-        "debug output", debug_output_selector,
-        {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance", "moments", "mc cos", "mc N", "mc motion vectors"});
+    config.config_options("debug output", debug_output_selector,
+                          {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance",
+                           "moments", "mc cos", "mc N", "mc motion vectors"});
 
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
@@ -416,7 +422,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     }
 
     // Change outputs and require a graph rebuild
-    if (old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
+    if (needs_reconnect || old_mc_adaptive_buffer_size != mc_adaptive_buffer_size ||
         old_mc_static_buffer_size != mc_static_buffer_size ||
         old_mc_static_grid_width != mc_static_grid_width ||
         old_distance_mc_grid_width != distance_mc_grid_width ||

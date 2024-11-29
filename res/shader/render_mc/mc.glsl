@@ -2,6 +2,13 @@
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA .01
 
+#define MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL 0
+#define MERIAN_QUAKE_GRID_TYPE_QUADRATIC 1
+
+#ifndef MERIAN_QUAKE_ADAPTIVE_GRID_TYPE
+#define MERIAN_QUAKE_ADAPTIVE_GRID_TYPE 2
+#endif
+
 // GENERAL
 
 MCState mc_state_new(const vec3 pos, const vec3 normal) {
@@ -60,22 +67,28 @@ void mc_state_add_sample(inout MCState mc_state,
 
 uint mc_adaptive_level_for_pos(const vec3 pos) {
     const float target_grid_width = 2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos);
-    
-    // quadratic
-    //const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
-    
-    // exponential
-    const float level = log(max(target_grid_width, MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER);
+
+#if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
+    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * log(max(target_grid_width, MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER);
+#elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
+    const float level = MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER);
+#else
+#error "unknown grid type"
+#endif
     
     return uint(round(level));
 }
 
 float grid_width_for_level(const uint level) {
-    // quadratic
-    //return pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
 
-    // exponential
-    return MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level);
+#if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
+    return MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE);
+#elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
+    return pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH;
+#else
+#error "unknown grid type"
+#endif
+
 }
 
 ivec3 mc_adpative_grid_idx_for_level_closest(const uint level, const vec3 pos) {
