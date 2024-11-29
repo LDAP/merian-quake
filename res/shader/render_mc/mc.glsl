@@ -74,10 +74,13 @@ ivec3 mc_adaptive_grid_idx_for_level_interpolate(const uint level, const vec3 po
     return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
 }
 
+uint mc_adaptive_level_for_pos(const vec3 pos, const float random) {
+    return mc_adaptive_level_for_pos(pos) + uint((-log2(1.0 - random)));
+}
+
 // returns (buffer_index, hash)
 void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {
-    const float rand = XorShift32(rng_state);
-    const uint level = mc_adaptive_level_for_pos(pos) + (rand < .2 ? 1 : (rand > .8 ? 2 : 0));
+    const uint level = mc_adaptive_level_for_pos(pos, XorShift32(rng_state));
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos);
     buffer_index = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
     hash = hash2_grid_level(grid_idx, level);

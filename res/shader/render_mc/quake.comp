@@ -222,7 +222,7 @@ void main() {
             }
             case 3: {
                 // -- MC grid --
-                const uint level = mc_adaptive_level_for_pos(first_hit.pos);
+                const uint level = mc_adaptive_level_for_pos(first_hit.pos, XorShift32(rng_state));
                 uint seed = hash_grid(mc_adpative_grid_idx_for_level_closest(level, first_hit.pos), 256 * 256 * 256);
                 imageStore(img_debug, pixel, vec4(vec3(XorShift32Vec4(seed)), 1));
                 break;
