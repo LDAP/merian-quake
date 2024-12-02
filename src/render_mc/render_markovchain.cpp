@@ -149,6 +149,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             {"MC_SAMPLES_ADAPTIVE_PROB", std::to_string(mc_samples_adaptive_prob)},
             {"DISTANCE_MC_SAMPLES", std::to_string(distance_mc_samples)},
             {"MC_FAST_RECOVERY", std::to_string(mc_fast_recovery)},
+            {"MERIAN_QUAKE_LC_GRID_TYPE", std::to_string(lc_grid_type)},
             {"LIGHT_CACHE_BUFFER_SIZE", std::to_string(lc_buffer_size)},
             {"LC_GRID_STEPS_PER_UNIT_SIZE", std::to_string(lc_grid_steps_per_unit_size)},
             {"LC_GRID_TAN_ALPHA_HALF", std::to_string(lc_grid_tan_alpha_half)},
@@ -418,6 +419,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.config_bool("volume: use LC", volume_use_light_cache,
                        "query light cache for non-emitting surfaces");
 
+    needs_reconnect |=
+        config.config_options("LC grid type", lc_grid_type, {"exponential", "quadratic"});
     config.config_uint("LC buf size", lc_buffer_size, "Size of buffer backing the hash grid");
     needs_pipeline_rebuild |=
         config.config_float("LC grid tan(alpha/2)", lc_grid_tan_alpha_half,

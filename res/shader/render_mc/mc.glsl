@@ -2,9 +2,6 @@
 #define ML_MAX_N 1024
 #define ML_MIN_ALPHA .01
 
-#define MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL 0
-#define MERIAN_QUAKE_GRID_TYPE_QUADRATIC 1
-
 #ifndef MERIAN_QUAKE_ADAPTIVE_GRID_TYPE
 #error "unknown grid type"
 #else

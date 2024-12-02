@@ -1,21 +1,32 @@
 #define LIGHT_CACHE_MAX_N 128s
 #define LIGHT_CACHE_MIN_ALPHA .01
 
-uint lc_level_for_pos(const vec3 pos) {
-    const float target_grid_width = 2 * LC_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos);
-    const float level = LC_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width - LC_GRID_MIN_WIDTH, 0), 1 / LC_GRID_POWER);
-    return uint(round(level));
-}
+#ifndef MERIAN_QUAKE_LC_GRID_TYPE
+#error "unknown grid type"
+#else
+#if MERIAN_QUAKE_LC_GRID_TYPE > 1
+#error "unknown grid type"
+#endif
+#endif
 
-ivec3 lc_grid_idx_for_level_closest(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / LC_GRID_STEPS_PER_UNIT_SIZE, LC_GRID_POWER) + LC_GRID_MIN_WIDTH;
-    return grid_idx_closest(pos, grid_width);
-}
 
-ivec3 lc_grid_idx_for_level_interpolate(const uint level, const vec3 pos) {
-    const float grid_width = pow(level / LC_GRID_STEPS_PER_UNIT_SIZE, LC_GRID_POWER) + LC_GRID_MIN_WIDTH;
-    return grid_idx_interpolate(pos, grid_width, XorShift32(rng_state));
-}
+#define lc_target_grid_width(pos) (2 * LC_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos))
+
+#if MERIAN_QUAKE_LC_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
+    #define lc_level_for_pos(pos) uint(round(LC_GRID_STEPS_PER_UNIT_SIZE * log(max(lc_target_grid_width(pos), LC_GRID_MIN_WIDTH) / LC_GRID_MIN_WIDTH) / log(LC_GRID_POWER)))
+#elif MERIAN_QUAKE_LC_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
+    #define lc_level_for_pos(pos) uint(round(LC_GRID_STEPS_PER_UNIT_SIZE * pow(max(lc_target_grid_width(pos) - LC_GRID_MIN_WIDTH, 0), 1 / LC_GRID_POWER)))
+#endif
+
+#if MERIAN_QUAKE_LC_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
+    #define lc_grid_width_for_level(level) (LC_GRID_MIN_WIDTH * pow(LC_GRID_POWER, level / LC_GRID_STEPS_PER_UNIT_SIZE))
+#elif MERIAN_QUAKE_LC_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
+    #define lc_grid_width_for_level(level) (pow(level / LC_GRID_STEPS_PER_UNIT_SIZE, LC_GRID_POWER) + LC_GRID_MIN_WIDTH)
+#endif
+
+#define lc_grid_idx_for_level_closest(level, pos) grid_idx_closest(pos, lc_grid_width_for_level(level))
+
+#define lc_grid_idx_for_level_interpolate(level, pos) grid_idx_interpolate(pos, lc_grid_width_for_level(level), XorShift32(rng_state))
 
 void light_cache_get_level(out f16vec3 irr, out uint16_t N, const uint level, const vec3 pos, const vec3 normal) {
     const ivec3 grid_idx = lc_grid_idx_for_level_interpolate(level, pos);

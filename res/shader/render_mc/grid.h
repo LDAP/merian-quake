@@ -1,5 +1,8 @@
 #include "merian-shaders/types.glsl.h"
 
+#define MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL 0
+#define MERIAN_QUAKE_GRID_TYPE_QUADRATIC 1
+
 struct MCState {
     vec3 w_tgt;
     float sum_w;

@@ -131,6 +131,7 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     VkBool32 mc_fast_recovery = VK_TRUE;
 
+    int lc_grid_type = 0;
     uint32_t lc_buffer_size = 4000000;
     float lc_grid_steps_per_unit_size = 6.0;
     float lc_grid_tan_alpha_half = 0.002;

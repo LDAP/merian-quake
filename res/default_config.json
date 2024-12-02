@@ -606,6 +606,7 @@
                 "LC grid power": 2.0,
                 "LC grid steps per unit": 6.0,
                 "LC grid tan(alpha/2)": 0.004999999888241291,
+                "LC grid type": "quadratic",
                 "ML Prior": 0.30000001192092896,
                 "Phase Prob": 0.10000000149011612,
                 "adaptive grid buf size": 32777259,
