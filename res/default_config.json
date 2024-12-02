@@ -601,7 +601,7 @@
             "disable": false,
             "properties": {
                 "BSDF Prob": 0.10000000149011612,
-                "LC buf size": 4000000,
+                "LC buf size": 4000037,
                 "LC grid min width": 0.009999999776482582,
                 "LC grid power": 2.0,
                 "LC grid steps per unit": 6.0,
