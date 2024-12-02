@@ -88,20 +88,6 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
 
-    const std::map<std::string, std::string> additional_macro_definitions = {
-        {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))},
-        {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(static_cast<int>(mc_adaptive_grid_type))},
-    };
-
-    rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/quake.comp", std::nullopt, {}, additional_macro_definitions);
-    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/clear.comp");
-    volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/volume.comp", std::nullopt, {}, additional_macro_definitions);
-    volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_mc/volume_forward_project.comp");
-
     return {
         con_irradiance,     con_moments,      con_volume,
         con_volume_moments, con_volume_depth, con_volume_mv,
@@ -139,23 +125,70 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             seed = dist(rng);
         }
 
-        auto spec_builder = merian::SpecializationInfoBuilder();
         const float draine_g = std::exp(-2.20679 / (volume_particle_size_um + 3.91029) - 0.428934);
         const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
-        spec_builder.add_entry(
-            local_size_x, local_size_y, spp, max_path_length, use_light_cache_tail,
-            render_info.constant.fov_tan_alpha_half, render_info.constant.sun_direction.x,
-            render_info.constant.sun_direction.y, render_info.constant.sun_direction.z,
-            render_info.constant.sun_color.r, render_info.constant.sun_color.g,
-            render_info.constant.sun_color.b, adaptive_sampling, volume_spp, volume_use_light_cache,
-            draine_g, draine_a, mc_samples, mc_samples_adaptive_prob, distance_mc_samples,
-            mc_fast_recovery, lc_buffer_size, lc_grid_steps_per_unit_size, lc_grid_tan_alpha_half,
-            lc_grid_min_width, lc_grid_power, mc_adaptive_buffer_size,
-            mc_adaptive_grid_tan_alpha_half, mc_adaptive_grid_min_width, mc_adaptive_grid_power,
-            mc_adaptive_grid_steps_per_unit_size, mc_static_buffer_size, mc_static_grid_width,
-            distance_mc_grid_width, render_info.constant.volume_max_t, surf_bsdf_p, volume_phase_p,
-            dir_guide_prior, dist_guide_p, distance_mc_vertex_state_count, seed,
-            io.is_connected(con_debug), debug_output_selector);
+
+        const std::map<std::string, std::string> additional_macro_definitions = {
+            {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))},
+            {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(mc_adaptive_grid_type)},
+            {"SURFACE_SPP", std::to_string(spp)},
+            {"MAX_PATH_LENGTH", std::to_string(max_path_length)},
+            {"USE_LIGHT_CACHE_TAIL", std::to_string(use_light_cache_tail)},
+            {"FOV_TAN_ALPHA_HALF", std::to_string(render_info.constant.fov_tan_alpha_half)},
+            {"SUN_W_X", std::to_string(render_info.constant.sun_direction.x)},
+            {"SUN_W_Y", std::to_string(render_info.constant.sun_direction.y)},
+            {"SUN_W_Z", std::to_string(render_info.constant.sun_direction.z)},
+            {"SUN_COLOR_R", std::to_string(render_info.constant.sun_color.r)},
+            {"SUN_COLOR_G", std::to_string(render_info.constant.sun_color.g)},
+            {"SUN_COLOR_B", std::to_string(render_info.constant.sun_color.b)},
+            {"VOLUME_SPP", std::to_string(volume_spp)},
+            {"VOLUME_USE_LIGHT_CACHE", std::to_string(volume_use_light_cache)},
+            {"DRAINE_G", std::to_string(draine_g)},
+            {"DRAINE_A", std::to_string(draine_a)},
+            {"MC_SAMPLES", std::to_string(mc_samples)},
+            {"MC_SAMPLES_ADAPTIVE_PROB", std::to_string(mc_samples_adaptive_prob)},
+            {"DISTANCE_MC_SAMPLES", std::to_string(distance_mc_samples)},
+            {"MC_FAST_RECOVERY", std::to_string(mc_fast_recovery)},
+            {"LIGHT_CACHE_BUFFER_SIZE", std::to_string(lc_buffer_size)},
+            {"LC_GRID_STEPS_PER_UNIT_SIZE", std::to_string(lc_grid_steps_per_unit_size)},
+            {"LC_GRID_TAN_ALPHA_HALF", std::to_string(lc_grid_tan_alpha_half)},
+            {"LC_GRID_MIN_WIDTH", std::to_string(lc_grid_min_width)},
+            {"LC_GRID_POWER", std::to_string(lc_grid_power)},
+            {"MC_ADAPTIVE_BUFFER_SIZE", std::to_string(mc_adaptive_buffer_size)},
+            {"MC_ADAPTIVE_GRID_TAN_ALPHA_HALF", std::to_string(mc_adaptive_grid_tan_alpha_half)},
+            {"MC_ADAPTIVE_GRID_MIN_WIDTH", std::to_string(mc_adaptive_grid_min_width)},
+            {"MC_ADAPTIVE_GRID_POWER", std::to_string(mc_adaptive_grid_power)},
+            {"MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE",
+             std::to_string(mc_adaptive_grid_steps_per_unit_size)},
+            {"MC_STATIC_BUFFER_SIZE", std::to_string(mc_static_buffer_size)},
+            {"MC_STATIC_GRID_WIDTH", std::to_string(mc_static_grid_width)},
+            {"DISTANCE_MC_GRID_WIDTH", std::to_string(distance_mc_grid_width)},
+            {"VOLUME_MAX_T", std::to_string(render_info.constant.volume_max_t)},
+            {"SURF_BSDF_P", std::to_string(surf_bsdf_p)},
+            {"VOLUME_PHASE_P", std::to_string(volume_phase_p)},
+            {"DIR_GUIDE_PRIOR", std::to_string(dir_guide_prior)},
+            {"DIST_GUIDE_P", std::to_string(dist_guide_p)},
+            {"DISTANCE_MC_VERTEX_STATE_COUNT", std::to_string(distance_mc_vertex_state_count)},
+            {"SEED", std::to_string(seed)},
+            {"DEBUG_OUTPUT_CONNECTED",
+             std::to_string(static_cast<int>(io.is_connected(con_debug)))},
+            {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
+        };
+
+        rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+            context, "shader/render_mc/quake.comp", std::nullopt, {}, additional_macro_definitions);
+        clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+            context, "shader/render_mc/clear.comp", std::nullopt, {}, additional_macro_definitions);
+        volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+            context, "shader/render_mc/volume.comp", std::nullopt, {},
+            additional_macro_definitions);
+        volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+            context, "shader/render_mc/volume_forward_project.comp", std::nullopt, {},
+            additional_macro_definitions);
+
+        auto spec_builder = merian::SpecializationInfoBuilder();
+
+        spec_builder.add_entry(local_size_x, local_size_y);
 
         auto spec = spec_builder.build();
 
@@ -296,7 +329,6 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const int32_t old_spp = spp;
     const int32_t old_max_path_lenght = max_path_length;
     const VkBool32 old_use_light_cache_tail = use_light_cache_tail;
-    const int32_t old_adaptive_sampling = adaptive_sampling;
     const int32_t old_volume_spp = volume_spp;
     const VkBool32 old_volume_use_light_cache = volume_use_light_cache;
     const float old_volume_particle_size_um = volume_particle_size_um;
@@ -400,14 +432,13 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.config_options("debug output", debug_output_selector,
                           {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance",
                            "moments", "mc cos", "mc N", "mc motion vectors"});
-
+    needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
 
     // Only require a pipeline recreation
     if (needs_pipeline_rebuild || old_spp != spp || old_max_path_lenght != max_path_length ||
-        old_use_light_cache_tail != use_light_cache_tail ||
-        old_adaptive_sampling != adaptive_sampling || old_volume_spp != volume_spp ||
+        old_use_light_cache_tail != use_light_cache_tail || old_volume_spp != volume_spp ||
         old_volume_use_light_cache != volume_use_light_cache ||
         old_volume_particle_size_um != volume_particle_size_um || old_mc_samples != mc_samples ||
         old_mc_samples_adaptive_prob != mc_samples_adaptive_prob ||

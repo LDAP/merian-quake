@@ -6,47 +6,129 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-layout (constant_id = 2) const int MAX_SPP = 4;
-layout (constant_id = 3) const int MAX_PATH_LENGTH = 3;
-layout (constant_id = 4) const bool USE_LIGHT_CACHE_TAIL = false;
-layout (constant_id = 5) const float FOV_TAN_ALPHA_HALF = 0;
-layout (constant_id = 6) const float SUN_W_X = 0;
-layout (constant_id = 7) const float SUN_W_Y = 0;
-layout (constant_id = 8) const float SUN_W_Z = 0;
-layout (constant_id = 9) const float SUN_COLOR_R = 0;
-layout (constant_id = 10) const float SUN_COLOR_G = 0;
-layout (constant_id = 11) const float SUN_COLOR_B = 0;
-layout (constant_id = 12) const int ADAPTIVE_SAMPLING = 0;
-layout (constant_id = 13) const int VOLUME_SPP = 0;
-layout (constant_id = 14) const bool VOLUME_USE_LIGHT_CACHE = false;
-layout (constant_id = 15) const float DRAINE_G = 0.65;
-layout (constant_id = 16) const float DRAINE_A = 32.0;
-layout (constant_id = 17) const int MC_SAMPLES = 5;
-layout (constant_id = 18) const float MC_SAMPLES_ADAPTIVE_PROB = 0.7;
-layout (constant_id = 19) const int DISTANCE_MC_SAMPLES = 3;
-layout (constant_id = 20) const bool MC_FAST_RECOVERY = true;
-layout (constant_id = 21) const uint LIGHT_CACHE_BUFFER_SIZE = 4000000;
-layout (constant_id = 22) const float LC_GRID_STEPS_PER_UNIT_SIZE = 6.0;
-layout (constant_id = 23) const float LC_GRID_TAN_ALPHA_HALF = 0.002;
-layout (constant_id = 24) const float LC_GRID_MIN_WIDTH = 0.01;
-layout (constant_id = 25) const float LC_GRID_POWER = 2;
-layout (constant_id = 26) const uint MC_ADAPTIVE_BUFFER_SIZE = 32777259;
-layout (constant_id = 27) const float MC_ADAPTIVE_GRID_TAN_ALPHA_HALF = 0.002;
-layout (constant_id = 28) const float MC_ADAPTIVE_GRID_MIN_WIDTH = 0.01;
-layout (constant_id = 29) const float MC_ADAPTIVE_GRID_POWER = 4.0;
-layout (constant_id = 30) const float MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE = 4.743416490252569;
-layout (constant_id = 31) const uint MC_STATIC_BUFFER_SIZE = 800009;
-layout (constant_id = 32) const float MC_STATIC_GRID_WIDTH = 25.3;
-layout (constant_id = 33) const int DISTANCE_MC_GRID_WIDTH = 25;
-layout (constant_id = 34) const float VOLUME_MAX_T = 1000.;
-layout (constant_id = 35) const float SURF_BSDF_P = 0.15;
-layout (constant_id = 36) const float VOLUME_PHASE_P = 0.3;
-layout (constant_id = 37) const float DIR_GUIDE_PRIOR = 0.2;
-layout (constant_id = 38) const float DIST_GUIDE_P = 0.0;
-layout (constant_id = 39) const uint DISTANCE_MC_VERTEX_STATE_COUNT = MAX_DISTANCE_MC_VERTEX_STATE_COUNT;
-layout (constant_id = 40) const uint SEED = 0;
-layout (constant_id = 41) const bool DEBUG_OUTPUT_CONNECTED = false;
-layout (constant_id = 42) const int DEBUG_OUTPUT_SELECTOR = 0;
+// #ifndef SURFACE_SPP
+// #define SURFACE_SPP 4
+// #endif
+// #ifndef MAX_PATH_LENGTH
+// #define MAX_PATH_LENGTH 3
+// #endif
+// #ifndef USE_LIGHT_CACHE_TAIL
+// #define USE_LIGHT_CACHE_TAIL false
+// #endif
+// #ifndef FOV_TAN_ALPHA_HALF
+// #define FOV_TAN_ALPHA_HALF 0
+// #endif
+// #ifndef SUN_W_X
+// #define SUN_W_X 0
+// #endif
+// #ifndef SUN_W_Y
+// #define SUN_W_Y 0
+// #endif
+// #ifndef SUN_W_Z
+// #define SUN_W_Z 0
+// #endif
+// #ifndef SUN_COLOR_R
+// #define SUN_COLOR_R 0
+// #endif
+// #ifndef SUN_COLOR_G
+// #define SUN_COLOR_G 0
+// #endif
+// #ifndef SUN_COLOR_B
+// #define SUN_COLOR_B 0
+// #endif
+// #ifndef ADAPTIVE_SAMPLING
+// #define ADAPTIVE_SAMPLING 0
+// #endif
+// #ifndef VOLUME_SPP
+// #define VOLUME_SPP 0
+// #endif
+// #ifndef VOLUME_USE_LIGHT_CACHE
+// #define VOLUME_USE_LIGHT_CACHE false
+// #endif
+// #ifndef DRAINE_G
+// #define DRAINE_G 0.65
+// #endif
+// #ifndef DRAINE_A
+// #define DRAINE_A 32.0
+// #endif
+// #ifndef MC_SAMPLES
+// #define MC_SAMPLES 5
+// #endif
+// #ifndef MC_SAMPLES_ADAPTIVE_PROB
+// #define MC_SAMPLES_ADAPTIVE_PROB 0.7
+// #endif
+// #ifndef DISTANCE_MC_SAMPLES
+// #define DISTANCE_MC_SAMPLES 3
+// #endif
+// #ifndef MC_FAST_RECOVERY
+// #define MC_FAST_RECOVERY true
+// #endif
+// #ifndef LIGHT_CACHE_BUFFER_SIZE
+// #define LIGHT_CACHE_BUFFER_SIZE 4000000
+// #endif
+// #ifndef LC_GRID_STEPS_PER_UNIT_SIZE
+// #define LC_GRID_STEPS_PER_UNIT_SIZE 6.0
+// #endif
+// #ifndef LC_GRID_TAN_ALPHA_HALF
+// #define LC_GRID_TAN_ALPHA_HALF 0.002
+// #endif
+// #ifndef LC_GRID_MIN_WIDTH
+// #define LC_GRID_MIN_WIDTH 0.01
+// #endif
+// #ifndef LC_GRID_POWER
+// #define LC_GRID_POWER 2
+// #endif
+// #ifndef MC_ADAPTIVE_BUFFER_SIZE
+// #define MC_ADAPTIVE_BUFFER_SIZE 32777259
+// #endif
+// #ifndef MC_ADAPTIVE_GRID_TAN_ALPHA_HALF
+// #define MC_ADAPTIVE_GRID_TAN_ALPHA_HALF 0.002
+// #endif
+// #ifndef MC_ADAPTIVE_GRID_MIN_WIDTH
+// #define MC_ADAPTIVE_GRID_MIN_WIDTH 0.01
+// #endif
+// #ifndef MC_ADAPTIVE_GRID_POWER
+// #define MC_ADAPTIVE_GRID_POWER 4.0
+// #endif
+// #ifndef MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE
+// #define MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE 4.743416490252569
+// #endif
+// #ifndef MC_STATIC_BUFFER_SIZE
+// #define MC_STATIC_BUFFER_SIZE 800009
+// #endif
+// #ifndef MC_STATIC_GRID_WIDTH
+// #define MC_STATIC_GRID_WIDTH 25.3
+// #endif
+// #ifndef DISTANCE_MC_GRID_WIDTH
+// #define DISTANCE_MC_GRID_WIDTH 25
+// #endif
+// #ifndef VOLUME_MAX_T
+// #define VOLUME_MAX_T 1000.
+// #endif
+// #ifndef SURF_BSDF_P
+// #define SURF_BSDF_P 0.15
+// #endif
+// #ifndef VOLUME_PHASE_P
+// #define VOLUME_PHASE_P 0.3
+// #endif
+// #ifndef DIR_GUIDE_PRIOR
+// #define DIR_GUIDE_PRIOR 0.2
+// #endif
+// #ifndef DIST_GUIDE_P
+// #define DIST_GUIDE_P 0.0
+// #endif
+// #ifndef DISTANCE_MC_VERTEX_STATE_COUNT
+// #define DISTANCE_MC_VERTEX_STATE_COUNT MAX_DISTANCE_MC_VERTEX_STATE_COUNT
+// #endif
+// #ifndef SEED
+// #define SEED 0
+// #endif
+// #ifndef DEBUG_OUTPUT_CONNECTED
+// #define DEBUG_OUTPUT_CONNECTED false
+// #endif
+// #ifndef DEBUG_OUTPUT_SELECTOR
+// #define DEBUG_OUTPUT_SELECTOR 0
+// #endif
 
 #include "grid.h"
 #include "../scene_info.glsl.h"

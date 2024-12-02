@@ -3,7 +3,7 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-layout (constant_id = 2) const int MAX_SPP = 4;
+layout (constant_id = 2) const int SURFACE_SPP = 4;
 layout (constant_id = 3) const int MAX_PATH_LENGTH = 3;
 layout (constant_id = 4) const float FOV_TAN_ALPHA_HALF = 0;
 layout (constant_id = 5) const float SUN_W_X = 0;

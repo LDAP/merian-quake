@@ -25,12 +25,9 @@ f16vec3 get_sky(const vec3 w) {
     f16vec3 emm = f16vec3(0);
 
     {
-        const vec3 sundir = vec3(SUN_W_X, SUN_W_Y, SUN_W_Z);
-        const f16vec3 suncolor = f16vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
-
-        emm += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(sundir, w))), 4.0hf);
-        emm += 5.0hf * float16_t(vmf_pdf(3000.0, dot(sundir, w)));
-        emm *= suncolor;
+        emm += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z), w))), 4.0hf);
+        emm += 5.0hf * float16_t(vmf_pdf(3000.0, dot(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z), w)));
+        emm *= f16vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
     }
 
 

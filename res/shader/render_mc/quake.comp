@@ -40,7 +40,7 @@ void main() {
     irr = vec3(0);
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
-    for (int s = 0; s < MAX_SPP; s++) {
+    for (int s = 0; s < SURFACE_SPP; s++) {
         Hit current_hit = first_hit;
 
         // Camera throughput encoded in albedo
@@ -132,18 +132,18 @@ void main() {
             f16vec3 throughput = f16vec3(1);
             trace_ray(throughput, incident, next_hit);
             // Full GI (infinite diffuse bounces)
-            const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) || (!USE_LIGHT_CACHE_TAIL && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+            const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) || (USE_LIGHT_CACHE_TAIL == 0 && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
             // EVALUATE BSDF
             // without albedo (added below to skip first albedo)
             const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
             
             current_throughput *= microfacet_bsdf;
-            if (USE_LIGHT_CACHE_TAIL) {
+#if USE_LIGHT_CACHE_TAIL == 1 
                 f = current_throughput * (segment < MAX_PATH_LENGTH - 1 ? incident : lc_incident);
-            } else {
+#else
                 f = current_throughput * incident;
-            }
+#endif
             p *= wo_p;
             current_throughput *= throughput;
 
@@ -160,7 +160,7 @@ void main() {
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                    } else if (MC_FAST_RECOVERY && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state, current_hit.pos)) {
+                    } else if (MC_FAST_RECOVERY == 1 && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state, current_hit.pos)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index].sum_w = 0.;
                     }
@@ -190,16 +190,15 @@ void main() {
         return;
     }
 
-    if (MAX_SPP > 0) {
-        irr /= MAX_SPP;
-        moments /= MAX_SPP;
+    if (SURFACE_SPP > 0) {
+        irr /= SURFACE_SPP;
+        moments /= SURFACE_SPP;
     }
 
-    imageStore(img_irradiance, pixel, vec4(irr, MAX_SPP));
+    imageStore(img_irradiance, pixel, vec4(irr, SURFACE_SPP));
     imageStore(img_moments, pixel, vec4(moments, 0, 0));
 
-
-    if (DEBUG_OUTPUT_CONNECTED) {
+#if DEBUG_OUTPUT_CONNECTED == 1
         switch(DEBUG_OUTPUT_SELECTOR) {
             case 0: {
                 // -- show light cache -- 
@@ -259,5 +258,5 @@ void main() {
                 break;
             }
         }
-    }
+#endif
 }

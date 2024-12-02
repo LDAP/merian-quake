@@ -29,7 +29,7 @@ void main() {
     ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
-    for (int s = 0; s < MAX_SPP; s++) {
+    for (int s = 0; s < SURFACE_SPP; s++) {
         Hit current_hit = first_hit;
 
         const vec3 wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));

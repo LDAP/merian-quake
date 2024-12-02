@@ -65,25 +65,25 @@ void mc_state_add_sample(inout MCState mc_state,
 
 // ADAPTIVE GRID
 
-#define target_grid_width(pos) (2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos))
+#define mc_target_grid_width(pos) (2 * MC_ADAPTIVE_GRID_TAN_ALPHA_HALF * distance(params.cam_x.xyz, pos))
 
 #if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
-    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * log(max(target_grid_width(pos), MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER)))
+    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * log(max(mc_target_grid_width(pos), MC_ADAPTIVE_GRID_MIN_WIDTH) / MC_ADAPTIVE_GRID_MIN_WIDTH) / log(MC_ADAPTIVE_GRID_POWER)))
 #elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
-    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(target_grid_width(pos) - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER)))
+    #define mc_adaptive_target_level_for_pos(pos) uint(round(MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE * pow(max(mc_target_grid_width(pos) - MC_ADAPTIVE_GRID_MIN_WIDTH, 0), 1 / MC_ADAPTIVE_GRID_POWER)))
 #endif
 
 #define mc_adaptive_level_for_pos(pos, random) (mc_adaptive_target_level_for_pos(pos) + uint((-log2(1.0 - random))))
 
 #if MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_EXPONENTIAL
-    #define grid_width_for_level(level) (MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE))
+    #define mc_grid_width_for_level(level) (MC_ADAPTIVE_GRID_MIN_WIDTH * pow(MC_ADAPTIVE_GRID_POWER, level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE))
 #elif MERIAN_QUAKE_ADAPTIVE_GRID_TYPE == MERIAN_QUAKE_GRID_TYPE_QUADRATIC
-    #define grid_width_for_level(level) (pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH)
+    #define mc_grid_width_for_level(level) (pow(level / MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE, MC_ADAPTIVE_GRID_POWER) + MC_ADAPTIVE_GRID_MIN_WIDTH)
 #endif
 
-#define mc_adpative_grid_idx_for_level_closest(level, pos) grid_idx_closest(pos, grid_width_for_level(level))
+#define mc_adpative_grid_idx_for_level_closest(level, pos) grid_idx_closest(pos, mc_grid_width_for_level(level))
 
-#define mc_adaptive_grid_idx_for_level_interpolate(level, pos) grid_idx_interpolate(pos, grid_width_for_level(level), XorShift32(rng_state))
+#define mc_adaptive_grid_idx_for_level_interpolate(level, pos) grid_idx_interpolate(pos, mc_grid_width_for_level(level), XorShift32(rng_state))
 
 // returns (buffer_index, hash)
 void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {

@@ -172,10 +172,11 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-        if (VOLUME_USE_LIGHT_CACHE)
+#if VOLUME_USE_LIGHT_CACHE == 1
             if (!any(greaterThan(incident, f16vec3(0)))) {
                 incident = throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
             }
+#endif
 
         const float phase = phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A);
         const vec3 contrib = incident * phase * MU_S * transmittance3(t, MU_T, VOLUME_MAX_T) / p;
@@ -207,7 +208,7 @@ void main() {
                 mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                 mc_static_save(mc_state, current_hit.pos, jittered_normal);
                 mc_adaptive_save(mc_state, current_hit.pos, jittered_normal);
-            } else if (MC_FAST_RECOVERY && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state, current_hit.pos)) {
+            } else if (MC_FAST_RECOVERY == 1 && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state, current_hit.pos)) {
                 // fix slow recovery after light source disappears
                 mc_states[mc_buffer_index] = mc_state_new(current_hit.pos, -first_wi);
             }
