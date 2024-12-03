@@ -52,7 +52,7 @@ void main() {
         }
     }    
 
-    imageStore(img_irradiance, pixel, vec4(irr, 0));
+    imageStore(img_irradiance, pixel, vec4(irr, 1));
     const float l = yuv_luminance(irr);
     imageStore(img_moments, pixel, vec4(l, l * l, 0, 0));
 }
