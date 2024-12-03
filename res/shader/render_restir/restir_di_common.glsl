@@ -1,8 +1,7 @@
 #ifndef _MERIAN_QUAKE_RESTIR_DI_COMMOON_
 #define _MERIAN_QUAKE_RESTIR_DI_COMMOON_
 
-#include "merian-shaders/bsdf_microfacet.glsl"
-#include "merian-shaders/frames.glsl"
+#include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 
 float restir_di_target_pdf(const ReSTIRDISample y, const Hit surface) {
@@ -13,7 +12,7 @@ float restir_di_target_pdf(const ReSTIRDISample y, const Hit surface) {
         return 0;
     }
 
-    const float bsdf = bsdf_microfacet_eval(-surface.wi, make_frame(surface.normal), wo, vec2(surface.roughness)) * wodotn;
+    const float bsdf = bsdf_ggx_diffuse_mix_times_wodotn(surface.wi, wo, surface.normal, bsdf_ggx_roughness_to_alpha(surface.roughness), 0.02);
 
     return yuv_luminance(bsdf * y.radiance);
 }
