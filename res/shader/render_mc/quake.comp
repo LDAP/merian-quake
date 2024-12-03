@@ -86,7 +86,7 @@ void main() {
                         if (adaptive_grid) {
                             mc_adaptive_finalize_load(state, hash);
                         } else {
-                            mc_static_finalize_load(state, hash, s == 0 ? current_hit.prev_pos : current_hit.pos, current_hit.normal);
+                            mc_static_finalize_load(state, hash, current_hit.pos, current_hit.normal);
                         }
 
                         scores[i] = state.sum_w;
