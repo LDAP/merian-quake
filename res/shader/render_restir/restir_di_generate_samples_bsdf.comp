@@ -9,7 +9,7 @@
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
 #include "merian-shaders/bsdf_diffuse.glsl"
-#include "merian-shaders/bsdf_microfacet.glsl"
+#include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 
@@ -32,7 +32,8 @@ void main() {
     for (int s = 0; s < SURFACE_SPP; s++) {
         Hit current_hit = first_hit;
 
-        const vec3 wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+        //const vec3 wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+        const vec3 wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
         const float wodotn = dot(wo, current_hit.normal);
         if (dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3 || wodotn <= 1e-3)
             continue;
@@ -48,7 +49,7 @@ void main() {
         restir_di_reservoir_add_sample(reservoir,
                                        rng_state,
                                        x,
-                                       bsdf_diffuse_pdf(wodotn),
+                                       bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)),
                                        restir_di_target_pdf(x, current_hit)
                                        );
     }

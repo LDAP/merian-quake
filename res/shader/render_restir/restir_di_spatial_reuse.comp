@@ -45,6 +45,10 @@ void main() {
 
         ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
 
+        if (SPATIAL_CLAMP_M > 0) {
+            neighbor_reservoir.M = min(neighbor_reservoir.M, SPATIAL_CLAMP_M);
+        }
+
         bool selected_neighbor = restir_di_reservoir_combine_finalized(
             reservoir,
             rng_state,

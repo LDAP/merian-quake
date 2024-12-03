@@ -8,7 +8,7 @@
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
 #include "merian-shaders/bsdf_diffuse.glsl"
-#include "merian-shaders/bsdf_microfacet.glsl"
+#include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 
@@ -46,7 +46,7 @@ void main() {
             write_reservoir = reservoir;
         }
 
-        const float microfacet_bsdf = bsdf_microfacet_eval(-first_hit.wi, make_frame(first_hit.normal), wo, vec2(first_hit.roughness)) * wodotn;
+        const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(first_hit.wi, wo, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), 0.02);;
         if (!isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
                 irr = microfacet_bsdf * incident * reservoir.w_sum_or_W;
         }

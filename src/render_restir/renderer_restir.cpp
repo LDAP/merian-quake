@@ -161,7 +161,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             io.is_connected(con_debug), debug_output_selector, visibility_shade,
             temporal_normal_reject_cos, temporal_depth_reject_percent, spatial_normal_reject_cos,
             spatial_depth_reject_percent, temporal_clamp_m, spatial_radius,
-            temporal_bias_correction, spatial_bias_correction);
+            temporal_bias_correction, spatial_bias_correction, spatial_clamp_m);
 
         auto spec = spec_builder.build();
 
@@ -309,6 +309,8 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
     recreate_pipeline |= config.config_int("spatital radius", spatial_radius, 0, 100);
+    recreate_pipeline |= config.config_int("spatial clamp m", spatial_clamp_m,
+                                           "Clamp M to limit spatial influence.");
     recreate_pipeline |= config.config_options("spatial bias correction", spatial_bias_correction,
                                                {"none", "basic", "raytraced"});
 
