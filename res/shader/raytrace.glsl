@@ -192,7 +192,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         return;
     }
 
-    vec2 st = extra_data.st * rq_barycentrics(ray_query);
+    const vec3 bary = rq_barycentrics(ray_query);
+    vec2 st = extra_data.st * bary;
     if (flags > 0 && flags < 5) {
         st = MERIAN_TEXTUREEFFECT_QUAKE_WARPCALC(st, params.cl_time);
         if (flags == MAT_FLAGS_WATER) {
@@ -215,16 +216,15 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         verts[1] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y];
         verts[2] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z];
 #endif
-        hit.pos = mat3(verts[0], verts[1], verts[2]) * rq_barycentrics(ray_query);
+        hit.pos = verts[0] * bary.x  + verts[1] * bary.y + verts[2] * bary.z;
         dudv[0] = verts[2] - verts[0];
         dudv[1] = verts[1] - verts[0];
         hit.normal = normalize(cross(dudv[0], dudv[1]));
         hit.enc_geonormal = geo_encode_normal(hit.normal);
 
-        hit.prev_pos = mat3(buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x],
-                            buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y],
-                            buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z])
-                     * rq_barycentrics(ray_query);
+        hit.prev_pos = buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x] * bary.x
+                     + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y] * bary.y
+                     + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z] * bary.z;
     }
 
 #ifdef MERIAN_QUAKE_FIRST_HIT
@@ -252,7 +252,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
 
         if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
-            const vec3 tangent_normal = textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb;
+            const vec3 tangent_normal = (textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb - 0.5) * 2;
             const float16_t st_det = st_dudv[0].x * st_dudv[1].y - st_dudv[1].x * st_dudv[0].y;
             if (abs(st_det) > 1e-8) {
                 const vec3 du2 =  normalize(( st_dudv[1].y * dudv[0] - st_dudv[0].y * dudv[1]) / st_det);
@@ -261,7 +261,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
 
             const vec3 geo_normal = hit.normal;
-            hit.normal = normalize(mat3(dudv[0], dudv[1], hit.normal) * ((tangent_normal - vec3(0.5)) * vec3(2)));
+            hit.normal = normalize(dudv[0] * tangent_normal.x + dudv[1] * tangent_normal.y + hit.normal * tangent_normal.z);
 
             // Keller et al. [2017] workaround for artifacts
             const vec3 r = reflect(hit.wi, hit.normal);
