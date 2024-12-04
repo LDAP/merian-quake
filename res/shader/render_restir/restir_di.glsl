@@ -39,7 +39,7 @@
 //
 
 ReSTIRDIReservoir restir_di_reservoir_init() {
-    ReSTIRDIReservoir reservoir = {0, 0., 0., ReSTIRDISample(vec3(0), f16vec3(0.hf), 0)};
+    ReSTIRDIReservoir reservoir = {0, 0., 0., ReSTIRDISample(vec3(0), vec3(0), f16vec3(0.hf), 0)};
     return reservoir;
 }
 

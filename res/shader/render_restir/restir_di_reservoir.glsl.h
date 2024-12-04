@@ -7,6 +7,7 @@
 
 struct ReSTIRDISample {
     vec3 pos;
+    vec3 normal;
     f16vec3 radiance;
     uint flags;
 };

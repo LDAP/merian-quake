@@ -48,7 +48,7 @@ void main() {
 
         const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(first_hit.wi, wo, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), 0.02);
         if (!isnan(reservoir.w_sum_or_W) && !isinf(reservoir.w_sum_or_W)) {
-                irr = microfacet_bsdf * incident * reservoir.w_sum_or_W;
+                irr = microfacet_bsdf * incident * reservoir.w_sum_or_W * max(dot(reservoir.y.normal, -wo), 0) / pow(distance(reservoir.y.pos, first_hit.pos), 2);
         }
     }    
 

@@ -45,11 +45,13 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-        const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, incident, ReSTIRDISample_Flags_Valid);
+        float geo = max(dot(next_hit.normal, -wo), 0) / pow(distance(next_hit.pos, current_hit.pos), 2);
+
+        const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, next_hit.normal, incident, ReSTIRDISample_Flags_Valid);
         restir_di_reservoir_add_sample(reservoir,
                                        rng_state,
                                        x,
-                                       bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)),
+                                       geo * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)),
                                        restir_di_target_pdf(x, current_hit)
                                        );
     }

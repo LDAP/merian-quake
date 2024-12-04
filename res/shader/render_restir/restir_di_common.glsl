@@ -14,7 +14,7 @@ float restir_di_target_pdf(const ReSTIRDISample y, const Hit surface) {
 
     const float bsdf = bsdf_ggx_diffuse_mix_times_wodotn(surface.wi, wo, surface.normal, bsdf_ggx_roughness_to_alpha(surface.roughness), 0.02);
 
-    return yuv_luminance(bsdf * y.radiance);
+    return max(dot(y.normal, -wo), 0) / pow(distance(y.pos, surface.pos), 2) * bsdf * yuv_luminance_f16(y.radiance);
 }
 
 #endif // _MERIAN_QUAKE_RESTIR_DI_COMMOON_
