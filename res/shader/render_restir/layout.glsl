@@ -24,9 +24,9 @@ layout (constant_id = 19) const int TEMPORAL_CLAMP_M = 32 * 20;
 layout (constant_id = 20) const int SPATIAL_RADIUS = 30;
 layout (constant_id = 21) const int TEMPORAL_BIAS_CORRECTION = 0;
 layout (constant_id = 22) const int SPATIAL_BIAS_CORRECTION = 0;
-layout (constant_id = 23) const int SPATIAL_CLAMP_M = 32 * 20;
-layout (constant_id = 24) const int SUBGROUP_SIZE = 32;
-layout (constant_id = 25) const float BOILING_FILTER_STRENGTH = 0.0;
+layout (constant_id = 23) const int SUBGROUP_SIZE = 32;
+layout (constant_id = 24) const float BOILING_FILTER_STRENGTH = 0.0;
+layout (constant_id = 25) const int SPATIAL_REUSE_ITERATIONS = 1;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"

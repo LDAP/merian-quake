@@ -37,51 +37,64 @@ void main() {
                                           current_reservoir.p_target
                                           );
 
-    const ivec2 neighbor = ivec2(round(pixel + SPATIAL_RADIUS * (2 * XorShift32Vec2(rng_state) - 1)));
+    int selected = -1;
+    ivec2 neighbors[SPATIAL_REUSE_ITERATIONS];
 
-    if (all(lessThan(neighbor, resolution)) && all(greaterThanEqual(neighbor, ivec2(0)))
-        && reprojection_valid(geo_decode_normal(gbuf(pixel).enc_normal), geo_decode_normal(gbuf(neighbor).enc_normal), SPATIAL_NORMAL_REJECT_COS,
-                          gbuf(pixel).linear_z,  gbuf(pixel).vel_z, gbuf(neighbor).linear_z, SPATIAL_DEPTH_REJECT)) {
+    for (int i = 0; i < SPATIAL_REUSE_ITERATIONS; i++) {
+        neighbors[i] = ivec2(round(pixel + SPATIAL_RADIUS * (2 * XorShift32Vec2(rng_state) - 1)));
 
-        ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbor);
-
-        if (SPATIAL_CLAMP_M > 0) {
-            neighbor_reservoir.M = min(neighbor_reservoir.M, SPATIAL_CLAMP_M);
+        if (any(greaterThanEqual(neighbors[i], resolution)) ||
+            any(lessThan(neighbors[i], ivec2(0))) ||
+            !reprojection_valid(geo_decode_normal(gbuf(pixel).enc_normal), geo_decode_normal(gbuf(neighbors[i]).enc_normal), SPATIAL_NORMAL_REJECT_COS,
+                          gbuf(pixel).linear_z,  gbuf(pixel).vel_z, gbuf(neighbors[i]).linear_z, SPATIAL_DEPTH_REJECT)
+            ) {
+            neighbors[i].x = -1;
+            continue;
         }
 
-        bool selected_neighbor = restir_di_reservoir_combine_finalized(
+        ReSTIRDIReservoir neighbor_reservoir = read_reservoir(neighbors[i]);
+
+        const bool selected_neighbor = restir_di_reservoir_combine_finalized(
             reservoir,
             rng_state,
             neighbor_reservoir,
             restir_di_target_pdf(neighbor_reservoir.y, center_surface)
         );
+
+        if (selected_neighbor) {
+            selected = i;
+        }
+    }
+
     
 
-        if (SPATIAL_BIAS_CORRECTION == 0 /*NONE*/) {
-            restir_di_reservoir_finalize(reservoir);
-        } else if (SPATIAL_BIAS_CORRECTION >= 1 /*BASIC or RAYTRACED or RAYTRACED_PREV_BVH*/) {
-            // called RTXDI_BIAS_CORRECTION_BASIC in rtxdi-runtime / RESTIR DI implementation
-            float pi = reservoir.p_target;
-            float pi_sum = reservoir.p_target * current_reservoir.M;
-            float spatial_p = restir_di_target_pdf(reservoir.y, surface_at(neighbor));
+    if (SPATIAL_BIAS_CORRECTION == 0 /*NONE*/) {
+        // no bias correction necessary
+        restir_di_reservoir_finalize(reservoir);
+    } else {
+        // => SPATIAL_BIAS_CORRECTION >= 1 meaning BASIC or RAYTRACED
+        float pi = reservoir.p_target;
+        float pi_sum = reservoir.p_target * current_reservoir.M;
 
-            if (spatial_p > 0) {
+        for (int i = 0; i < SPATIAL_REUSE_ITERATIONS; i++) {
+            if (neighbors[i].x == -1) {
+                continue;
+            }
+
+            float spatial_p = restir_di_target_pdf(reservoir.y, surface_at(neighbors[i]));
+
+            if (SPATIAL_BIAS_CORRECTION == 2 /*RAYTRACED*/ && spatial_p > 0) {
                 // do this only if really necessary...
-                if (SPATIAL_BIAS_CORRECTION == 2 /*RAYTRACED*/) {
-                    if (!trace_visibility(surface_at(neighbor).pos, reservoir.y.pos)) {
-                        spatial_p = 0;
-                    }
+                if (!trace_visibility(surface_at(neighbors[i]).pos, reservoir.y.pos)) {
+                    spatial_p = 0;
                 }
             }
 
-            pi = selected_neighbor ? spatial_p : pi;
-            pi_sum += spatial_p * neighbor_reservoir.M;
-
-            restir_di_reservoir_finalize_custom(reservoir, pi, pi_sum);
+            pi = selected == i ? spatial_p : pi;
+            pi_sum += spatial_p * read_reservoir(neighbors[i]).M;
         }
-    } else {
-        // no bias correction necessary
-        restir_di_reservoir_finalize(reservoir);
+
+        restir_di_reservoir_finalize_custom(reservoir, pi, pi_sum);
     }
 
     write_reservoir = reservoir;

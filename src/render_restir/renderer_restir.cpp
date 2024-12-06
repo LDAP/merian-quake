@@ -113,7 +113,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
                            vk::DescriptorBufferInfo{*io[con_reservoirs_out], 0, VK_WHOLE_SIZE})};
     // start ping pong buffer such that the last write of the spatial passes goes to the graph
     // output.
-    uint32_t ping_pong_index = (spatial_reuse_iterations + 1) & 1;
+    uint32_t ping_pong_index = static_cast<int>(spatial_reuse_iterations == 0) & 1;
 
     const auto get_push_descriptor_writes = [this,
                                              &ping_pong_buffers](const uint32_t ping_pong_index) {
@@ -161,9 +161,8 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             debug_output_selector, visibility_shade, temporal_normal_reject_cos,
             temporal_depth_reject_percent, spatial_normal_reject_cos, spatial_depth_reject_percent,
             temporal_clamp_m, spatial_radius, temporal_bias_correction, spatial_bias_correction,
-            spatial_clamp_m,
             context->physical_device.physical_device_subgroup_properties.subgroupSize,
-            boiling_filter_strength);
+            boiling_filter_strength, std::max(spatial_reuse_iterations, 1));
 
         auto spec = spec_builder.build();
 
@@ -239,21 +238,17 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
 
     if (spatial_reuse_iterations > 0) {
         ping_pong_index ^= 1;
-
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "spatial reuse");
-        for (int i = 0; i < spatial_reuse_iterations; i++) {
-            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
-                                     fmt::format("spatial reuse iteration {}", i));
-            sync_reservoirs();
-            pipelines.spatial_reuse->bind(cmd);
-            pipelines.spatial_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
-            pipelines.spatial_reuse->push_descriptor_set(
-                cmd, 1, get_push_descriptor_writes(ping_pong_index));
-            ping_pong_index ^= 1;
-            pipelines.spatial_reuse->push_constant(cmd, render_info.uniform);
-            cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                         (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
-        }
+
+        sync_reservoirs();
+        pipelines.spatial_reuse->bind(cmd);
+        pipelines.spatial_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
+        pipelines.spatial_reuse->push_descriptor_set(cmd, 1,
+                                                     get_push_descriptor_writes(ping_pong_index));
+        ping_pong_index ^= 1;
+        pipelines.spatial_reuse->push_constant(cmd, render_info.uniform);
+        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
+                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
     }
 
     {
@@ -305,7 +300,8 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
                               "Discard the upper X percent of samples. Disable with 0.0.");
 
     config.st_separate("Spatial Reuse");
-    config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
+    recreate_pipeline |=
+        config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
     float spatial_reject_angle = glm::acos(spatial_normal_reject_cos);
     recreate_pipeline |= config.config_angle("spatial normal threshold", spatial_reject_angle,
                                              "Reject points with normals farther apart", 0, 180);
@@ -314,8 +310,6 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
     recreate_pipeline |= config.config_int("spatital radius", spatial_radius, 0, 100);
-    recreate_pipeline |= config.config_int("spatial clamp m", spatial_clamp_m,
-                                           "Clamp M to limit spatial influence.");
     recreate_pipeline |= config.config_options("spatial bias correction", spatial_bias_correction,
                                                {"none", "basic", "raytraced"});
 
