@@ -113,7 +113,6 @@ class RendererRESTIR : public merian_nodes::Node {
     static constexpr uint32_t LOCAL_SIZE_Y = 8;
 
     int32_t spp = 1;
-    int32_t max_path_length = 3;
 
     uint32_t seed = 0;
     bool randomize_seed = true;
@@ -123,6 +122,7 @@ class RendererRESTIR : public merian_nodes::Node {
     int32_t spatial_reuse_iterations = 0;
     bool visibility_shade = false;
     int32_t temporal_clamp_m = 32 * 20;
+    float boiling_filter_strength = 0.0;
 
     float temporal_normal_reject_cos = 0.96;
     float temporal_depth_reject_percent = 0.1;

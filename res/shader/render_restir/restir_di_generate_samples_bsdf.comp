@@ -45,7 +45,7 @@ void main() {
         f16vec3 throughput = f16vec3(1);
         trace_ray(throughput, incident, next_hit);
 
-        float geo = max(dot(next_hit.normal, -wo), 0) / pow(distance(next_hit.pos, current_hit.pos), 2);
+        const float geo = max(dot(next_hit.normal, -wo), 0) / pow(distance(next_hit.pos, current_hit.pos), 2);
 
         const ReSTIRDISample x = ReSTIRDISample(next_hit.pos, next_hit.normal, incident, ReSTIRDISample_Flags_Valid);
         restir_di_reservoir_add_sample(reservoir,

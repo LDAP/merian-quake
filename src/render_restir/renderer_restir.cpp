@@ -153,15 +153,17 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
 
         auto spec_builder = merian::SpecializationInfoBuilder();
         spec_builder.add_entry(
-            LOCAL_SIZE_X, LOCAL_SIZE_Y, spp, max_path_length,
-            render_info.constant.fov_tan_alpha_half, render_info.constant.sun_direction.x,
-            render_info.constant.sun_direction.y, render_info.constant.sun_direction.z,
-            render_info.constant.sun_color.r, render_info.constant.sun_color.g,
-            render_info.constant.sun_color.b, render_info.constant.volume_max_t, seed,
-            io.is_connected(con_debug), debug_output_selector, visibility_shade,
-            temporal_normal_reject_cos, temporal_depth_reject_percent, spatial_normal_reject_cos,
-            spatial_depth_reject_percent, temporal_clamp_m, spatial_radius,
-            temporal_bias_correction, spatial_bias_correction, spatial_clamp_m);
+            LOCAL_SIZE_X, LOCAL_SIZE_Y, spp, render_info.constant.fov_tan_alpha_half,
+            render_info.constant.sun_direction.x, render_info.constant.sun_direction.y,
+            render_info.constant.sun_direction.z, render_info.constant.sun_color.r,
+            render_info.constant.sun_color.g, render_info.constant.sun_color.b,
+            render_info.constant.volume_max_t, seed, io.is_connected(con_debug),
+            debug_output_selector, visibility_shade, temporal_normal_reject_cos,
+            temporal_depth_reject_percent, spatial_normal_reject_cos, spatial_depth_reject_percent,
+            temporal_clamp_m, spatial_radius, temporal_bias_correction, spatial_bias_correction,
+            spatial_clamp_m,
+            context->physical_device.physical_device_subgroup_properties.subgroupSize,
+            boiling_filter_strength);
 
         auto spec = spec_builder.build();
 
@@ -298,6 +300,9 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_options("temporal bias correction", temporal_bias_correction,
                               {"none", "basic", "raytraced", "raytraced previous bvh"});
+    recreate_pipeline |=
+        config.config_percent("boiling filter strength", boiling_filter_strength,
+                              "Discard the upper X percent of samples. Disable with 0.0.");
 
     config.st_separate("Spatial Reuse");
     config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);

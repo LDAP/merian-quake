@@ -1,5 +1,8 @@
 #version 460
-#extension GL_GOOGLE_include_directive : enable
+#extension GL_GOOGLE_include_directive          : enable
+#extension GL_KHR_shader_subgroup_basic         : enable
+#extension GL_KHR_shader_subgroup_arithmetic    : enable
+#extension GL_KHR_shader_subgroup_ballot        : enable
 
 #include "layout.glsl"
 #include "../raytrace.glsl"
@@ -24,6 +27,45 @@
 #define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
 #define gbuf(pixel) gbuffer[gbuffer_index((pixel), resolution)]
 #define prev_gbuf(pixel) prev_gbuffer[gbuffer_index((pixel), resolution)]
+
+// for boiling filter
+#define SUBGROUP_COUNT ((gl_WorkGroupSize.x * gl_WorkGroupSize.y + SUBGROUP_SIZE - 1) / SUBGROUP_SIZE)
+
+shared float subgroup_sums[SUBGROUP_COUNT];
+shared uint subgroup_counts[SUBGROUP_COUNT];
+
+void boiling_filter(inout ReSTIRDIReservoir reservoir) {
+    const float boiling_filter_multiplier = 10.f / BOILING_FILTER_STRENGTH - 9.f;
+    const float subgroup_sum = subgroupAdd(reservoir.w_sum_or_W);
+    const uint subgroup_count = subgroupBallotBitCount(subgroupBallot(reservoir.w_sum_or_W > 0));
+
+    if (subgroupElect()) {
+        subgroup_sums[gl_SubgroupID] = subgroup_sum;
+        subgroup_counts[gl_SubgroupID] = subgroup_count;
+    }
+
+    barrier();
+    memoryBarrier();
+
+    if (gl_LocalInvocationIndex == 0) {
+        float sum = 0.0;
+        uint count = 0;
+
+        for (int i = 0; i < gl_NumSubgroups; i++) {
+            sum += subgroup_sums[i];
+            count += subgroup_counts[i];
+        }
+
+        subgroup_sums[0] = count > 0 ? sum / float(count) : 0;
+    }
+
+    barrier();
+    memoryBarrier();
+
+    if (reservoir.w_sum_or_W > subgroup_sums[0] * boiling_filter_multiplier) {
+        restir_di_reservoir_discard(reservoir);
+    }
+}
 
 void main() {
     if (any(greaterThanEqual(pixel, resolution))) {
@@ -89,6 +131,10 @@ void main() {
         pi_sum += temporal_p * prev_reservoir.M;
 
         restir_di_reservoir_finalize_custom(reservoir, pi, pi_sum);
+    }
+
+    if (BOILING_FILTER_STRENGTH > 1e-6) {
+        boiling_filter(reservoir);
     }
 
     write_reservoir = reservoir;
