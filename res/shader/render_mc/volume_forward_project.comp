@@ -30,7 +30,7 @@ void main() {
         
         // overwrite mv that are written in quake.comp
         if (all(lessThan(new_pixel, imageSize(img_volume_mv))) && all(greaterThanEqual(new_pixel, vec2(0)))) {
-            imageStore(img_volume_mv, new_pixel, vec4(pixel - new_pixel, 0, 0));
+            imageStore(img_volume_mv, new_pixel, vec4(0, 0, 0, 0));
         }
     }
 }

@@ -18,6 +18,69 @@
 #include "merian-shaders/raytrace.glsl"
 #include "merian-shaders/textures.glsl"
 
+// Water shader source: https://www.shadertoy.com/view/MdXyzX
+// afl_ext MIT-License
+
+#define DRAG_MULT 0.28 // changes how much waves pull on the water
+#define WATER_DEPTH 1. // how deep is the water
+#define ITERATIONS_NORMAL 25 // waves iterations when calculating normals
+
+// Calculates wave value and its derivative, 
+// for the wave direction, position in space, wave frequency and time
+vec2 wavedx(vec2 position, vec2 direction, float frequency, float timeshift) {
+  float x = dot(direction, position) * frequency + timeshift;
+  float wave = exp(sin(x) - 1.0);
+  float dx = wave * cos(x);
+  return vec2(wave, -dx);
+}
+
+// Calculates waves by summing octaves of various waves with various parameters
+float getwaves(vec2 position, int iterations) {
+  float iter = 0.0; // this will help generating well distributed wave directions
+  float frequency = 1.0; // frequency of the wave, this will change every iteration
+  float timeMultiplier = 1.0; // time multiplier for the wave, this will change every iteration
+  float weight = 1.0;// weight in final sum for the wave, this will change every iteration
+  float sumOfValues = 0.0; // will store final sum of values
+  float sumOfWeights = 0.0; // will store final sum of weights
+  for(int i=0; i < iterations; i++) {
+    // generate some wave direction that looks kind of random
+    vec2 p = vec2(sin(iter), cos(iter));
+    // calculate wave data
+    vec2 res = wavedx(position, p, frequency, params.cl_time * timeMultiplier);
+
+    // shift position around according to wave drag and derivative of the wave
+    position += p * res.y * weight * DRAG_MULT;
+
+    // add the results to sums
+    sumOfValues += res.x * weight;
+    sumOfWeights += weight;
+
+    // modify next octave parameters
+    weight *= 0.82;
+    frequency *= 1.18;
+    timeMultiplier *= 1.07;
+
+    // add some kind of random value to make next wave look random too
+    iter += 1232.399963;
+  }
+  // calculate and return
+  return sumOfValues / sumOfWeights;
+}
+
+// Calculate normal at point by calculating the height at the pos and 2 additional points very close to pos
+vec3 water_normal(vec2 pos, float e, float depth) {
+  vec2 ex = vec2(e, 0);
+  float H = getwaves(pos.xy, ITERATIONS_NORMAL) * depth;
+  vec3 a = vec3(pos.x, H, pos.y);
+  return normalize(
+    cross(
+      a - vec3(pos.x - e, getwaves(pos.xy - ex.xy, ITERATIONS_NORMAL) * depth, pos.y), 
+      a - vec3(pos.x, getwaves(pos.xy + ex.yx, ITERATIONS_NORMAL) * depth, pos.y + e)
+    )
+  );
+}
+
+
 // assert(alpha != 0)
 #define decode_alpha(enc_alpha) (float16_t(enc_alpha - 1) / 14.hf)
 
@@ -157,6 +220,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
 
     rayQueryEXT ray_query;
 
+    bool was_water = false;
+    while(true) {
+
     // FIND NEXT HIT
     trace_ray_init(ray_query, hit.wi, hit.pos);
 
@@ -171,7 +237,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         contribution = throughput * sky;
         hit.albedo = sky;
 
-        hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+        if (!was_water)
+            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
         hit.enc_geonormal = geo_encode_normal(-hit.wi);
         hit.normal = -hit.wi;
         return;
@@ -186,7 +253,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         contribution += throughput * sky;
         hit.albedo = sky;
 
-        hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+        if (!was_water)
+            hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
         hit.enc_geonormal = geo_encode_normal(-hit.wi);
         hit.normal = -hit.wi;
         return;
@@ -209,13 +277,13 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     {
         const uvec3 prim_indexes = buf_idx[nonuniformEXT(rq_instance_id(ray_query))].i[rq_primitive_index(ray_query)];
         vec3 verts[3];
-#ifdef MERIAN_CONTEXT_EXT_ENABLED_ExtensionVkRayTracingPositionFetch
+        #ifdef MERIAN_CONTEXT_EXT_ENABLED_ExtensionVkRayTracingPositionFetch
         rayQueryGetIntersectionTriangleVertexPositionsEXT(ray_query, true, verts);
-#else
+        #else
         verts[0] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x];
         verts[1] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y];
         verts[2] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z];
-#endif
+        #endif
         hit.pos = verts[0] * bary.x  + verts[1] * bary.y + verts[2] * bary.z;
         dudv[0] = verts[2] - verts[0];
         dudv[1] = verts[1] - verts[0];
@@ -223,11 +291,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         hit.enc_geonormal = geo_encode_normal(hit.normal);
 
         hit.prev_pos = buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x] * bary.x
-                     + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y] * bary.y
-                     + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z] * bary.z;
+        + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.y] * bary.y
+        + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z] * bary.z;
     }
 
-#ifdef MERIAN_QUAKE_FIRST_HIT
+    #ifdef MERIAN_QUAKE_FIRST_HIT
     f16vec4 albedo_texture;
     if (ENABLE_MIPMAP) {
         RayDifferential rd = ray_diff_create(vec3(0), vec3(0), r_x, r_y);
@@ -238,30 +306,30 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         const vec2 grad_y = st_dudv * (pinv * rd.dOdy);
 
         albedo_texture = f16vec4(textureGrad(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, grad_x, grad_y));
-    } else {
-        albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
-    }
-#else
-    const f16vec4 albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
-#endif
+        } else {
+            albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
+        }
+        #else
+        const f16vec4 albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
+        #endif
 
 
 
-    if (extra_data.n1_brush == 0xffffffff) {
-        const uint16_t texnum_normal = uint16_t(extra_data.n0_gloss_norm >> 16);
-        const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
+        if (extra_data.n1_brush == 0xffffffff) {
+            const uint16_t texnum_normal = uint16_t(extra_data.n0_gloss_norm >> 16);
+            const uint16_t texnum_gloss = uint16_t(extra_data.n0_gloss_norm & 0xffff);
 
-        if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
-            const vec3 tangent_normal = (textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb - 0.5) * 2;
-            const float16_t st_det = st_dudv[0].x * st_dudv[1].y - st_dudv[1].x * st_dudv[0].y;
-            if (abs(st_det) > 1e-8) {
-                const vec3 du2 =  normalize(( st_dudv[1].y * dudv[0] - st_dudv[0].y * dudv[1]) / st_det);
-                dudv[1] = -normalize((-st_dudv[1].x * dudv[0] + st_dudv[0].x * dudv[1]) / st_det);
-                dudv[0] = du2;
-            }
+            if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
+                const vec3 tangent_normal = (textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb - 0.5) * 2;
+                const float16_t st_det = st_dudv[0].x * st_dudv[1].y - st_dudv[1].x * st_dudv[0].y;
+                if (abs(st_det) > 1e-8) {
+                    const vec3 du2 =  normalize(( st_dudv[1].y * dudv[0] - st_dudv[0].y * dudv[1]) / st_det);
+                    dudv[1] = -normalize((-st_dudv[1].x * dudv[0] + st_dudv[0].x * dudv[1]) / st_det);
+                    dudv[0] = du2;
+                }
 
-            const vec3 geo_normal = hit.normal;
-            hit.normal = normalize(dudv[0] * tangent_normal.x + dudv[1] * tangent_normal.y + hit.normal * tangent_normal.z);
+                const vec3 geo_normal = hit.normal;
+                hit.normal = normalize(dudv[0] * tangent_normal.x + dudv[1] * tangent_normal.y + hit.normal * tangent_normal.z);
 
             // Keller et al. [2017] workaround for artifacts
             const vec3 r = reflect(hit.wi, hit.normal);
@@ -273,11 +341,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
             hit.roughness = float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st, 0).r);;
         }
-    } else if (flags == MAT_FLAGS_SOLID) {
-        hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
-        contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) / 255.hf);
-        return;
-    } else {
+        } else if (flags == MAT_FLAGS_SOLID) {
+            hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
+            contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) / 255.hf);
+            return;
+            } else {
         // Only for alias models. Disabled for now, results in artifacts.
 
         // hit.normal = normalize(mat3(geo_decode_normal(extra_data.n0_gloss_norm),
@@ -289,6 +357,32 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     if (flags == MAT_FLAGS_WATERFALL) {
         hit.albedo = albedo_texture.rgb;
         contribution += throughput * hit.albedo;
+    } else if (!was_water && flags == MAT_FLAGS_WATER) {
+        hit.albedo = albedo_texture.rgb;
+
+        #define WATER_IOR 1.33
+        #define CRIT_ANGLE 0.02
+        const bool underwater = true;
+        hit.normal = make_frame(hit.normal) * water_normal(hit.pos.xy / 50, 0.1, WATER_DEPTH).xzy;
+        float fresnel;
+        if (underwater) fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(WATER_IOR*WATER_IOR*(1.0 - dot(-hit.wi, hit.normal)*dot(-hit.wi, hit.normal)), 0.0, 1.0), 5.0);
+        else            fresnel = CRIT_ANGLE + (1.0-CRIT_ANGLE) * pow(clamp(1.0 - dot(-hit.wi, hit.normal), 0.0, 1.0), 5.0);
+
+        vec3 w = hit.wi;
+        if (fresnel < 1.) {
+            // refract
+            if (underwater) hit.wi = refract(hit.wi, hit.normal, WATER_IOR);
+            else            hit.wi = refract(hit.wi, hit.normal, 1.0 / WATER_IOR);
+
+            //throughput /= uint16_t(1. - fresnel);
+        } else {
+            // reflect
+            hit.wi = reflect(hit.wi, hit.normal);
+            //throughput /= uint16_t(fresnel);
+        }
+        hit.pos += w * rq_get_t(ray_query) * abs(dot(-w, hit.normal)/dot(hit.wi, hit.normal)) * 1.0/WATER_IOR;
+        was_water = true;
+        continue;
     } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
         hit.albedo = ldr_to_hdr(albedo_texture.rgb);
         contribution += throughput * hit.albedo;
@@ -302,6 +396,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                 hit.albedo = emission;
             }
         }
+    }
+
+    break;
     }
 }
 
