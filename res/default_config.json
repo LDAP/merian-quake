@@ -625,7 +625,7 @@
                 "mc fast recovery": true,
                 "mc samples": 5,
                 "mc static width": 25.299999237060547,
-                "particle size": 25.0,
+                "particle size": 7.0,
                 "randomize seed": true,
                 "reference mode": false,
                 "spp": 2,
