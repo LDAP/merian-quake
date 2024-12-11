@@ -6,7 +6,8 @@
 struct MCState {
     vec3 w_tgt;
     float sum_w;
-    uint N;
+    uint16_t N;
+    uint16_t flags;
     float w_cos;
 
     vec3 mv;

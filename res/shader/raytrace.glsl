@@ -149,10 +149,11 @@ bool trace_visibility(const vec3 from, const vec3 to) {
 // Returns the throughput along the ray (without hit)
 // and contribution (with hit) multiplied with throughput.
 // (allows for volumetric effects)
+// and true if is_sky
 #ifdef MERIAN_QUAKE_FIRST_HIT
-void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit, const vec3 r_x, const vec3 r_y) {
+bool trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit, const vec3 r_x, const vec3 r_y) {
 #else
-void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
+bool trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit hit) {
 #endif
 
     rayQueryEXT ray_query;
@@ -171,10 +172,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         contribution = throughput * sky;
         hit.albedo = sky;
 
-        hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+        hit.prev_pos = hit.pos = hit.wi;
         hit.enc_geonormal = geo_encode_normal(-hit.wi);
         hit.normal = -hit.wi;
-        return;
+        return true;
     }
 
     // HIT
@@ -186,10 +187,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         contribution += throughput * sky;
         hit.albedo = sky;
 
-        hit.prev_pos = hit.pos = hit.pos + hit.wi * T_MAX;
+        hit.prev_pos = hit.pos = hit.wi;
         hit.enc_geonormal = geo_encode_normal(-hit.wi);
         hit.normal = -hit.wi;
-        return;
+        return true;
     }
 
     const vec3 bary = rq_barycentrics(ray_query);
@@ -276,7 +277,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     } else if (flags == MAT_FLAGS_SOLID) {
         hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
         contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) / 255.hf);
-        return;
+        return false;
     } else {
         // Only for alias models. Disabled for now, results in artifacts.
 
@@ -303,6 +304,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
             }
         }
     }
+    return false;
 }
 
 #endif // _MERIAN_QUAKE_RT_

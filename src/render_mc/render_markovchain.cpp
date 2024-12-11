@@ -167,7 +167,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             {"VOLUME_MAX_T", std::to_string(render_info.constant.volume_max_t)},
             {"SURF_BSDF_P", std::to_string(surf_bsdf_p)},
             {"VOLUME_PHASE_P", std::to_string(volume_phase_p)},
-            {"DIR_GUIDE_PRIOR", std::to_string(dir_guide_prior)},
+            {"MC_PRIOR_LIGHTSOURCE_AREA", std::to_string(mc_prior_lightsource_area)},
+            {"MC_PRIOR_STRENGTH", std::to_string(mc_prior_strength)},
             {"DIST_GUIDE_P", std::to_string(dist_guide_p)},
             {"DISTANCE_MC_VERTEX_STATE_COUNT", std::to_string(distance_mc_vertex_state_count)},
             {"SEED", std::to_string(seed)},
@@ -345,7 +346,6 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     const uint32_t old_light_cache_buffer_size = lc_buffer_size;
     const float old_surf_bsdf_p = surf_bsdf_p;
     const float old_volume_phase_p = volume_phase_p;
-    const float old_dir_guide_prior = dir_guide_prior;
     const float old_dist_guide_p = dist_guide_p;
     const uint32_t old_distance_mc_vertex_state_count = distance_mc_vertex_state_count;
     const uint32_t old_seed = seed;
@@ -366,7 +366,11 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.config_bool("reference mode", reference_mode);
 
     config.st_separate("Guiding Markov chain");
-    config.config_percent("ML Prior", dir_guide_prior);
+    needs_pipeline_rebuild |=
+        config.config_float("prior lightsource area", mc_prior_lightsource_area, 0, 20,
+                            "set the mean area of a light source in units for the prior.");
+    needs_pipeline_rebuild |= config.config_float("prior strength", mc_prior_strength, 0, 100,
+                                                  "higher values mean use prior for longer");
     config.config_int("mc samples", mc_samples, 0, 30);
 
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
@@ -434,7 +438,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     config.st_separate("Debug");
     config.config_options("debug output", debug_output_selector,
                           {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance",
-                           "moments", "mc cos", "mc N", "mc motion vectors"});
+                           "moments", "mc cos", "mc prior", "mc N", "mc motion vectors"});
     needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
     dump_mc = config.config_bool("Download 128MB MC states",
                                  "Dumps the states as json into mc_dump.json");
@@ -449,8 +453,8 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
         old_mc_fast_recovery != mc_fast_recovery ||
         old_mc_adaptive_grid_tan_alpha_half != mc_adaptive_grid_tan_alpha_half ||
         old_surf_bsdf_p != surf_bsdf_p || old_volume_phase_p != volume_phase_p ||
-        old_dir_guide_prior != dir_guide_prior || old_dist_guide_p != dist_guide_p ||
-        old_seed != seed || old_randomize_seed != randomize_seed ||
+        old_dist_guide_p != dist_guide_p || old_seed != seed ||
+        old_randomize_seed != randomize_seed ||
         old_debug_output_selector != debug_output_selector) {
         pipe.reset();
     }

@@ -104,7 +104,7 @@ void main() {
                 if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
-                    mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+                    mc_state.sum_w = 0.;
                 } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 
@@ -130,7 +130,7 @@ void main() {
             next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
             f16vec3 incident = f16vec3(0); // contains throughput already
             f16vec3 throughput = f16vec3(1);
-            trace_ray(throughput, incident, next_hit);
+            bool is_sky = trace_ray(throughput, incident, next_hit);
             // Full GI (infinite diffuse bounces)
             const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) || (USE_LIGHT_CACHE_TAIL == 0 && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
 
@@ -157,10 +157,10 @@ void main() {
 
                     if (XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES) {
                         // == XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)
-                        mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
+                        mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF, is_sky);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                    } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos, next_hit.pos)) {
+                    } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index].sum_w = 0.;
                     }
@@ -173,7 +173,7 @@ void main() {
                 current_hit = next_hit;
 
                 // we stop if we won't transport any more light or if we found emissive material
-                if (all(lessThan(current_throughput, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
+                if (is_sky || all(lessThan(current_throughput, vec3(1e-7))) || any(greaterThan(f, vec3(1e-7))))
                     break;
             }
         }
@@ -240,17 +240,24 @@ void main() {
                 // -- MC learned cos --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
-                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? mc_state.w_cos / mc_state.sum_w : 0), 1));
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? acos(mc_state.w_cos / mc_state.sum_w) : 0), 1));
                 break;
             }
             case 7: {
+                // -- MC prior --
+                MCState mc_state;
+                mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? acos(mc_state_prior(mc_state, first_hit.pos)) : 0), 1));
+                break;
+            }
+            case 8: {
                 // -- MC N --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
                 imageStore(img_debug, pixel, vec4(vec3(mc_state.N) / ML_MAX_N, 1));
                 break;
             }
-            case 8: {
+            case 9: {
                 // -- MC MV --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);

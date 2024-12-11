@@ -154,7 +154,10 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     float surf_bsdf_p = 0.15;
     float volume_phase_p = 0.3;
-    float dir_guide_prior = 0.2;
+
+    float mc_prior_lightsource_area = 6.0;
+    float mc_prior_strength = 20.;
+
     float dist_guide_p = 0.0;
 
     uint32_t distance_mc_vertex_state_count = 10;
