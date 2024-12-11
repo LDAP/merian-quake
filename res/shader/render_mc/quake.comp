@@ -160,7 +160,7 @@ void main() {
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                    } else if (MC_FAST_RECOVERY == 1 && mc_f < 1e-5 * mc_state.sum_w && dot(wo, mc_state_dir(mc_state, current_hit.pos)) > mc_state_mean_cos(mc_state, current_hit.pos)) {
+                    } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos, next_hit.pos)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index].sum_w = 0.;
                     }

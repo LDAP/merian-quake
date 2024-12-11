@@ -22,9 +22,26 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 
 #define mc_state_pos(mc_state) (mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt)
 
-#define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / pow(distance((pos), mc_state_pos(mc_state)), 2)))
+#define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / merian_square(distance((pos), mc_state_pos(mc_state)))))
 
 #define mc_state_mean_cos(mc_state, pos) ((mc_state.N * mc_state.N * clamp(mc_state.w_cos / mc_state.sum_w, 0.0, 0.999999)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)))
+
+bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos, const vec3 hit) {
+
+    if (mc_f > 1e-5 * mc_state.sum_w) {
+        return false;
+    }
+
+    const vec3 target = mc_state_pos(mc_state);
+    const float cos = dot(wo, normalize(target - pos));
+
+    if (cos < mc_state_mean_cos(mc_state, pos)) {
+        // light might still be there 
+        return false;
+    }
+
+    return true;
+}
 
 float mc_state_kappa(const MCState mc_state, const vec3 pos) {
     const float r = mc_state_mean_cos(mc_state, pos);
