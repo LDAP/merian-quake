@@ -404,7 +404,7 @@
                 "reproducible renders": false,
                 "startup commands": "",
                 "stop after worldspawn": -1,
-                "volume max t": 1000.0
+                "volume max t": 10000.0
             },
             "type": "Quake"
         },
