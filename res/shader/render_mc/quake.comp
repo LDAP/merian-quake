@@ -54,11 +54,11 @@ void main() {
             float wo_p = 0;
 
 #if MERIAN_QUAKE_REFERENCE_MODE == 1
-            wo = bsdf_diffuse_sample(current_hit.normal, XorShift32Vec2(rng_state));
+            wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
             wodotn = dot(wo, current_hit.normal);
             if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
                 break;
-            wo_p = bsdf_diffuse_pdf(wodotn);
+            wo_p = bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness));
 #else
 
             MCState mc_state;
