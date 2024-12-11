@@ -28,14 +28,17 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 
 bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos) {
 
-    if (mc_f > 1e-5 * mc_state.sum_w) {
+    if (mc_f > 0.5 * mc_state.sum_w) {
         return false;
     }
 
-    const vec3 target = mc_state_pos(mc_state);
-    const float cos = dot(wo, normalize(target - pos));
+    if (params.cl_time == mc_state.T) {
+        return false;
+    }
 
-    if (cos < mc_state_mean_cos(mc_state, pos)) {
+    const float cos = dot(wo, mc_state_dir(mc_state, pos));
+
+    if (cos < 0.9 + 0.1 * mc_state_mean_cos(mc_state, pos)) {
         // light might still be there 
         return false;
     }
