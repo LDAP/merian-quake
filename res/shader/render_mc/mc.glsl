@@ -26,7 +26,7 @@ MCState mc_state_new(const vec3 pos, const vec3 normal) {
 
 #define mc_state_mean_cos(mc_state, pos) ((mc_state.N * mc_state.N * clamp(mc_state.w_cos / mc_state.sum_w, 0.0, 0.999999)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)))
 
-bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos, const vec3 hit) {
+bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos) {
 
     if (mc_f > 1e-5 * mc_state.sum_w) {
         return false;

@@ -104,7 +104,7 @@ void main() {
                 if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
-                    mc_state = mc_state_new(current_hit.pos, current_hit.normal);
+                    mc_state.N = 0;
                 } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 
@@ -160,7 +160,7 @@ void main() {
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                    } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos, next_hit.pos)) {
+                    } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index].sum_w = 0.;
                     }
@@ -240,7 +240,7 @@ void main() {
                 // -- MC learned cos --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
-                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? mc_state.w_cos / mc_state.sum_w : 0), 1));
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? acos(mc_state.w_cos / mc_state.sum_w) * INV_PI : 0), 1));
                 break;
             }
             case 7: {
