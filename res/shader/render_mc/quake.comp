@@ -104,7 +104,7 @@ void main() {
                 if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
-                    mc_state.N = 0;
+                    mc_state = mc_state_new();
                 } // else {VMF Sampling // wo = set above }
                 wodotn = dot(wo, current_hit.normal);
 

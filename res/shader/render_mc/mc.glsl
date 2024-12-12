@@ -12,10 +12,7 @@
 
 // GENERAL
 
-MCState mc_state_new(const vec3 pos, const vec3 normal) {
-    MCState r = {vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0};
-    return r;
-}
+#define mc_state_new() MCState(vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0);
 
 // return normalized direction (from pos)
 #define mc_state_dir(mc_state, pos) normalize((mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt) - pos)
@@ -65,13 +62,13 @@ void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
                          const float w,          // goodness
                          const vec3 target, const vec3 target_mv) {    // ray hit point
+
     mc_state.N = min(mc_state.N + 1, ML_MAX_N);
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
 
     mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
     mc_state.w_tgt = mix(mc_state.w_tgt, w * target, alpha);
     mc_state.w_cos = min(mix(mc_state.w_cos, w * max(0, dot(normalize(target - pos), mc_state_dir(mc_state, pos))), alpha), mc_state.sum_w);
-
     //mc_state.w_cos = min(length(mix(mc_state.w_cos * mc_state_dir(mc_state, pos), w * normalize(target - pos), alpha)), mc_state.sum_w);
 
     mc_state.mv = target_mv;
