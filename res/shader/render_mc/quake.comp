@@ -90,7 +90,7 @@ void main() {
                         }
 
                         scores[i] = state.sum_w;
-                        score_sum += scores[i];
+                        score_sum += state.sum_w;
                         vmfs[i] = mc_state_get_vmf(state, current_hit.pos);
                         if (XorShift32(rng_state) < scores[i] / score_sum) {
                             // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
@@ -101,7 +101,7 @@ void main() {
                     }
                 }
 
-                if (XorShift32(rng_state) < SURF_BSDF_P || score_sum == 0) {
+                if (score_sum == 0 || XorShift32(rng_state) < SURF_BSDF_P) {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
                     mc_state = mc_state_new();
