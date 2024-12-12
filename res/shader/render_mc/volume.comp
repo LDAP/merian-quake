@@ -138,7 +138,7 @@ void main() {
                     }
 
                     scores[i] = state.sum_w;
-                    score_sum += scores[i];
+                    score_sum += state.sum_w;
                     vmfs[i] = mc_state_get_vmf(state, current_hit.pos);
                     if (XorShift32(rng_state) < scores[i] / score_sum) {
                         // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
@@ -148,7 +148,7 @@ void main() {
                     }
                 }
 
-                if (XorShift32(rng_state) < VOLUME_PHASE_P || score_sum == 0) {
+                if (score_sum == 0 || XorShift32(rng_state) < VOLUME_PHASE_P) {
                     wo = phase_draine_sample(XorShift32Vec2(rng_state), first_wi, DRAINE_G, DRAINE_A);
                     mc_state = mc_state_new();
                 }
