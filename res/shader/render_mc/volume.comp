@@ -150,7 +150,7 @@ void main() {
 
                 if (XorShift32(rng_state) < VOLUME_PHASE_P || score_sum == 0) {
                     wo = phase_draine_sample(XorShift32Vec2(rng_state), first_wi, DRAINE_G, DRAINE_A);
-                    mc_state.N = 0;
+                    mc_state = mc_state_new();
                 }
                 
                 // Multiple importance sampling
