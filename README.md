@@ -1,6 +1,6 @@
 # Merian-Quake
 
-A path-tracer for the original Quake game on top of [quakespasm](https://github.com/sezero/quakespasm).
+A path-tracer for the original Quake game on top of [quakespasm](https://github.com/sezero/quakespasm) and [Merian](https://github.com/LDAP/merian).
 
 <hr>
 
