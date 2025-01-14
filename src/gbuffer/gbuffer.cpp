@@ -9,10 +9,7 @@
 #include "../../res/shader/hit.glsl.h"
 #include "merian-shaders/gbuffer.glsl.h"
 
-GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {
-    shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/gbuffer/gbuffer.comp");
-}
+GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {}
 
 GBuffer::~GBuffer() {}
 
@@ -90,6 +87,10 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
     QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     if (!pipe || render_info.constant_data_update) {
+        shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+            context, "shader/gbuffer/gbuffer.comp", std::nullopt, {},
+            {{"ENABLE_MIPMAP", std::to_string(static_cast<int>(enable_mipmap))}});
+
         auto pipe_builder = merian::PipelineLayoutBuilder(context);
         pipe_builder.add_push_constant<QuakeNode::UniformData>();
         merian::PipelineLayoutHandle pipe_layout =
@@ -111,7 +112,6 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         spec_builder.add_entry(sun_color.b);
 
         spec_builder.add_entry(render_info.constant.volume_max_t);
-        spec_builder.add_entry(enable_mipmap);
 
         pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader, spec_builder.build());
 

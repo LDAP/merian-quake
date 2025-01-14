@@ -227,9 +227,8 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
                      + buf_prev_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.z] * bary.z;
     }
 
-#ifdef MERIAN_QUAKE_FIRST_HIT
-    f16vec4 albedo_texture;
-    if (ENABLE_MIPMAP) {
+
+#if defined(MERIAN_QUAKE_FIRST_HIT) && ENABLE_MIPMAP
         RayDifferential rd = ray_diff_create(vec3(0), vec3(0), r_x, r_y);
         ray_diff_propagate(rd, hit.wi, rq_get_t(ray_query), hit.normal);
         const mat3x2 pinv = pseudoinverse(dudv);
@@ -237,12 +236,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         const vec2 grad_x = st_dudv * (pinv * rd.dOdx);
         const vec2 grad_y = st_dudv * (pinv * rd.dOdy);
 
-        albedo_texture = f16vec4(textureGrad(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, grad_x, grad_y));
-    } else {
-        albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
-    }
+        const f16vec4 albedo_texture = f16vec4(textureGrad(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, grad_x, grad_y));
 #else
-    const f16vec4 albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
+        const f16vec4 albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
 #endif
 
 
@@ -296,7 +292,11 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         const uint16_t texnum_fb = extra_data.texnum_fb_flags & 0xfffs;
         hit.albedo = albedo_texture.rgb;
         if (texnum_fb > 0 && texnum_fb < MAX_GLTEXTURES) {
+#if defined(MERIAN_QUAKE_FIRST_HIT) && ENABLE_MIPMAP
+            const f16vec3 emission = ldr_to_hdr(f16vec3(textureGrad(img_tex[nonuniformEXT(texnum_fb)], st, grad_x, grad_y).rgb));
+#else
             const f16vec3 emission = ldr_to_hdr(f16vec3(textureLod(img_tex[nonuniformEXT(texnum_fb)], st, 0).rgb));
+#endif
             if (any(greaterThan(emission, f16vec3(0)))) {
                 contribution += throughput * emission;
                 hit.albedo = emission;

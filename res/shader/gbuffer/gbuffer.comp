@@ -18,7 +18,6 @@ layout (constant_id = 7) const float SUN_COLOR_R = 0;
 layout (constant_id = 8) const float SUN_COLOR_G = 0;
 layout (constant_id = 9) const float SUN_COLOR_B = 0;
 layout (constant_id = 10) const float VOLUME_MAX_T = 1000.;
-layout (constant_id = 11) const bool ENABLE_MIPMAP = false;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"
