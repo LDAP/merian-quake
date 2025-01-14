@@ -189,19 +189,18 @@ extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     shm->buffer = (unsigned char*)calloc(1, buffersize);
 
     quake_data.audio_device->unpause_audio();
-    return true;
+    return 1;
 }
 
 extern "C" int SNDDMA_GetDMAPos(void) {
-    if (shm)
+    if (shm != nullptr)
         return shm->samplepos;
-    else
-        return 0;
+    return 0;
 }
 
 extern "C" void SNDDMA_Shutdown(void) {
-    if (shm) {
-        if (shm->buffer)
+    if (shm != nullptr) {
+        if (shm->buffer != nullptr)
             free(shm->buffer);
         shm->buffer = NULL;
         shm = NULL;
@@ -234,17 +233,18 @@ void parse_worldspawn() {
     glm::vec3& quake_sun_dir = quake_data.current_sun_direction;
 
     std::map<std::string, std::string> worldspawn_props;
-    char key[128], value[4096];
+    char key[128];
+    char value[4096];
     const char* data;
 
     data = COM_Parse(cl.worldmodel->entities);
-    if (!data)
+    if (data == nullptr)
         return; // error
     if (com_token[0] != '{')
         return; // error
     while (1) {
         data = COM_Parse(data);
-        if (!data)
+        if (data == nullptr)
             return; // error
         if (com_token[0] == '}')
             break; // end of worldspawn
@@ -252,10 +252,10 @@ void parse_worldspawn() {
             q_strlcpy(key, com_token + 1, sizeof(key));
         else
             q_strlcpy(key, com_token, sizeof(key));
-        while (key[0] && key[strlen(key) - 1] == ' ') // remove trailing spaces
+        while ((key[0] != 0) && key[strlen(key) - 1] == ' ') // remove trailing spaces
             key[strlen(key) - 1] = 0;
         data = COM_Parse(data);
-        if (!data)
+        if (data == nullptr)
             return; // error
         q_strlcpy(value, com_token, sizeof(value));
 
@@ -289,7 +289,8 @@ void parse_worldspawn() {
         sscanf(worldspawn_props["sun_mangle"].c_str(), "%f %f %f", &angles[1], &angles[0],
                &angles[2]);
         // This seems wrong.. But works on ad_azad
-        float right[3], up[3];
+        float right[3];
+        float up[3];
         angles[1] -= 180;
         AngleVectors(angles, &quake_sun_dir.x, right, up);
     } else {
@@ -318,7 +319,7 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
                                    const vk::BufferUsageFlags usage,
                                    const vk::CommandBuffer& cmd,
                                    const std::vector<T>& data,
-                                   const merian::BufferHandle optional_buffer,
+                                   const merian::BufferHandle& optional_buffer,
                                    const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
                                    const std::string& debug_name = {}) {
     merian::BufferHandle buffer = optional_buffer;
@@ -342,17 +343,18 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
 // If the supplied buffers are not nullptr and are large enough, they are returned and an upload
 // is recorded. Returns (vertex_buffer, index_buffer).
 // Appropriate barriers are inserted.
-std::tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
-ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
-                               const vk::CommandBuffer& cmd,
-                               const std::vector<float>& vtx,
-                               const std::vector<float>& prev_vtx,
-                               const std::vector<uint32_t>& idx,
-                               const std::vector<VertexExtraData>& ext,
-                               const merian::BufferHandle optional_vtx_buffer,
-                               const merian::BufferHandle optional_prev_vtx_buffer,
-                               const merian::BufferHandle optional_idx_buffer,
-                               const merian::BufferHandle optional_ext_buffer) {
+static std::
+    tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
+    ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
+                                   const vk::CommandBuffer& cmd,
+                                   const std::vector<float>& vtx,
+                                   const std::vector<float>& prev_vtx,
+                                   const std::vector<uint32_t>& idx,
+                                   const std::vector<VertexExtraData>& ext,
+                                   const merian::BufferHandle& optional_vtx_buffer,
+                                   const merian::BufferHandle& optional_prev_vtx_buffer,
+                                   const merian::BufferHandle& optional_idx_buffer,
+                                   const merian::BufferHandle& optional_ext_buffer) {
     auto usage_rt = vk::BufferUsageFlagBits::eShaderDeviceAddress |
                     vk::BufferUsageFlagBits::eStorageBuffer |
                     vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
@@ -401,14 +403,14 @@ ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
     return std::make_tuple(vertex_buffer, prev_vertex_buffer, index_buffer, ext_buffer);
 }
 
-QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& allocator,
-                                      const vk::CommandBuffer& cmd,
-                                      const std::vector<float>& vtx,
-                                      const std::vector<float>& prev_vtx,
-                                      const std::vector<uint32_t>& idx,
-                                      const std::vector<VertexExtraData>& ext,
-                                      const QuakeNode::RTGeometry& old_geo,
-                                      const vk::BuildAccelerationStructureFlagsKHR flags) {
+static QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& allocator,
+                                             const vk::CommandBuffer& cmd,
+                                             const std::vector<float>& vtx,
+                                             const std::vector<float>& prev_vtx,
+                                             const std::vector<uint32_t>& idx,
+                                             const std::vector<VertexExtraData>& ext,
+                                             const QuakeNode::RTGeometry& old_geo,
+                                             const vk::BuildAccelerationStructureFlagsKHR flags) {
     assert(!vtx.empty());
     assert(!prev_vtx.empty());
     assert(!idx.empty());
@@ -563,11 +565,12 @@ void QuakeNode::VID_Changed_f([[maybe_unused]] cvar_t* var) {
 }
 
 void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
-    // LOG -----------------------------------------------
-
-    std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
+// LOG -----------------------------------------------
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
+    const std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
     SPDLOG_DEBUG("texture_load {} {} {}x{} from {}, frame: {}", glt->texnum, glt->name, glt->width,
                  glt->height, source, glt->visframe);
+#endif
 
     if (glt->width == 0 || glt->height == 0) {
         SPDLOG_WARN("image extent was 0. skipping");
@@ -577,10 +580,10 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
     // STORE SOME TEXTURE IDs ----------------------------
 
     // HACK: for blood patch
-    if (!strcmp(glt->name, "progs/gib_1.mdl:frame0"))
+    if (strcmp(glt->name, "progs/gib_1.mdl:frame0") == 0)
         texnum_blood = glt->texnum;
     // HACK: for sparks and for emissive rocket particle trails
-    if (!strcmp(glt->name, "progs/s_exp_big.spr:frame10"))
+    if (strcmp(glt->name, "progs/s_exp_big.spr:frame10") == 0)
         texnum_explosion = glt->texnum;
 
     // ALLOCATE ----------------------------
@@ -685,9 +688,11 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes
     for (const auto& [texnum, tex] : pending_uploads) {
         vk::Filter mag_filter;
         if (default_filtering == 0) {
-            mag_filter = tex.flags & TEXPREF_LINEAR ? vk::Filter::eLinear : vk::Filter::eNearest;
+            mag_filter =
+                ((tex.flags & TEXPREF_LINEAR) != 0u) ? vk::Filter::eLinear : vk::Filter::eNearest;
         } else {
-            mag_filter = tex.flags & TEXPREF_NEAREST ? vk::Filter::eNearest : vk::Filter::eLinear;
+            mag_filter =
+                ((tex.flags & TEXPREF_NEAREST) != 0u) ? vk::Filter::eNearest : vk::Filter::eLinear;
         }
 
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
@@ -726,9 +731,9 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         update_textures(cmd, io);
     }
 
-    render_info.render &= !scr_drawloading;
+    render_info.render &= scr_drawloading == 0;
 
-    if (cl.worldmodel && frame == last_worldspawn_frame) {
+    if ((cl.worldmodel != nullptr) && frame == last_worldspawn_frame) {
         key_dest = key_game;
         m_state = m_none;
         sv_player = nullptr;
@@ -767,7 +772,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
 
     // Update uniform data
     {
-        if (render_info.render && sv_player) {
+        if (render_info.render && (sv_player != nullptr)) {
             // Demos do not have a player set
             render_info.uniform.player.flags = 0;
             render_info.uniform.player.flags |=
@@ -788,10 +793,10 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         render_info.uniform.sky.fill(notexture->texnum);
         if (!render_info.render) {
             render_info.uniform.sky.fill(notexture->texnum);
-        } else if (skybox_name[0]) {
+        } else if (skybox_name[0] != 0) {
             for (int i = 0; i < 6; i++)
                 render_info.uniform.sky[i] = skybox_textures[i]->texnum;
-        } else if (solidskytexture) {
+        } else if (solidskytexture != nullptr) {
             render_info.uniform.sky[0] = solidskytexture->texnum;
             render_info.uniform.sky[1] = alphaskytexture->texnum;
             render_info.uniform.sky[2] = static_cast<uint16_t>(-1u);
