@@ -1,6 +1,6 @@
 # Merian-Quake
 
-A path-tracer for the original Quake game on top of  [quakespasm](https://github.com/sezero/quakespasm).
+A path-tracer for the original Quake game on top of [quakespasm](https://github.com/sezero/quakespasm).
 
 <hr>
 
@@ -49,8 +49,8 @@ Build dependencies:
 
 ```bash
 # Clone the repository with all submodules:
-git clone --recursive https://github.com/LDAP/merian-quake-rt
-cd merian-quake-rt
+git clone --recursive https://github.com/LDAP/merian-quake
+cd merian-quake
 
 # Compile
 meson setup build [--prefix=path/to/installdir]
