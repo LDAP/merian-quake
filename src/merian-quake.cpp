@@ -213,27 +213,32 @@ int main(const int argc, const char** argv) {
         context->file_loader.find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
-        output->set_on_blit_completed(
-            [&](const merian::CommandBufferHandle& cmd, merian::SwapchainAcquireResult& aquire_result) {
-                imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
+        output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
+                                          merian::SwapchainAcquireResult& aquire_result) {
+            imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
-                const double frametime_ms = frametime.millis();
-                frametime.reset();
-                ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
-                                         frametime_ms, 1000 / frametime_ms)
-                                 .c_str(),
-                             NULL, ImGuiWindowFlags_NoFocusOnAppearing);
+            if (controller->get_raw_mouse_input()) {
+                ImGui::GetIO().ClearInputMouse();
+                ImGui::GetIO().ClearInputKeys();
+            }
 
-                config_manager.get(config);
-                ImGui::End();
+            const double frametime_ms = frametime.millis();
+            frametime.reset();
+            ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
+                                     frametime_ms, 1000 / frametime_ms)
+                             .c_str(),
+                         NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
-                QuakeMessageOverlay();
+            config_manager.get(config);
+            ImGui::End();
 
-                imgui.render(cmd);
-                controller->set_active(
-                    controller->get_raw_mouse_input() ||
-                    !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
-            });
+            QuakeMessageOverlay();
+
+            imgui.render(cmd);
+            controller->set_active(
+                controller->get_raw_mouse_input() ||
+                !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
+        });
     }
 
     std::signal(SIGINT, signal_handler);
