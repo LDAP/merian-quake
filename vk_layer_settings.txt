@@ -19,7 +19,7 @@ khronos_validation.thread_safety = true
 khronos_validation.debug_action = 
 
 # Comma-delineated list of options specifying the types of messages to be reported
-khronos_validation.report_flags = debug,error,perf,info,warn
+khronos_validation.report_flags = verbose,error,perf,info,warn
 
 # Enable limiting of duplicate messages.
 khronos_validation.enable_message_limit = true
