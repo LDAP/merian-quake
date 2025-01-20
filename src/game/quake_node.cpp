@@ -317,7 +317,7 @@ void parse_worldspawn() {
 template <typename T>
 merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& allocator,
                                    const vk::BufferUsageFlags usage,
-                                   const vk::CommandBuffer& cmd,
+                                   const merian::CommandBufferHandle& cmd,
                                    const std::vector<T>& data,
                                    const merian::BufferHandle& optional_buffer,
                                    const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
@@ -325,15 +325,13 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
     merian::BufferHandle buffer = optional_buffer;
     if (!allocator->ensureBufferSize(buffer, merian::size_of(data), usage, debug_name,
                                      merian::MemoryMappingType::NONE, min_alignment, 1.25)) {
-        cmd.pipelineBarrier(
-            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR |
-                vk::PipelineStageFlagBits::eComputeShader,
-            vk::PipelineStageFlagBits::eTransfer, {}, {},
-            buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                       vk::AccessFlagBits::eShaderRead |
-                                       vk::AccessFlagBits::eTransferRead,
-                                   vk::AccessFlagBits::eTransferWrite),
-            {});
+        cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR |
+                         vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eTransfer,
+                     buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                                vk::AccessFlagBits::eShaderRead |
+                                                vk::AccessFlagBits::eTransferRead,
+                                            vk::AccessFlagBits::eTransferWrite));
     }
     allocator->getStaging()->cmdToBuffer(cmd, *buffer, 0, merian::size_of(data), data.data());
     return buffer;
@@ -346,7 +344,7 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
 static std::
     tuple<merian::BufferHandle, merian::BufferHandle, merian::BufferHandle, merian::BufferHandle>
     ensure_vertex_index_ext_buffer(const merian::ResourceAllocatorHandle& allocator,
-                                   const vk::CommandBuffer& cmd,
+                                   const merian::CommandBufferHandle& cmd,
                                    const std::vector<float>& vtx,
                                    const std::vector<float>& prev_vtx,
                                    const std::vector<uint32_t>& idx,
@@ -397,14 +395,13 @@ static std::
             vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferWrite),
     };
 
-    vk::DependencyInfo dep_info{{}, {}, barriers, {}};
-    cmd.pipelineBarrier2(dep_info);
+    cmd->barrier(barriers);
 
     return std::make_tuple(vertex_buffer, prev_vertex_buffer, index_buffer, ext_buffer);
 }
 
 static QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHandle& allocator,
-                                             const vk::CommandBuffer& cmd,
+                                             const merian::CommandBufferHandle& cmd,
                                              const std::vector<float>& vtx,
                                              const std::vector<float>& prev_vtx,
                                              const std::vector<uint32_t>& idx,
@@ -683,7 +680,8 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& i
     };
 }
 
-void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
+void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
+                                const merian_nodes::NodeIO& io) {
 
     for (const auto& [texnum, tex] : pending_uploads) {
         vk::Filter mag_filter;
@@ -697,7 +695,7 @@ void QuakeNode::update_textures(const vk::CommandBuffer& cmd, const merian_nodes
 
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
             cmd, tex.cpu_tex.data(), tex.width, tex.height, mag_filter, vk::Filter::eLinear,
-            !tex.linear, tex.name, tex.flags & TEXPREF_MIPMAP);
+            !tex.linear, tex.name, (tex.flags & TEXPREF_MIPMAP) != 0u);
         io[con_textures].set(texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
                              vk::PipelineStageFlagBits2::eTransfer);
     }
@@ -717,7 +715,7 @@ QuakeNode::NodeStatusFlags QuakeNode::pre_process([[maybe_unused]] merian_nodes:
 }
 
 void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
-                        [[maybe_unused]] const vk::CommandBuffer& cmd,
+                        [[maybe_unused]] const merian::CommandBufferHandle& cmd,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
                         [[maybe_unused]] const merian_nodes::NodeIO& io) {
     if (update_gamestate) {
@@ -851,7 +849,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
     frame++;
 }
 
-void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
+void QuakeNode::update_static_geo(const merian::CommandBufferHandle& cmd) {
     std::vector<RTGeometry> old_static_geo = static_geo;
     static_geo.clear();
 
@@ -900,7 +898,7 @@ void QuakeNode::update_static_geo(const vk::CommandBuffer& cmd) {
     }
 }
 
-void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
+void QuakeNode::update_dynamic_geo(const merian::CommandBufferHandle& cmd,
                                    const merian::ProfilerHandle& profiler) {
     vtx.clear();
     prev_vtx.clear();
@@ -988,7 +986,7 @@ void QuakeNode::update_dynamic_geo(const vk::CommandBuffer& cmd,
     }
 }
 
-void QuakeNode::update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io) {
+void QuakeNode::update_as(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io) {
     vk::BuildAccelerationStructureFlagsKHR flags =
         vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
     if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {

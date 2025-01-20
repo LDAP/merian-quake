@@ -138,7 +138,7 @@ class QuakeNode : public merian_nodes::Node {
     NodeStatusFlags pre_process(merian_nodes::GraphRun& run, const merian_nodes::NodeIO& io);
 
     void process(merian_nodes::GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const merian::CommandBufferHandle& cmd,
                  const merian::DescriptorSetHandle& descriptor_set,
                  const merian_nodes::NodeIO& io);
 
@@ -169,11 +169,12 @@ class QuakeNode : public merian_nodes::Node {
 
   private:
     // processes the pending uploads and updates the current descriptor set
-    void update_textures(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
+    void update_textures(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io);
 
-    void update_static_geo(const vk::CommandBuffer& cmd);
-    void update_dynamic_geo(const vk::CommandBuffer& cmd, const merian::ProfilerHandle& profiler);
-    void update_as(const vk::CommandBuffer& cmd, const merian_nodes::NodeIO& io);
+    void update_static_geo(const merian::CommandBufferHandle& cmd);
+    void update_dynamic_geo(const merian::CommandBufferHandle& cmd,
+                            const merian::ProfilerHandle& profiler);
+    void update_as(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io);
 
   private:
     const merian::ContextHandle context;

@@ -202,10 +202,6 @@ int main(const int argc, const char** argv) {
         quake->set_controller(controller);
     }
 
-    // TODO!
-    // image_writer->set_callback([accum]() { accum->request_clear(); });
-    // image_writer_volume->set_callback([volume_accum]() { volume_accum->request_clear(); });
-
     merian::ImGuiProperties config;
     merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
     merian::GLFWImGui imgui(context, debug_ctx, true);
@@ -218,7 +214,7 @@ int main(const int argc, const char** argv) {
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed(
-            [&](const vk::CommandBuffer& cmd, merian::SwapchainAcquireResult& aquire_result) {
+            [&](const merian::CommandBufferHandle& cmd, merian::SwapchainAcquireResult& aquire_result) {
                 imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
                 const double frametime_ms = frametime.millis();

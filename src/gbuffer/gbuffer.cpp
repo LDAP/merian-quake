@@ -22,8 +22,7 @@ std::vector<merian_nodes::InputConnectorHandle> GBuffer::describe_inputs() {
 
 std::vector<merian_nodes::OutputConnectorHandle>
 GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
-    extent.width = io_layout[con_resolution]->value().width;
-    extent.height = io_layout[con_resolution]->value().height;
+    extent = io_layout[con_resolution]->value();
 
     con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
         "albedo", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
@@ -51,12 +50,6 @@ GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
     return {con_albedo, con_irradiance, con_mv, con_gbuffer, con_hits};
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t>
-GBuffer::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept {
-    return {(extent.width + local_size_x - 1) / local_size_x,
-            (extent.height + local_size_y - 1) / local_size_y, 1};
-};
-
 GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& props) {
     bool spec_changed = props.config_bool("hide sun", hide_sun);
     spec_changed |= props.config_bool("enable mipmap", enable_mipmap);
@@ -78,7 +71,7 @@ GBuffer::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layo
 }
 
 void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
-                      const vk::CommandBuffer& cmd,
+                      const merian::CommandBufferHandle& cmd,
                       const merian::DescriptorSetHandle& descriptor_set,
                       const merian_nodes::NodeIO& io) {
     merian::PipelineHandle& old_pipeline = io.frame_data<merian::PipelineHandle>();
@@ -132,9 +125,8 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
     }
 
     old_pipeline = current_pipe;
-    current_pipe->bind(cmd);
-    current_pipe->bind_descriptor_set(cmd, descriptor_set);
-    current_pipe->push_constant(cmd, render_info.uniform);
-    auto [x, y, z] = get_group_count(io);
-    cmd.dispatch(x, y, z);
+    cmd->bind(current_pipe);
+    cmd->bind_descriptor_set(current_pipe, descriptor_set);
+    cmd->push_constant(current_pipe, render_info.uniform);
+    cmd->dispatch(extent, local_size_x, local_size_y);
 }

@@ -100,7 +100,7 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& 
 }
 
 void RendererRESTIR::process(merian_nodes::GraphRun& run,
-                             const vk::CommandBuffer& cmd,
+                             const merian::CommandBufferHandle& cmd,
                              const merian::DescriptorSetHandle& graph_descriptor_set,
                              const merian_nodes::NodeIO& io) {
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
@@ -187,17 +187,13 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
 
     cur_frame = pipelines;
 
-    const uint32_t render_width = io[con_resolution].width;
-    const uint32_t render_height = io[con_resolution].height;
-
     if (!render_info.render) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
-        pipelines.clear->bind(cmd);
-        pipelines.clear->bind_descriptor_set(cmd, graph_descriptor_set);
-        pipelines.clear->push_descriptor_set(cmd, 1, get_push_descriptor_writes(1));
-        pipelines.clear->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        cmd->bind(pipelines.clear);
+        cmd->bind_descriptor_set(pipelines.clear, graph_descriptor_set);
+        cmd->push_descriptor_set(pipelines.clear, 1, get_push_descriptor_writes(1));
+        cmd->push_constant(pipelines.clear, render_info.uniform);
+        cmd->dispatch(io[con_resolution], LOCAL_SIZE_X, LOCAL_SIZE_Y);
         return;
     }
 
@@ -208,32 +204,30 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         const auto bar2 = pong_buffer->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {bar1, bar2}, {});
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, {bar1, bar2});
     };
 
     // BIND PIPELINE
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "generate samples");
-        pipelines.generate_samples->bind(cmd);
-        pipelines.generate_samples->bind_descriptor_set(cmd, graph_descriptor_set);
-        pipelines.generate_samples->push_descriptor_set(
-            cmd, 1, get_push_descriptor_writes(ping_pong_index));
-        pipelines.generate_samples->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        cmd->bind(pipelines.generate_samples);
+        cmd->bind_descriptor_set(pipelines.generate_samples, graph_descriptor_set);
+        cmd->push_descriptor_set(pipelines.generate_samples, 1,
+                                 get_push_descriptor_writes(ping_pong_index));
+        cmd->push_constant(pipelines.generate_samples, render_info.uniform);
+        cmd->dispatch(io[con_resolution], LOCAL_SIZE_X, LOCAL_SIZE_Y);
     }
 
     if (temporal_reuse_enable && run.get_iteration() > 0ul) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "temporal reuse");
         sync_reservoirs();
-        pipelines.temporal_reuse->bind(cmd);
-        pipelines.temporal_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
-        pipelines.temporal_reuse->push_descriptor_set(cmd, 1,
-                                                      get_push_descriptor_writes(ping_pong_index));
-        pipelines.temporal_reuse->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        cmd->bind(pipelines.temporal_reuse);
+        cmd->bind_descriptor_set(pipelines.temporal_reuse, graph_descriptor_set);
+        cmd->push_descriptor_set(pipelines.temporal_reuse, 1,
+                                 get_push_descriptor_writes(ping_pong_index));
+        cmd->push_constant(pipelines.temporal_reuse, render_info.uniform);
+        cmd->dispatch(io[con_resolution], LOCAL_SIZE_X, LOCAL_SIZE_Y);
     }
 
     if (spatial_reuse_iterations > 0) {
@@ -241,25 +235,23 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "spatial reuse");
 
         sync_reservoirs();
-        pipelines.spatial_reuse->bind(cmd);
-        pipelines.spatial_reuse->bind_descriptor_set(cmd, graph_descriptor_set);
-        pipelines.spatial_reuse->push_descriptor_set(cmd, 1,
-                                                     get_push_descriptor_writes(ping_pong_index));
+        cmd->bind(pipelines.spatial_reuse);
+        cmd->bind_descriptor_set(pipelines.spatial_reuse, graph_descriptor_set);
+        cmd->push_descriptor_set(pipelines.spatial_reuse, 1,
+                                 get_push_descriptor_writes(ping_pong_index));
         ping_pong_index ^= 1;
-        pipelines.spatial_reuse->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        cmd->push_constant(pipelines.spatial_reuse, render_info.uniform);
+        cmd->dispatch(io[con_resolution], LOCAL_SIZE_X, LOCAL_SIZE_Y);
     }
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "shade");
         sync_reservoirs();
-        pipelines.shade->bind(cmd);
-        pipelines.shade->bind_descriptor_set(cmd, graph_descriptor_set);
-        pipelines.shade->push_descriptor_set(cmd, 1, get_push_descriptor_writes(1));
-        pipelines.shade->push_constant(cmd, render_info.uniform);
-        cmd.dispatch((render_width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X,
-                     (render_height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y, 1);
+        cmd->bind(pipelines.shade);
+        cmd->bind_descriptor_set(pipelines.shade, graph_descriptor_set);
+        cmd->push_descriptor_set(pipelines.shade, 1, get_push_descriptor_writes(1));
+        cmd->push_constant(pipelines.shade, render_info.uniform);
+        cmd->dispatch(io[con_resolution], LOCAL_SIZE_X, LOCAL_SIZE_Y);
     }
 }
 

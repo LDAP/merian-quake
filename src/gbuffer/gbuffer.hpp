@@ -28,15 +28,12 @@ class GBuffer : public merian_nodes::Node {
     std::vector<merian_nodes::OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout) override;
 
-    std::tuple<uint32_t, uint32_t, uint32_t>
-    get_group_count(const merian_nodes::NodeIO& io) const noexcept;
-
     virtual NodeStatusFlags
     on_connected(const merian_nodes::NodeIOLayout& io_layout,
                  const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     virtual void process(merian_nodes::GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const merian::CommandBufferHandle& cmd,
                          const merian::DescriptorSetHandle& descriptor_set,
                          const merian_nodes::NodeIO& io) override;
 
