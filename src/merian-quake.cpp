@@ -214,7 +214,7 @@ int main(const int argc, const char** argv) {
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
-                                          merian::SwapchainAcquireResult& aquire_result) {
+                                          const merian::SwapchainAcquireResult& aquire_result) {
             imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
             if (controller->get_raw_mouse_input()) {
