@@ -217,13 +217,17 @@ int main(const int argc, const char** argv) {
                                           const merian::SwapchainAcquireResult& aquire_result) {
             imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
+            float alpha = 1.0;
             if (controller->get_raw_mouse_input()) {
                 ImGui::GetIO().ClearInputMouse();
                 ImGui::GetIO().ClearInputKeys();
+                alpha = 0.2;
             }
 
             const double frametime_ms = frametime.millis();
             frametime.reset();
+
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
             ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
                                      frametime_ms, 1000 / frametime_ms)
                              .c_str(),
@@ -231,6 +235,7 @@ int main(const int argc, const char** argv) {
 
             config_manager.get(config);
             ImGui::End();
+            ImGui::PopStyleVar();
 
             QuakeMessageOverlay();
 
