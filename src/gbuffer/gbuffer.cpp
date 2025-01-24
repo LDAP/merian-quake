@@ -74,9 +74,6 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
                       const merian::CommandBufferHandle& cmd,
                       const merian::DescriptorSetHandle& descriptor_set,
                       const merian_nodes::NodeIO& io) {
-    merian::PipelineHandle& old_pipeline = io.frame_data<merian::PipelineHandle>();
-    old_pipeline.reset();
-
     QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     if (!pipe || render_info.constant_data_update) {
@@ -124,7 +121,6 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         current_pipe = clear_pipe;
     }
 
-    old_pipeline = current_pipe;
     cmd->bind(current_pipe);
     cmd->bind_descriptor_set(current_pipe, descriptor_set);
     cmd->push_constant(current_pipe, render_info.uniform);

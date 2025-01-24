@@ -180,13 +180,6 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         pipelines.recreate = false;
     }
 
-    auto& cur_frame_ptr = io.frame_data<std::shared_ptr<Pipelines>>();
-    if (!cur_frame_ptr)
-        cur_frame_ptr = std::make_shared<Pipelines>();
-    Pipelines& cur_frame = *cur_frame_ptr;
-
-    cur_frame = pipelines;
-
     if (!render_info.render) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         cmd->bind(pipelines.clear);

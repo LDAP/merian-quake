@@ -200,16 +200,6 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             pipe_layout, volume_forward_project_shader, spec);
     }
 
-    auto& cur_frame_ptr = io.frame_data<std::shared_ptr<FrameData>>();
-    if (!cur_frame_ptr)
-        cur_frame_ptr = std::make_shared<FrameData>();
-    FrameData& cur_frame = *cur_frame_ptr;
-
-    cur_frame.pipe = pipe;
-    cur_frame.clear_pipe = clear_pipe;
-    cur_frame.volume_pipe = volume_pipe;
-    cur_frame.volume_forward_project_pipe = volume_forward_project_pipe;
-
     // RESET MARKOV CHAINS AT ITERATION 0
     if (run.get_iteration() == 0UL) {
         // ZERO markov chains and light cache
