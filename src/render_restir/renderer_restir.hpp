@@ -47,7 +47,6 @@ class RendererRESTIR : public merian_nodes::Node {
                  const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) override;
 
     void process(merian_nodes::GraphRun& run,
-                 const merian::CommandBufferHandle& cmd,
                  const merian::DescriptorSetHandle& descriptor_set,
                  const merian_nodes::NodeIO& io) override;
 

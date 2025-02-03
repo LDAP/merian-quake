@@ -71,13 +71,14 @@ GBuffer::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layo
 }
 
 void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
-                      const merian::CommandBufferHandle& cmd,
                       const merian::DescriptorSetHandle& descriptor_set,
                       const merian_nodes::NodeIO& io) {
+    const merian::CommandBufferHandle& cmd = run.get_cmd();
+
     QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     if (!pipe || render_info.constant_data_update) {
-        shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/gbuffer/gbuffer.comp", std::nullopt, {},
             {{"ENABLE_MIPMAP", std::to_string(static_cast<int>(enable_mipmap))}});
 

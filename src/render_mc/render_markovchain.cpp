@@ -110,9 +110,10 @@ RendererMarkovChain::on_connected([[maybe_unused]] const merian_nodes::NodeIOLay
 }
 
 void RendererMarkovChain::process(merian_nodes::GraphRun& run,
-                                  const merian::CommandBufferHandle& cmd,
                                   const merian::DescriptorSetHandle& graph_descriptor_set,
                                   const merian_nodes::NodeIO& io) {
+    const merian::CommandBufferHandle& cmd = run.get_cmd();
+
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     // (RE-) CREATE PIPELINE
@@ -176,16 +177,17 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
         };
 
-        rt_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        rt_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/render_mc/quake.comp", std::nullopt, {}, additional_macro_definitions);
-        clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        clear_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/render_mc/clear.comp", std::nullopt, {}, additional_macro_definitions);
-        volume_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+        volume_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/render_mc/volume.comp", std::nullopt, {},
             additional_macro_definitions);
-        volume_forward_project_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
-            context, "shader/render_mc/volume_forward_project.comp", std::nullopt, {},
-            additional_macro_definitions);
+        volume_forward_project_shader =
+            run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+                context, "shader/render_mc/volume_forward_project.comp", std::nullopt, {},
+                additional_macro_definitions);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
 

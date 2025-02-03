@@ -25,16 +25,18 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
                                const merian::ResourceAllocatorHandle& allocator)
     : Node(), context(context), allocator(allocator) {
 
+    const auto shader_compiler = merian::ShaderCompiler::get(context);
+
     // PIPELINE CREATION
-    generate_samples_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+    generate_samples_shader = shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_restir/restir_di_generate_samples_bsdf.comp");
-    temporal_reuse_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+    temporal_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_restir/restir_di_temporal_reuse.comp");
-    spatial_reuse_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+    spatial_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_restir/restir_di_spatial_reuse.comp");
-    shade_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+    shade_shader = shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_restir/restir_di_shade.comp");
-    clear_shader = context->shader_compiler->find_compile_glsl_to_shadermodule(
+    clear_shader = shader_compiler->find_compile_glsl_to_shadermodule(
         context, "shader/render_restir/restir_di_clear.comp");
 
     reservoir_pingpong_layout =
@@ -100,9 +102,9 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& 
 }
 
 void RendererRESTIR::process(merian_nodes::GraphRun& run,
-                             const merian::CommandBufferHandle& cmd,
                              const merian::DescriptorSetHandle& graph_descriptor_set,
                              const merian_nodes::NodeIO& io) {
+    const merian::CommandBufferHandle& cmd = run.get_cmd();
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     const std::array<std::pair<vk::DescriptorBufferInfo, vk::DescriptorBufferInfo>, 2>

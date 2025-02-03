@@ -33,7 +33,6 @@ class GBuffer : public merian_nodes::Node {
                  const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     virtual void process(merian_nodes::GraphRun& run,
-                         const merian::CommandBufferHandle& cmd,
                          const merian::DescriptorSetHandle& descriptor_set,
                          const merian_nodes::NodeIO& io) override;
 

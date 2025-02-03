@@ -709,15 +709,11 @@ QuakeNode::NodeStatusFlags QuakeNode::on_connected(
     return {};
 }
 
-QuakeNode::NodeStatusFlags QuakeNode::pre_process([[maybe_unused]] merian_nodes::GraphRun& run,
-                                                  [[maybe_unused]] const merian_nodes::NodeIO& io) {
-    return {};
-}
-
 void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
-                        [[maybe_unused]] const merian::CommandBufferHandle& cmd,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
                         [[maybe_unused]] const merian_nodes::NodeIO& io) {
+    const merian::CommandBufferHandle& cmd = run.get_cmd();
+
     if (update_gamestate) {
         MERIAN_PROFILE_SCOPE(run.get_profiler(), "update gamestate");
         sync_render.push((float)run.get_time_delta(), 1);
@@ -743,7 +739,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
     }
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update dynamic geo");
-        update_dynamic_geo(cmd, run.get_profiler());
+        update_dynamic_geo(run, cmd, run.get_profiler());
     }
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "update as");
@@ -898,14 +894,15 @@ void QuakeNode::update_static_geo(const merian::CommandBufferHandle& cmd) {
     }
 }
 
-void QuakeNode::update_dynamic_geo(const merian::CommandBufferHandle& cmd,
+void QuakeNode::update_dynamic_geo(merian_nodes::GraphRun& run,
+                                   const merian::CommandBufferHandle& cmd,
                                    const merian::ProfilerHandle& profiler) {
     vtx.clear();
     prev_vtx.clear();
     idx.clear();
     ext.clear();
 
-    const uint32_t number_tasks = context->thread_pool.size();
+    const uint32_t number_tasks = run.get_thread_pool()->size();
     std::vector<std::vector<float>> thread_dynamic_vtx(number_tasks);
     std::vector<std::vector<float>> thread_dynamic_prev_vtx(number_tasks);
     std::vector<std::vector<uint32_t>> thread_dynamic_idx(number_tasks);
@@ -913,7 +910,7 @@ void QuakeNode::update_dynamic_geo(const merian::CommandBufferHandle& cmd,
 
     {
         MERIAN_PROFILE_SCOPE(profiler, "parallel transform");
-        std::future<void> future = context->thread_pool.submit<void>([&]() {
+        std::future<void> future = run.get_thread_pool()->submit<void>([&]() {
             if (playermodel == 1) {
                 add_geo(&cl.viewent, vtx, prev_vtx, idx, ext);
             } else if (playermodel == 2) {
@@ -936,7 +933,7 @@ void QuakeNode::update_dynamic_geo(const merian::CommandBufferHandle& cmd,
                             thread_dynamic_prev_vtx[thread_index], thread_dynamic_idx[thread_index],
                             thread_dynamic_ext[thread_index]);
             },
-            context->thread_pool, number_tasks);
+            *run.get_thread_pool(), number_tasks);
 
         future.get();
     }
