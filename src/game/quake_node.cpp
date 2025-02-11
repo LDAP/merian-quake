@@ -333,7 +333,7 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
                                                 vk::AccessFlagBits::eTransferRead,
                                             vk::AccessFlagBits::eTransferWrite));
     }
-    allocator->getStaging()->cmdToBuffer(cmd, *buffer, 0, merian::size_of(data), data.data());
+    allocator->getStaging()->cmd_to_device(cmd, buffer, data);
     return buffer;
 }
 

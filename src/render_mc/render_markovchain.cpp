@@ -285,13 +285,14 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     if (dump_mc) {
         const std::size_t count =
             std::min(128L * 1024 * 1024 / sizeof(MCState), (std::size_t)mc_adaptive_buffer_size);
-        const MCState* buf = static_cast<const MCState*>(allocator->getStaging()->cmdFromBuffer(
-            cmd, *io[con_markovchain], 0, sizeof(MCState) * count));
-        run.add_submit_callback([count, buf](const merian::QueueHandle& queue,
-                                             [[maybe_unused]] merian_nodes::GraphRun& run) {
+        const merian::MemoryAllocationHandle memory = allocator->getStaging()->cmd_from_device(
+            cmd, io[con_markovchain], 0, sizeof(MCState) * count);
+        run.add_submit_callback([count, memory](const merian::QueueHandle& queue,
+                                                [[maybe_unused]] merian_nodes::GraphRun& run) {
             queue->wait_idle();
             nlohmann::json j;
 
+            MCState* buf = memory->map_as<MCState>();
             for (const MCState* v = buf; v < buf + count; v++) {
                 nlohmann::json o;
                 o["N"] = v->N;
@@ -302,7 +303,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
                 j.emplace_back(o);
             }
-
+            memory->unmap();
             std::ofstream file("mc_dump.json");
             file << std::setw(4) << j << '\n';
         });
