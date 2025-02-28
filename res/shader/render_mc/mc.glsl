@@ -21,7 +21,7 @@
 
 #define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / merian_square(distance((pos), mc_state_pos(mc_state)))))
 
-#define mc_state_mean_cos(mc_state, pos) ((mc_state.N * mc_state.N * clamp(mc_state.w_cos / mc_state.sum_w, 0.0, 0.999999)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)))
+#define mc_state_mean_cos(mc_state, pos) ((mc_state.N * mc_state.N * clamp(mc_state.w_cos / mc_state.sum_w, 0.0, 0.9999999)) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)))
 
 bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos) {
 

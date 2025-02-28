@@ -157,7 +157,7 @@ void main() {
                 [[unroll]]
                 for (int i = 0; i < MC_SAMPLES; i++) {
                     // score_sum > 0 ? results in black artifacts
-                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(vmfs[i].w, dot(wo, vmfs[i].xyz))) / score_sum : 0);
+                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w)) / score_sum : 0);
                 }
                 wo_p = (score_sum > 0 ? VOLUME_PHASE_P : 1.0) * phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A) + (1 - VOLUME_PHASE_P) * wo_p;
             }

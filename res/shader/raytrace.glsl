@@ -26,7 +26,7 @@ f16vec3 get_sky(const vec3 w) {
 
     {
         emm += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z), w))), 4.0hf);
-        emm += 5.0hf * float16_t(vmf_pdf(3000.0, dot(vec3(SUN_W_X, SUN_W_Y, SUN_W_Z), w)));
+        emm += 5.0hf * float16_t(vmf_pdf(w, vec3(SUN_W_X, SUN_W_Y, SUN_W_Z), 3000.0));
         emm *= f16vec3(SUN_COLOR_R, SUN_COLOR_G, SUN_COLOR_B);
     }
 
