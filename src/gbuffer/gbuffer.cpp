@@ -51,8 +51,10 @@ GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
 }
 
 GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& props) {
-    bool spec_changed = props.config_bool("hide sun", hide_sun);
-    spec_changed |= props.config_bool("enable mipmap", enable_mipmap);
+    bool spec_changed = false;
+    spec_changed |= props.config_bool("hide sun", hide_sun);
+    spec_changed |= props.config_bool("enable albedo mipmap", enable_albedo_mipmap);
+    spec_changed |= props.config_bool("enable emission mipmap", enable_emission_mipmap);
 
     if (spec_changed) {
         pipe.reset();
@@ -80,7 +82,11 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
     if (!pipe || render_info.constant_data_update) {
         shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/gbuffer/gbuffer.comp", std::nullopt, {},
-            {{"ENABLE_MIPMAP", std::to_string(static_cast<int>(enable_mipmap))}});
+            {
+                {"ENABLE_ALBEDO_MIPMAP", std::to_string(static_cast<int>(enable_albedo_mipmap))},
+                {"ENABLE_EMISSION_MIPMAP",
+                 std::to_string(static_cast<int>(enable_emission_mipmap))},
+            });
 
         auto pipe_builder = merian::PipelineLayoutBuilder(context);
         pipe_builder.add_push_constant<QuakeNode::UniformData>();
