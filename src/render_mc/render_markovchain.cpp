@@ -130,7 +130,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
 
         const std::map<std::string, std::string> additional_macro_definitions = {
-            {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode))},
+            {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode || surf_bsdf_p == 1.0))},
             {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(mc_adaptive_grid_type)},
             {"SURFACE_SPP", std::to_string(spp)},
             {"MAX_PATH_LENGTH", std::to_string(max_path_length)},
