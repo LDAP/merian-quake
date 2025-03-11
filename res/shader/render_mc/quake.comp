@@ -16,6 +16,7 @@
 #include "merian-shaders/bsdf_diffuse.glsl"
 #include "merian-shaders/grid.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/color/colors_oklch.glsl"
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/bsdf_microfacet.glsl"
@@ -216,14 +217,14 @@ void main() {
                 // -- MC learned directions --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
-                imageStore(img_debug, pixel, vec4(vec3(mc_state_get_vmf(mc_state, first_hit.pos)), 1));
+                imageStore(img_debug, pixel, vec4((mc_state_get_vmf(mc_state, first_hit.pos).xyz + 1) / 2, 1));
                 break;
             }
             case 3: {
                 // -- MC grid --
                 const uint level = mc_adaptive_level_for_pos(first_hit.pos, XorShift32(rng_state));
-                uint seed = hash_grid(mc_adpative_grid_idx_for_level_closest(level, first_hit.pos), 256 * 256 * 256);
-                imageStore(img_debug, pixel, vec4(vec3(XorShift32Vec4(seed)), 1));
+                uint seed = hash2_grid(mc_adpative_grid_idx_for_level_closest(level, first_hit.pos));
+                imageStore(img_debug, pixel, vec4(oklch_to_rgb(vec3(exp(0.001 * -distance(first_hit.pos, params.cam_x.xyz)) *  .9, 0.3, TWO_PI * XorShift32(seed))), 1));
                 break;
             }
             case 4: {
