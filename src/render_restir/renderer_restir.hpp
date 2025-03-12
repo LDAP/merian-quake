@@ -1,12 +1,9 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
-#include "merian-nodes/connectors/vk_texture_array_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
 #include "merian-nodes/graph/node.hpp"
@@ -15,6 +12,9 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+
+#include <merian-nodes/connectors/vk_buffer_in.hpp>
+#include <merian-nodes/connectors/vk_image_in.hpp>
 
 class RendererRESTIR : public merian_nodes::Node {
   public:
@@ -70,25 +70,25 @@ class RendererRESTIR : public merian_nodes::Node {
         merian_nodes::VkBufferArrayIn::compute_read("idx");
     merian_nodes::VkBufferArrayInHandle con_ext =
         merian_nodes::VkBufferArrayIn::compute_read("ext");
-    merian_nodes::ManagedVkBufferInHandle con_gbuffer =
-        merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
-    merian_nodes::ManagedVkBufferInHandle con_prev_gbuffer =
-        merian_nodes::ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
-    merian_nodes::ManagedVkBufferInHandle con_hits =
-        merian_nodes::ManagedVkBufferIn::compute_read("hits");
+    merian_nodes::VkBufferInHandle con_gbuffer =
+        merian_nodes::VkBufferIn::compute_read("gbuffer");
+    merian_nodes::VkBufferInHandle con_prev_gbuffer =
+        merian_nodes::VkBufferIn::compute_read("prev_gbuffer", 1);
+    merian_nodes::VkBufferInHandle con_hits =
+        merian_nodes::VkBufferIn::compute_read("hits");
 
-    merian_nodes::VkTextureArrayInHandle con_textures =
-        merian_nodes::VkTextureArrayIn::compute_read("textures");
+    merian_nodes::VkImageInHandle con_textures =
+        merian_nodes::VkImageIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
 
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian_nodes::ManagedVkBufferInHandle con_reservoirs_in =
-        merian_nodes::ManagedVkBufferIn::compute_read("reservoirs", 1);
-    merian_nodes::ManagedVkImageInHandle con_mv =
-        merian_nodes::ManagedVkImageIn::compute_read("mv");
+    merian_nodes::VkBufferInHandle con_reservoirs_in =
+        merian_nodes::VkBufferIn::compute_read("reservoirs", 1);
+    merian_nodes::VkImageInHandle con_mv =
+        merian_nodes::VkImageIn::compute_read("mv");
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_moments;

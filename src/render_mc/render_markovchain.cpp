@@ -246,11 +246,11 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     if (enable_volume) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy mv for volume");
         cmd->copy(
-            io[con_mv], vk::ImageLayout::eTransferSrcOptimal, io[con_volume_mv],
+            io[con_mv].get(0), vk::ImageLayout::eTransferSrcOptimal, io[con_volume_mv].get(0),
             vk::ImageLayout::eTransferDstOptimal,
             vk::ImageCopy{
-                merian::first_layer(), {}, merian::first_layer(), {}, io[con_mv]->get_extent()});
-        const auto volume_mv_bar = io[con_volume_mv]->barrier(
+                merian::first_layer(), {}, merian::first_layer(), {}, io[con_mv].get(0)->get_extent()});
+        const auto volume_mv_bar = io[con_volume_mv].get(0)->barrier(
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
         cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
@@ -267,7 +267,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         cmd->dispatch(io[con_resolution], local_size_x, local_size_y);
 
         const auto volume_mv_bar =
-            io[con_volume_mv]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+            io[con_volume_mv].get(0)->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
                                        vk::AccessFlagBits::eShaderRead);
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                      vk::PipelineStageFlagBits::eComputeShader, volume_mv_bar);
