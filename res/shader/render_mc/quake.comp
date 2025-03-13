@@ -222,9 +222,9 @@ void main() {
             }
             case 3: {
                 // -- MC grid --
-                const uint level = mc_adaptive_level_for_pos(first_hit.pos, XorShift32(rng_state));
+                const uint level = mc_adaptive_target_level_for_pos(first_hit.pos);
                 uint seed = hash2_grid(mc_adpative_grid_idx_for_level_closest(level, first_hit.pos));
-                imageStore(img_debug, pixel, vec4(oklch_to_rgb(vec3(exp(0.001 * -distance(first_hit.pos, params.cam_x.xyz)) *  .9, 0.3, TWO_PI * XorShift32(seed))), 1));
+                imageStore(img_debug, pixel, vec4(oklch_to_rgb(vec3(exp(0.001 * -distance(first_hit.pos, params.cam_x.xyz)) * (.0 + XorShift32(seed) * 1.) + 0.2, 0.2, TWO_PI * XorShift32(seed))), 1));
                 break;
             }
             case 4: {
@@ -241,7 +241,7 @@ void main() {
                 // -- MC learned cos --
                 MCState mc_state;
                 mc_adaptive_load(mc_state, first_hit.pos, first_hit.normal);
-                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? acos(mc_state.w_cos / mc_state.sum_w) * INV_PI : 0), 1));
+                imageStore(img_debug, pixel, vec4(vec3(mc_state.sum_w > 0 ? 1 - clamp(acos(mc_state.w_cos / mc_state.sum_w) * INV_PI, 0, 1) : 0), 1));
                 break;
             }
             case 7: {
