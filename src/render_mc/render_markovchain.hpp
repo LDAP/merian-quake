@@ -69,7 +69,6 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
     merian_nodes::ManagedVkBufferInHandle con_hits =
         merian_nodes::ManagedVkBufferIn::compute_read("hits");
-
     merian_nodes::VkTextureArrayInHandle con_textures =
         merian_nodes::VkTextureArrayIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
@@ -77,6 +76,8 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
     merian_nodes::ManagedVkImageInHandle con_mv =
         merian_nodes::ManagedVkImageIn::transfer_src("mv");
+    merian_nodes::ManagedVkBufferInHandle con_prev_ssmc =
+        merian_nodes::ManagedVkBufferIn::compute_read("prev_ssmc", 1);
 
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
@@ -94,6 +95,8 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian_nodes::ManagedVkBufferOutHandle con_markovchain;
     merian_nodes::ManagedVkBufferOutHandle con_lightcache;
     merian_nodes::ManagedVkBufferOutHandle con_volume_distancemc;
+
+    merian_nodes::ManagedVkBufferOutHandle con_ssmc;
 
     //-----------------------------------------------------
 

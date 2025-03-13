@@ -25,12 +25,11 @@ RendererMarkovChain::~RendererMarkovChain() {}
 // -------------------------------------------------------------------------------------------
 
 std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
-    return {
-        con_vtx,      con_prev_vtx,   con_idx,
-        con_ext,      con_gbuffer,    con_hits,
-        con_textures, con_tlas,       con_prev_volume_depth,
-        con_mv,       con_resolution, con_render_info,
-    };
+    return {con_vtx,      con_prev_vtx,   con_idx,
+            con_ext,      con_gbuffer,    con_hits,
+            con_textures, con_tlas,       con_prev_volume_depth,
+            con_mv,       con_resolution, con_render_info,
+            con_prev_ssmc};
 }
 
 std::vector<merian_nodes::OutputConnectorHandle>
@@ -88,13 +87,29 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
 
-    return {
-        con_irradiance,     con_moments,      con_volume,
-        con_volume_moments, con_volume_depth, con_volume_mv,
-        con_debug,
+    con_ssmc = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+        "ssmc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo{
+            {},
+            gbuffer_size((long long)render_width, render_height) * sizeof(SSMCState),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
+                vk::BufferUsageFlagBits::eTransferSrc},
+        false);
 
-        con_markovchain,    con_lightcache,   con_volume_distancemc,
-    };
+    return {con_irradiance,
+            con_moments,
+            con_volume,
+            con_volume_moments,
+            con_volume_depth,
+            con_volume_mv,
+            con_debug,
+
+            con_markovchain,
+            con_lightcache,
+            con_volume_distancemc,
+            con_ssmc};
 }
 
 RendererMarkovChain::NodeStatusFlags
@@ -130,7 +145,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
 
         const std::map<std::string, std::string> additional_macro_definitions = {
-            {"MERIAN_QUAKE_REFERENCE_MODE", std::to_string(static_cast<int>(reference_mode || surf_bsdf_p == 1.0))},
+            {"MERIAN_QUAKE_REFERENCE_MODE",
+             std::to_string(static_cast<int>(reference_mode || surf_bsdf_p == 1.0))},
             {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(mc_adaptive_grid_type)},
             {"SURFACE_SPP", std::to_string(spp)},
             {"MAX_PATH_LENGTH", std::to_string(max_path_length)},
@@ -208,21 +224,24 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         cmd->fill(io[con_markovchain]);
         cmd->fill(io[con_lightcache]);
         cmd->fill(io[con_volume_distancemc]);
+        cmd->fill(io[con_ssmc]);
 
-        const std::array<vk::BufferMemoryBarrier, 3> barriers = {
+        const std::array<vk::BufferMemoryBarrier, 4> barriers = {
             io[con_markovchain]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                 vk::AccessFlagBits::eShaderRead),
             io[con_lightcache]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                vk::AccessFlagBits::eShaderRead),
             io[con_volume_distancemc]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                                       vk::AccessFlagBits::eShaderRead),
+            io[con_ssmc]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                         vk::AccessFlagBits::eShaderRead),
         };
 
         cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
                      vk::PipelineStageFlagBits::eComputeShader, barriers);
     }
 
-    if (!render_info.render) {
+    if (!render_info.render || run.get_iteration() == 0UL /* prev not valid yet */) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         cmd->bind(clear_pipe);
         cmd->bind_descriptor_set(clear_pipe, graph_descriptor_set);

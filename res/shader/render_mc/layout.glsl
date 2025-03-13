@@ -167,25 +167,31 @@ layout(set = 0, binding = 5, scalar) buffer readonly restrict buf_hits {
 layout(set = 0, binding = 6) uniform sampler2D img_tex[MAX_GLTEXTURES];
 layout(set = 0, binding = 7) uniform accelerationStructureEXT tlas;
 layout(set = 0, binding = 8) uniform sampler2D img_prev_volume_depth;
-
+layout(set = 0, binding = 9, scalar) buffer readonly restrict buf_prev_ssmc {
+    SSMCState prev_ssmc[];
+};
 
 // --- GRAPH out ---
-layout(set = 0, binding = 9) uniform writeonly restrict image2D img_irradiance;
-layout(set = 0, binding = 10) uniform writeonly restrict image2D img_moments;
+layout(set = 0, binding = 10) uniform writeonly restrict image2D img_irradiance;
+layout(set = 0, binding = 11) uniform writeonly restrict image2D img_moments;
 
-layout(set = 0, binding = 11) uniform writeonly restrict image2D img_volume;
-layout(set = 0, binding = 12) uniform writeonly restrict image2D img_volume_moments;
-layout(set = 0, binding = 13) uniform writeonly restrict image2D img_volume_depth;
-layout(set = 0, binding = 14, rg16f) uniform restrict    image2D img_volume_mv;
-layout(set = 0, binding = 15) uniform writeonly restrict image2D img_debug;
+layout(set = 0, binding = 12) uniform writeonly restrict image2D img_volume;
+layout(set = 0, binding = 13) uniform writeonly restrict image2D img_volume_moments;
+layout(set = 0, binding = 14) uniform writeonly restrict image2D img_volume_depth;
+layout(set = 0, binding = 15, rg16f) uniform restrict    image2D img_volume_mv;
+layout(set = 0, binding = 16) uniform writeonly restrict image2D img_debug;
 
 // GRAPH buffer out
-layout(set = 0, binding = 16, scalar) buffer restrict buf_mc_states {
+layout(set = 0, binding = 17, scalar) buffer restrict buf_mc_states {
     MCState mc_states[];
 };
-layout(set = 0, binding = 17, scalar) buffer restrict buf_light_cache {
+layout(set = 0, binding = 18, scalar) buffer restrict buf_light_cache {
     LightCacheVertex light_cache[];
 };
-layout(set = 0, binding = 18, scalar) buffer restrict buf_dist_mc_states {
+layout(set = 0, binding = 19, scalar) buffer restrict buf_dist_mc_states {
     DistanceMCVertex distance_mc_states[];
 };
+layout(set = 0, binding = 20, scalar) buffer restrict buf_ssmc {
+    SSMCState ssmc[];
+};
+

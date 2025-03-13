@@ -15,6 +15,14 @@ struct MCState {
     uint hash; // grid_idx and level
 };
 
+struct SSMCState {
+    vec3  sum_tgt;
+    float sum_w;
+    uint  N;
+    float sum_len;
+    float f;
+};
+
 struct LightCacheVertex {
     uint hash; // grid_idx and level
     uint lock;
