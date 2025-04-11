@@ -635,7 +635,7 @@
                 "volume spp": 2,
                 "volume: use LC": true
             },
-            "type": "Renderer (Markov Chain Raytracer)"
+            "type": "Renderer (MCPG)"
         },
         "tonemap": {
             "disable": false,

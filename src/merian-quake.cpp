@@ -25,8 +25,9 @@
 
 #include "game/quake_node.hpp"
 #include "hud/hud.hpp"
-#include "render_mc/render_markovchain.hpp"
+#include "render_mcpg/render_mcpg.hpp"
 #include "render_restir/renderer_restir.hpp"
+#include "render_ssmm/render_ssmm.hpp"
 
 std::atomic_bool stop(false);
 ImFont* quake_font_sm;
@@ -178,7 +179,7 @@ int main(const int argc, const char** argv) {
         "Hud", "Show gamestate and apply screen effects.",
         [=]() { return std::make_shared<merian::QuakeHud>(context); }});
     graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
-        "Renderer (Markov Chain Raytracer)", "Renders a scene using Markov Chain Path Guiding.",
+        "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
         [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
     graph.get_registry().register_node<RendererRESTIR>(merian_nodes::NodeRegistry::NodeInfo{
         "Renderer (RESTIR)", "Renders a scene using RESTIR.",
@@ -186,6 +187,10 @@ int main(const int argc, const char** argv) {
     graph.get_registry().register_node<GBuffer>(
         merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
                                              [=]() { return std::make_shared<GBuffer>(context); }});
+    graph.get_registry().register_node<RendererSSMM>(
+        {"Renderer (SSMM)",
+         "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)",
+         [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
 
     // this also creates all nodes in the graph.
     ConfigurationManager config_manager(graph, context->file_loader);

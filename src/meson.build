@@ -1,5 +1,6 @@
 subdir('game')
 subdir('gbuffer')
-subdir('render_mc')
+subdir('render_mcpg')
 subdir('render_restir')
+subdir('render_ssmm')
 subdir('hud')

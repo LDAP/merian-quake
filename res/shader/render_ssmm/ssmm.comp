@@ -1,0 +1,240 @@
+#version 460
+#extension GL_GOOGLE_include_directive              : enable
+#extension GL_EXT_ray_tracing                       : enable
+#extension GL_EXT_ray_query                         : enable
+#extension GL_EXT_ray_tracing_position_fetch        : enable
+#extension GL_EXT_shader_explicit_arithmetic_types  : enable
+#extension GL_EXT_nonuniform_qualifier              : enable
+#extension GL_EXT_control_flow_attributes           : enable
+#extension GL_KHR_shader_subgroup_ballot            : enable
+#extension GL_KHR_shader_subgroup_arithmetic        : enable
+#extension GL_KHR_shader_subgroup_shuffle           : enable
+
+#include "merian-shaders/camera.glsl"
+#include "merian-shaders/random.glsl"
+#include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/raytrace.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/hash.glsl"
+#include "merian-shaders/bsdf_ggx.glsl"
+
+uint rng_state;
+vec2 moments;
+vec3 irr;
+
+#include "../config.h"
+#include "layout.glsl"
+#include "../raytrace.glsl"
+
+#define pixel ivec2(gl_GlobalInvocationID)
+#define resolution ivec2(imageSize(img_irradiance))
+#define first_hit hits[gbuffer_index(pixel, resolution)]
+
+#define mc_state_t SSMCState
+
+// Ported from VKDT: https://github.com/hanatos/vkdt
+// with approval from author.
+
+bool mc_state_valid(mc_state_t s) { return s.sum_w > 0.0; }
+
+vec3 mc_state_dir(mc_state_t s, vec3 x) {
+  vec3 tgt = s.sum_tgt / (s.sum_w > 0.0 ? s.sum_w : 1.0);
+  return normalize(tgt - x);
+}
+
+// add sample to lobe via maximum likelihood estimator and exponentially weighted average
+void mc_state_add(inout mc_state_t s, vec3 x, float w, vec3 dir, vec3 y) {
+  s.N = min(s.N + 1, ML_MAX_N);
+  // float alpha = 0.999; // for faster adaptation!
+  float alpha = max(1.0 / s.N, ML_MIN_ALPHA);
+  s.sum_w   = mix(s.sum_w, w, alpha);
+  s.sum_tgt = mix(s.sum_tgt, w*y, alpha);
+  vec3 to = s.sum_len * mc_state_dir(s, x);
+  to = mix(to, w * dir, alpha);
+  s.sum_len = length(to);
+}
+
+// return a vmf lobe (direction + kappa) for the given position
+vec4 mc_state_vmf(mc_state_t s, vec3 x) {
+  float r = s.sum_len / (s.sum_w > 0.0 ? s.sum_w : 1.0); // = mean cosine in [0,1]
+  r = (s.N * s.N * r) / (s.N * s.N + ML_PRIOR_N);
+  return vec4(mc_state_dir(s, x), (3.0*r - r*r*r) / (1.0 - r*r));
+}
+
+// shuffle state to different subgroup lane
+void mc_state_shuffle(inout mc_state_t s, uint lane) {
+  s.N       = subgroupShuffle(s.N, lane);
+  s.sum_w   = subgroupShuffle(s.sum_w, lane);
+  s.sum_len = subgroupShuffle(s.sum_len, lane);
+  s.sum_tgt = subgroupShuffle(s.sum_tgt, lane);
+  s.f       = subgroupShuffle(s.f, lane);
+}
+
+// zero-init new markov chain state
+mc_state_t mc_state_new() {
+  mc_state_t r = { vec3(0.0), 0.0, 0, 0.0, 0.0};
+  return r;
+}
+
+// evaluate hemisphere clamp test (can this light y be seen from x with normal nx?)
+float mc_state_C(mc_state_t s, vec3 x, vec3 nx, ivec2 tc, ivec2 tc0) {
+  // return 1.0;
+  GBuffer gbuf = gbuffer[gbuffer_index(tc, resolution)];
+  // gbuf = texelFetch(img_gbuf_in, tc0, 0);
+  // const float irr0 = gbuf.w;
+  // const float sig0 = sqrt(max(0, gbuf.w - gbuf.z*gbuf.z)); // noise stddev
+  // const float sig1 = sqrt(max(0, gbuf.w - gbuf.z*gbuf.z)); // noise stddev
+  vec3 nq = geo_decode_normal(gbuf.enc_normal);
+  const float sigma_n = 64; // svgf style
+  const float sigma_z = 10;
+  const float sigma_r = 100; // lower to like 0.1 for sharp static contact shadows.
+                             // unfortunately dynamic/rotating lights require a looser bound here
+                             // also estimating variance is expensive (texture access), so disabled for now:
+  // float w_r = exp(-abs(gbuf.w - irr0) / (sigma_r*(sig0+sig1)));
+  float w_n = pow(max(0.0, dot(nx, nq)), sigma_n);
+  float w_d = exp(-abs(gbuf.linear_z - length(x - params.cam_x.xyz))/sigma_z);
+  return w_n * w_d;// * w_r;
+}
+
+float mc_state_score(mc_state_t s, vec3 x, vec3 nx, float rnd0, ivec2 tc, ivec2 tc0) {
+  const float f = s.f;
+  return f * mc_state_C(s, x, nx, tc, tc0);
+}
+
+void read_neighbour_state(
+    inout mc_state_t tent,
+    vec3 x,
+    vec3 n,
+    ivec2 ipos,
+    vec2  mv,
+    inout uint seed) {
+  float sum = mc_state_score(tent, x, n, XorShift32(seed), ivec2(ipos+mv), ivec2(ipos+mv));
+  for(int i=0; i<SMIS_GROUP_SIZE; i++) {
+    // helps explore difficult cases but is expensive
+    vec4 r0 = XorShift32Vec4(seed);
+    vec4 r1 = XorShift32Vec4(seed);
+    vec4 r2 = XorShift32Vec4(seed);
+    ivec2 off = ivec2(15.0 * (r0.xy + r0.zw + r1.xy + r1.zw + r2.xy + r2.zw - 3.0));
+    float rnd = XorShift32(seed);
+    mc_state_t t2 = prev_ssmc[gbuffer_index(clamp(ivec2(ipos+mv+off), ivec2(0), resolution - 1), resolution)];
+    float other = mc_state_score(t2, x, n, XorShift32(seed), ivec2(ipos+mv+off), ivec2(ipos+mv));
+    if(sum <= 0.0 || rnd < other / (other + sum))
+      tent = t2;
+    sum += other;
+  }
+}
+
+void main() {
+    rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
+    moments = vec2(0);
+    irr = vec3(0);
+
+    const bool valid = all(lessThan(pixel, resolution));
+    const vec2 mv = texelFetch(img_mv, pixel, 0).rg;
+
+    vec3 sample_dirs[SURFACE_SPP];
+    vec3 sample_weights[SURFACE_SPP];
+    vec4 vmfs[SURFACE_SPP];
+
+    mc_state_t curr = mc_state_new(); // zero current state
+    mc_state_t tent = mc_state_new(); // tentative new state
+    mc_state_t ptent = mc_state_new(); // tentative new state
+
+    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
+    for (int s = 0; s < SURFACE_SPP; s++) {
+        mc_state_shuffle(tent, (gl_SubgroupInvocationID+1)%gl_SubgroupSize);
+        sample_dirs[s] = vec3(0);
+        sample_weights[s] = vec3(0);
+
+        if (valid) {
+            read_neighbour_state(tent, first_hit.pos, first_hit.normal, pixel, mv, rng_state);
+        }
+
+        vmfs[s] = vec4(0);
+        if (valid && mc_state_valid(tent))
+            vmfs[s] = mc_state_vmf(tent, first_hit.pos);
+
+        float pdf = 0;
+        vec3 directContrib = vec3(0);
+        vec3 direction = vec3(0);
+        vec3 position = vec3(0);
+        bool bsdf_sample = false;
+        do {
+            if (vmfs[s].w == 0 || XorShift32(rng_state) < SURF_BSDF_P) {
+                direction = bsdf_ggx_diffuse_mix_sample(first_hit.wi, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), XorShift32Vec3(rng_state));
+                if (dot(direction, first_hit.normal) <= 1e-3 || dot(direction, geo_decode_normal(first_hit.enc_geonormal)) <= 1e-3)
+                    break;
+
+                pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
+                bsdf_sample = true;
+            } else {
+                direction = vmf_sample(vmfs[s].xyz, vmfs[s].w, XorShift32Vec2(rng_state));
+                pdf = vmf_pdf(direction, vmfs[s].xyz, vmfs[s].w);
+            }
+
+            float throughput = bsdf_ggx_diffuse_mix_times_wodotn(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), 0.02);
+        
+            Hit next_hit;
+            next_hit.wi = direction;
+            // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+            next_hit.pos = first_hit.pos - first_hit.wi * 1e-3;
+            f16vec3 incident = f16vec3(0); // contains throughput already
+            f16vec3 ray_throughput = f16vec3(1);
+            trace_ray(ray_throughput, incident, next_hit);
+
+            position = next_hit.pos;
+            directContrib = throughput * incident / pdf;
+
+            sample_dirs[s] = direction;
+            sample_weights[s] = throughput * incident;
+        } while (false);
+
+        if (!valid)
+            continue;
+
+        const float tent_f = yuv_luminance(directContrib);
+        if (curr.f == 0 || XorShift32(rng_state) < tent_f / curr.f) {
+            if (bsdf_sample)
+                tent = mc_state_new();
+            tent.f = tent_f;
+            mc_state_add(tent, first_hit.pos, tent_f, direction, position);
+            //tent.add(sd.posW, tent_f, direction, position);
+            curr = tent;
+        }
+        else if (!bsdf_sample)
+            mc_state_add(tent, first_hit.pos, tent_f, direction, position);
+            // tent.add(sd.posW, tent_f, direction, position);
+    }
+
+    for (int s = 0; s < SURFACE_SPP; s++) {
+        if (all(equal(sample_weights[s], vec3(0))))
+            continue;
+
+        const float bsdf_pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, sample_dirs[s], first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
+        float sum_pdf = 0;
+        for (int t = 0; t < SURFACE_SPP; t++) {
+            sum_pdf += vmfs[t].w > 0 ? vmf_pdf(sample_dirs[s], vmfs[t].xyz, vmfs[t].w) : bsdf_pdf;
+        }
+
+        sum_pdf = SURF_BSDF_P * SMIS_GROUP_SIZE * bsdf_pdf + (1 - SURF_BSDF_P) * sum_pdf;
+
+        if (sum_pdf > 0) {
+            vec3 con = sample_weights[s] / sum_pdf;
+            if (!any(isinf(con)) && !any(isnan(con))) {
+                irr += con;
+                const float l = yuv_luminance(con);
+                moments += vec2(l, l * l);
+            }
+        }
+    }
+
+    if (!valid) {
+        return;
+    }
+
+    ssmc[gbuffer_index(pixel, resolution)] = curr;
+
+
+    imageStore(img_irradiance, pixel, vec4(irr, SURFACE_SPP));
+    imageStore(img_moments, pixel, vec4(moments, 0, 0));
+}
