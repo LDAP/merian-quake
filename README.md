@@ -4,9 +4,9 @@ A path-tracer for the original Quake game on top of [quakespasm](https://github.
 
 <hr>
 
-This project introduces a novel real-time path guiding algorithm developed during my Master's thesis. For a comprehensive description of the algorithm and the inner workings of this project, please refer to the thesis.
+This project showcases a novel real-time path guiding algorithm. For a comprehensive description of the algorithm and the inner workings of this project, please refer to the paper:
 
-> Lucas Alber. (2024), Markov Chain Path Guiding for Real-Time Global Illumination and Single-Scattering, MSc Thesis, Karlsruhe Institute of Technology.
+> Lucas Alber, Johannes Hanika, and Carsten Dachsbacher. 2025. Real-Time Markov Chain Path Guiding for Global Illumination and Single Scattering. Proc. ACM Comput. Graph. Interact. Tech. 8, 1, Article 15 (May 2025), 18 pages. https://doi.org/10.1145/3728296
 
 <hr>
 
@@ -23,9 +23,11 @@ Maps in screenshots: start from [Alkaline](https://alkalinequake.wordpress.com/)
 
 This project requires a GPU with ray tracing support (Vulkan Ray Query).
 
-Tested: NVIDIA RTX 2080 / 3070 TI / 3080 TI, AMD RX 6800 XT, AMD RX 7900 XTX and Intel Arc.
+Tested: NVIDIA GeForce RTX 2080 / 3070 TI / 3080 TI / 4080 TI, AMD Radeon RX 6800 XT, AMD RX 7900 XTX and Intel Arc.
 
 ## Usage
+
+This project builds on [quakespasm](https://github.com/sezero/quakespasm), follow the instructions there on how to install the necessary `.pak` files. 
 
 ```bash
 merian-quake <quakespasm arguments>
@@ -34,7 +36,7 @@ merian-quake <quakespasm arguments>
 You can specify the path to your quake folder using the `-basedir` argument if you do not want to use the default.
 
 
-## Building
+## Building and Installing
 
 Supported OS:
 
@@ -52,10 +54,10 @@ Build dependencies:
 git clone --recursive https://github.com/LDAP/merian-quake
 cd merian-quake
 
-# Compile
+# Configure and compile
 meson setup build [--prefix=path/to/installdir]
 # or debug
-meson setup build [--prefix=path/to/installdir] --buildtype=debug 
+meson setup build [--prefix=path/to/installdir] --buildtype=debug
 
 meson compile -C build
 
