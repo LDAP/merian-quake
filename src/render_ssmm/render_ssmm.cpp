@@ -166,9 +166,9 @@ RendererSSMM::NodeStatusFlags RendererSSMM::properties(merian::Properties& confi
         config.config_percent("BSDF Prob", surf_bsdf_p, "the probability to use BSDF sampling");
 
     config.st_separate("MLE estimation");
-    needs_pipeline_rebuild |= config.config_float("prior N", ml_prior_n);
+    needs_pipeline_rebuild |= config.config_float("prior N", ml_prior_n, "", 0.01);
     needs_pipeline_rebuild |= config.config_uint("max N", ml_max_n, "");
-    needs_pipeline_rebuild |= config.config_float("min alpha", ml_min_alpha);
+    needs_pipeline_rebuild |= config.config_float("min alpha", ml_min_alpha, "", 0.01);
 
     config.st_separate("SMIS");
     needs_pipeline_rebuild |= config.config_uint("group size", smis_group_size, "");

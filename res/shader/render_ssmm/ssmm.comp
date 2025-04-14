@@ -140,42 +140,42 @@ void main() {
     mc_state_t tent = mc_state_new(); // tentative new state
     mc_state_t ptent = mc_state_new(); // tentative new state
 
-    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
-    for (int s = 0; s < SURFACE_SPP; s++) {
-        mc_state_shuffle(tent, (gl_SubgroupInvocationID+1)%gl_SubgroupSize);
-        sample_dirs[s] = vec3(0);
-        sample_weights[s] = vec3(0);
+    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7)))) {
+        for (int s = 0; s < SURFACE_SPP; s++) {
+            mc_state_shuffle(tent, (gl_SubgroupInvocationID+1)%gl_SubgroupSize);
+            sample_dirs[s] = vec3(0);
+            sample_weights[s] = vec3(0);
 
-        if (valid) {
-            read_neighbour_state(tent, first_hit.pos, first_hit.normal, pixel, mv, rng_state);
-        }
-
-        vmfs[s] = vec4(0);
-        if (valid && mc_state_valid(tent))
-            vmfs[s] = mc_state_vmf(tent, first_hit.pos);
-
-        float pdf = 0;
-        vec3 directContrib = vec3(0);
-        vec3 direction = vec3(0);
-        vec3 position = vec3(0);
-        bool bsdf_sample = false;
-        do {
-            if (vmfs[s].w == 0 || XorShift32(rng_state) < SURF_BSDF_P) {
-                direction = bsdf_ggx_diffuse_mix_sample(first_hit.wi, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), XorShift32Vec3(rng_state));
-                if (dot(direction, first_hit.normal) <= 1e-3 || dot(direction, geo_decode_normal(first_hit.enc_geonormal)) <= 1e-3)
-                    break;
-
-                pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
-                bsdf_sample = true;
-            } else {
-                direction = vmf_sample(vmfs[s].xyz, vmfs[s].w, XorShift32Vec2(rng_state));
-                pdf = vmf_pdf(direction, vmfs[s].xyz, vmfs[s].w);
+            if (valid) {
+                read_neighbour_state(tent, first_hit.pos, first_hit.normal, pixel, mv, rng_state);
             }
 
-            float throughput = bsdf_ggx_diffuse_mix_times_wodotn(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), 0.02);
-        
-            Hit next_hit;
-            next_hit.wi = direction;
+            vmfs[s] = vec4(0);
+            if (valid && mc_state_valid(tent))
+            vmfs[s] = mc_state_vmf(tent, first_hit.pos);
+
+            float pdf = 0;
+            vec3 directContrib = vec3(0);
+            vec3 direction = vec3(0);
+            vec3 position = vec3(0);
+            bool bsdf_sample = false;
+            do {
+                if (vmfs[s].w == 0 || XorShift32(rng_state) < SURF_BSDF_P) {
+                    direction = bsdf_ggx_diffuse_mix_sample(first_hit.wi, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), XorShift32Vec3(rng_state));
+                    if (dot(direction, first_hit.normal) <= 1e-3 || dot(direction, geo_decode_normal(first_hit.enc_geonormal)) <= 1e-3)
+                    break;
+
+                    pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
+                    bsdf_sample = true;
+                    } else {
+                        direction = vmf_sample(vmfs[s].xyz, vmfs[s].w, XorShift32Vec2(rng_state));
+                        pdf = vmf_pdf(direction, vmfs[s].xyz, vmfs[s].w);
+                    }
+
+                    float throughput = bsdf_ggx_diffuse_mix_times_wodotn(first_hit.wi, direction, first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness), 0.02);
+
+                    Hit next_hit;
+                    next_hit.wi = direction;
             // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
             next_hit.pos = first_hit.pos - first_hit.wi * 1e-3;
             f16vec3 incident = f16vec3(0); // contains throughput already
@@ -187,54 +187,56 @@ void main() {
 
             sample_dirs[s] = direction;
             sample_weights[s] = throughput * incident;
-        } while (false);
+            } while (false);
 
-        if (!valid)
+            if (!valid)
             continue;
 
-        const float tent_f = yuv_luminance(directContrib);
-        if (curr.f == 0 || XorShift32(rng_state) < tent_f / curr.f) {
-            if (bsdf_sample)
+            const float tent_f = yuv_luminance(directContrib);
+            if (curr.f == 0 || XorShift32(rng_state) < tent_f / curr.f) {
+                if (bsdf_sample)
                 tent = mc_state_new();
-            tent.f = tent_f;
-            mc_state_add(tent, first_hit.pos, tent_f, direction, position);
+                tent.f = tent_f;
+                mc_state_add(tent, first_hit.pos, tent_f, direction, position);
             //tent.add(sd.posW, tent_f, direction, position);
             curr = tent;
         }
         else if (!bsdf_sample)
-            mc_state_add(tent, first_hit.pos, tent_f, direction, position);
+        mc_state_add(tent, first_hit.pos, tent_f, direction, position);
             // tent.add(sd.posW, tent_f, direction, position);
-    }
+        }
 
-    for (int s = 0; s < SURFACE_SPP; s++) {
-        if (all(equal(sample_weights[s], vec3(0))))
+        for (int s = 0; s < SURFACE_SPP; s++) {
+            if (all(equal(sample_weights[s], vec3(0))))
             continue;
 
-        const float bsdf_pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, sample_dirs[s], first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
-        float sum_pdf = 0;
-        for (int t = 0; t < SURFACE_SPP; t++) {
-            sum_pdf += vmfs[t].w > 0 ? vmf_pdf(sample_dirs[s], vmfs[t].xyz, vmfs[t].w) : bsdf_pdf;
-        }
+            const float bsdf_pdf = bsdf_ggx_diffuse_mix_pdf(first_hit.wi, sample_dirs[s], first_hit.normal, bsdf_ggx_roughness_to_alpha(first_hit.roughness));
+            float sum_pdf = 0;
+            for (int t = 0; t < SURFACE_SPP; t++) {
+                sum_pdf += vmfs[t].w > 0 ? vmf_pdf(sample_dirs[s], vmfs[t].xyz, vmfs[t].w) : bsdf_pdf;
+            }
 
-        sum_pdf = SURF_BSDF_P * SMIS_GROUP_SIZE * bsdf_pdf + (1 - SURF_BSDF_P) * sum_pdf;
+            sum_pdf = SURF_BSDF_P * SMIS_GROUP_SIZE * bsdf_pdf + (1 - SURF_BSDF_P) * sum_pdf;
 
-        if (sum_pdf > 0) {
-            vec3 con = sample_weights[s] / sum_pdf;
-            if (!any(isinf(con)) && !any(isnan(con))) {
-                irr += con;
-                const float l = yuv_luminance(con);
-                moments += vec2(l, l * l);
+            if (sum_pdf > 0) {
+                vec3 con = sample_weights[s] / sum_pdf;
+                if (!any(isinf(con)) && !any(isnan(con))) {
+                    irr += con;
+                    const float l = yuv_luminance(con);
+                    moments += vec2(l, l * l);
+                }
             }
         }
+
+        if (!valid) {
+            return;
+        }
+
+        ssmc[gbuffer_index(pixel, resolution)] = curr;
+
     }
 
-    if (!valid) {
-        return;
-    }
 
-    ssmc[gbuffer_index(pixel, resolution)] = curr;
-
-
-    imageStore(img_irradiance, pixel, vec4(irr, SURFACE_SPP));
+    imageStore(img_irradiance, pixel, vec4(irr, max(SURFACE_SPP, 1)));
     imageStore(img_moments, pixel, vec4(moments, 0, 0));
 }
