@@ -116,6 +116,7 @@ class RendererRESTIR : public merian_nodes::Node {
     uint32_t seed = 0;
     bool randomize_seed = true;
     int32_t debug_output_selector = 0;
+    int32_t apply_mv = 0;
 
     bool temporal_reuse_enable = false;
     int32_t spatial_reuse_iterations = 0;

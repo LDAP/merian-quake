@@ -164,7 +164,7 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
             temporal_depth_reject_percent, spatial_normal_reject_cos, spatial_depth_reject_percent,
             temporal_clamp_m, spatial_radius, temporal_bias_correction, spatial_bias_correction,
             context->physical_device.physical_device_subgroup_properties.subgroupSize,
-            boiling_filter_strength, std::max(spatial_reuse_iterations, 1));
+            boiling_filter_strength, std::max(spatial_reuse_iterations, 1), apply_mv);
 
         auto spec = spec_builder.build();
 
@@ -285,6 +285,9 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_percent("boiling filter strength", boiling_filter_strength,
                               "Discard the upper X percent of samples. Disable with 0.0.");
+    recreate_pipeline |= config.config_bool("apply mv", apply_mv,
+                                            "Estimates the new sample position from geometry "
+                                            "movement. Reduces flickering but introduces bias in motion.");
 
     config.st_separate("Spatial Reuse");
     recreate_pipeline |=

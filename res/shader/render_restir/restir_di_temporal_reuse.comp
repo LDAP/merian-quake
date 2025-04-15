@@ -91,6 +91,11 @@ void main() {
 
     ReSTIRDIReservoir prev_reservoir = read_prev_reservoir(prev_pixel);
 
+    if (APPLY_MV == 1) {
+        prev_reservoir.y.pos += prev_reservoir.y.mv * (params.cl_time - prev_reservoir.y.T);
+        prev_reservoir.y.T = params.cl_time;
+    }
+
     if (TEMPORAL_CLAMP_M > 0) {
         prev_reservoir.M = min(prev_reservoir.M, TEMPORAL_CLAMP_M);
     }

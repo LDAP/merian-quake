@@ -27,6 +27,7 @@ layout (constant_id = 22) const int SPATIAL_BIAS_CORRECTION = 0;
 layout (constant_id = 23) const int SUBGROUP_SIZE = 32;
 layout (constant_id = 24) const float BOILING_FILTER_STRENGTH = 0.0;
 layout (constant_id = 25) const int SPATIAL_REUSE_ITERATIONS = 1;
+layout (constant_id = 26) const int APPLY_MV = 0;
 
 #include "../config.h"
 #include "../scene_info.glsl.h"

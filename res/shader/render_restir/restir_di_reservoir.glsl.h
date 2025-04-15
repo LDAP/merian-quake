@@ -8,6 +8,8 @@
 struct ReSTIRDISample {
     vec3 pos;
     vec3 normal;
+    vec3 mv;
+    float T;
     f16vec3 radiance;
     uint flags;
 };
