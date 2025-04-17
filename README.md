@@ -55,7 +55,7 @@ Build dependencies:
 
 - Vulkan SDK
 - Meson
-- A fairly recent C++ compiler
+- A fairly recent C++ compiler (Visual Studio Build Tools on Windows)
 
 ```bash
 # Clone the repository with all submodules:
@@ -66,6 +66,7 @@ cd merian-quake
 meson setup build [--prefix=path/to/installdir]
 # or debug
 meson setup build [--prefix=path/to/installdir] --buildtype=debug
+# on windows you might need to add --backend vs or set the compiler to cl (MSVC) using environment variables
 
 meson compile -C build
 
@@ -83,5 +84,7 @@ meson install -C build
 
 # Windows: (requires .dll paths set up correctly)
 meson devenv -C build
-./build/merian-quake [-basedir /path/to/quakedir]
+./merian-quake [-basedir /path/to/quakedir]
 ```
+
+Note, the quakedir is the folder that contains the `id1` subfolder.
