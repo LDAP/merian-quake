@@ -93,9 +93,9 @@ class RendererSSMM : public merian_nodes::Node {
     float surf_bsdf_p = 0.15;
 
     float ml_prior_n = .20;
-    uint ml_max_n = 1024;
+    uint32_t ml_max_n = 1024;
     float ml_min_alpha = 0.01;
-    uint smis_group_size = 5;
+    uint32_t smis_group_size = 5;
 
     uint32_t seed = 0;
     bool randomize_seed = true;
