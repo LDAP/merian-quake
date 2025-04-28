@@ -824,11 +824,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         render_info.uniform.cl_time = cl.time;
     }
 
-    if (update_gamestate && key_dest == key_game) {
-        controller->request_raw_mouse_input(true);
-    } else {
-        controller->request_raw_mouse_input(false);
-    }
+    controller->request_raw_mouse_input(false);
 
     if (stop_after_worldspawn >= 0 &&
         render_info.uniform.frame == (uint64_t)stop_after_worldspawn) {
