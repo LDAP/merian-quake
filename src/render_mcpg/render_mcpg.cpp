@@ -225,8 +225,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
                      vk::PipelineStageFlagBits::eComputeShader, barriers);
     }
 
-    if (!render_info.render ||
-        run.get_iteration() == 0UL /* make sure volume ping pong is ready */) {
+    if (!render_info.render) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "clear");
         cmd->bind(clear_pipe);
         cmd->bind_descriptor_set(clear_pipe, graph_descriptor_set);
@@ -261,7 +260,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
                      vk::PipelineStageFlagBits::eComputeShader, volume_mv_bar);
     }
 
-    if (enable_volume && volume_spp > 0 && volume_forward_project) {
+    if (enable_volume && volume_spp > 0 && volume_forward_project &&
+        run.get_iteration() != 0 /* make sure volume ping pong is ready */) {
         // Forward project motion vectors for volumes
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "volume forward project");
