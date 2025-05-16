@@ -255,7 +255,7 @@ int main(const int argc, const char** argv) {
     std::signal(SIGTERM, signal_handler);
 
     graph.set_on_run_starting([](merian_nodes::GraphRun&) { glfwPollEvents(); });
-    while (!(stop || (output && output->get_window() && output->get_window()->should_close()))) {
+    while (!stop) {
         graph.run();
     }
 

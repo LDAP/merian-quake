@@ -386,6 +386,7 @@
         }
     ],
     "graph_properties": {
+        "flush thread pool": true,
         "fps limiter": false,
         "low latency": false,
         "time overwrite": "None"
@@ -447,7 +448,6 @@
                 "advanced": {
                     "callback after capture": false,
                     "callback on record": false,
-                    "concurrency": 16,
                     "exit after seconds": -1.0,
                     "exit at iteration": -1,
                     "exit at run": -1,
@@ -535,7 +535,8 @@
         "gbuf": {
             "disable": false,
             "properties": {
-                "enable mipmap": true,
+                "enable albedo mipmap": true,
+                "enable emission mipmap": true,
                 "hide sun": true
             },
             "type": "GBuffer"
@@ -550,7 +551,6 @@
                 "advanced": {
                     "callback after capture": false,
                     "callback on record": false,
-                    "concurrency": 16,
                     "exit after seconds": -1.0,
                     "exit at iteration": -1,
                     "exit at run": -1,
@@ -590,10 +590,17 @@
         "output": {
             "disable": false,
             "properties": {
+                "acquire timeout": 100000000,
                 "blit mode": "FIT",
                 "mode": "windowed",
+                "on_should_close_actions": {
+                    "remove node": false,
+                    "send sigint": false,
+                    "send sigterm": true
+                },
+                "present mode": "Mailbox",
                 "rebuild on recreate": false,
-                "vsync": false
+                "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
             },
             "type": "Window (GLFW)"
         },
@@ -611,7 +618,7 @@
                 "Phase Prob": 0.10000000149011612,
                 "adaptive grid buf size": 32777259,
                 "adaptive grid min width": 0.009999999776482582,
-                "adaptive grid power": 1.7320508075688772,
+                "adaptive grid power": 1.7320507764816284,
                 "adaptive grid prob": 0.699999988079071,
                 "adaptive grid steps per unit": 1.0,
                 "adaptive grid tan(alpha/2)": 0.0020000000949949026,
@@ -703,7 +710,6 @@
                 "advanced": {
                     "callback after capture": false,
                     "callback on record": false,
-                    "concurrency": 16,
                     "exit after seconds": -1.0,
                     "exit at iteration": -1,
                     "exit at run": -1,
@@ -732,8 +738,10 @@
         "profiling": true,
         "report intervall": 50,
         "run": {
-            "cpu max ms": 20.0,
-            "gpu max ms": 20.0
+            "cpu auto": true,
+            "cpu max ms": 329.9900207519531,
+            "gpu auto": true,
+            "gpu max ms": 9.033493041992188
         }
     }
 }
