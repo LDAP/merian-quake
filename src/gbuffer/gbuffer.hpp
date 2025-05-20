@@ -2,6 +2,7 @@
 
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
@@ -61,7 +62,7 @@ class GBuffer : public merian_nodes::Node {
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_mv;
 
-    merian_nodes::ManagedVkBufferOutHandle con_gbuffer;
+    merian_nodes::GBufferOutHandle con_gbuffer;
     merian_nodes::ManagedVkBufferOutHandle con_hits;
 
     vk::Extent3D extent;

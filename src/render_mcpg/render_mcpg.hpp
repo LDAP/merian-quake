@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
@@ -65,8 +66,7 @@ class RendererMarkovChain : public merian_nodes::Node {
         merian_nodes::VkBufferArrayIn::compute_read("idx");
     merian_nodes::VkBufferArrayInHandle con_ext =
         merian_nodes::VkBufferArrayIn::compute_read("ext");
-    merian_nodes::ManagedVkBufferInHandle con_gbuffer =
-        merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
+    merian_nodes::GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
     merian_nodes::ManagedVkBufferInHandle con_hits =
         merian_nodes::ManagedVkBufferIn::compute_read("hits");
 

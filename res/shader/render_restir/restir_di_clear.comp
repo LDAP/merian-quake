@@ -9,7 +9,7 @@ void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if(any(greaterThanEqual(ipos, imageSize(img_irradiance)))) return;
 
-  reservoirs[gbuffer_index(ipos, imageSize(img_irradiance))] = restir_di_reservoir_init();
+  reservoirs[image_to_buffer_index(ipos, imageSize(img_irradiance))] = restir_di_reservoir_init();
   imageStore(img_irradiance, ipos, vec4(0));
   imageStore(img_moments, ipos, vec4(0));
   imageStore(img_debug, ipos, vec4(0));

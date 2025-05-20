@@ -14,9 +14,9 @@
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
-#define first_hit hits[gbuffer_index(pixel, resolution)]
-#define read_reservoir(pixel) reservoirs[gbuffer_index((pixel), resolution)]
-#define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
+#define first_hit hits[image_to_buffer_index(pixel, resolution)]
+#define read_reservoir(pixel) reservoirs[image_to_buffer_index((pixel), resolution)]
+#define write_reservoir reservoirs[image_to_buffer_index((pixel), resolution)]
 
 void main() {
     if (any(greaterThanEqual(pixel, resolution))) {

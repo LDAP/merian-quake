@@ -46,7 +46,8 @@ void main() {
     irr = vec3(0);
     moments = vec2(0);
 
-    const GBuffer gbuf = gbuffer[gbuffer_index(pixel, resolution)];
+    const float linear_z = gbuffer_get_linear_z_pixel(gbuffer, pixel);
+    const vec3 first_n = gbuffer_get_normal_pixel(gbuffer, pixel);
     const vec3 first_wi = get_camera_ray_dir(pixel /*+ pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF);
     const vec2 mv = imageLoad(img_volume_mv, pixel).rg;
 
@@ -58,7 +59,7 @@ void main() {
         DistanceMCState dist_mc_state = distance_mc_state_new();
         float dist_score_sum = 0.0;
         {
-            const float xi_max = transmittance_xi_max(min(gbuf.linear_z, VOLUME_MAX_T), MU_T);
+            const float xi_max = transmittance_xi_max(min(linear_z, VOLUME_MAX_T), MU_T);
 
             float scores[DISTANCE_MC_SAMPLES];
             vec2 normal_dists[DISTANCE_MC_SAMPLES];
@@ -77,7 +78,7 @@ void main() {
                     normal_dists[i] = distance_mc_state_get_normal_dist(state);
                 }
 
-                scores[i] = state.sum_w * float(normal_dists[i].x < gbuf.linear_z);
+                scores[i] = state.sum_w * float(normal_dists[i].x < linear_z);
                 dist_score_sum += scores[i];
                 if (XorShift32(rng_state) < scores[i] / dist_score_sum) {
                     // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
@@ -88,7 +89,7 @@ void main() {
 
             if (DIST_GUIDE_P < XorShift32(rng_state) || dist_score_sum == 0) {
                 t = transmittance_sample2(MU_T, XorShift32(rng_state), xi_max);
-            } else if (t >= min(gbuf.linear_z, VOLUME_MAX_T) || t <= 0) {
+            } else if (t >= min(linear_z, VOLUME_MAX_T) || t <= 0) {
                 continue; // TODO: Use transmittance sampling then
             }
 
@@ -104,7 +105,7 @@ void main() {
         current_hit.wi = first_wi;
         current_hit.pos = params.cam_x.xyz + t * current_hit.wi;
         // Adaptive MC grid for surfaces is normal-biased currently. We use the gbuffer normal here. 
-        current_hit.normal = geo_decode_normal(gbuf.enc_normal);
+        current_hit.normal = first_n;
         
         vec3 wo;
         float wo_p = 0;
@@ -193,7 +194,7 @@ void main() {
                 if (dist_mc_state.sum_w > 0) {
                     dist = dist_mc_state.moments.x / dist_mc_state.sum_w;
                 } else {
-                    dist = gbuf.linear_z;
+                    dist = linear_z;
                 }
                 imageStore(img_volume_depth, pixel, vec4(dist, 0, 0, 0));
             }

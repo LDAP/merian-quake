@@ -17,11 +17,11 @@
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
-#define center_surface hits[gbuffer_index(pixel, resolution)]
-#define surface_at(pixel) hits[gbuffer_index(pixel, resolution)]
-#define read_reservoir(pixel) reservoirs_spatial_read[gbuffer_index((pixel), resolution)]
-#define write_reservoir reservoirs[gbuffer_index((pixel), resolution)]
-#define gbuf(pixel) gbuffer[gbuffer_index((pixel), resolution)]
+#define center_surface hits[image_to_buffer_index(pixel, resolution)]
+#define surface_at(pixel) hits[image_to_buffer_index(pixel, resolution)]
+#define read_reservoir(pixel) reservoirs_spatial_read[image_to_buffer_index((pixel), resolution)]
+#define write_reservoir reservoirs[image_to_buffer_index((pixel), resolution)]
+#define gbuf(pixel) gbuffer[image_to_buffer_index((pixel), resolution)]
 
 void main() {
     if (any(greaterThanEqual(pixel, resolution))) {

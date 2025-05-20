@@ -30,19 +30,12 @@ GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         "irradiance", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
     con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
                                                             extent.width, extent.height);
-    con_gbuffer = std::make_shared<merian_nodes::ManagedVkBufferOut>(
-        "gbuffer", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo{{},
-                             gbuffer_size_bytes(extent.width, extent.height),
-                             vk::BufferUsageFlagBits::eStorageBuffer |
-                                 vk::BufferUsageFlagBits::eTransferDst |
-                                 vk::BufferUsageFlagBits::eTransferSrc});
+    con_gbuffer = merian_nodes::GBufferOut::compute_write("gbuffer", extent.width, extent.height);
     con_hits = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
-                             gbuffer_size(extent.width, extent.height) * sizeof(Hit),
+                             image_to_buffer_size(extent.width, extent.height) * sizeof(Hit),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc});

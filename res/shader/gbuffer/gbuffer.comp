@@ -59,9 +59,8 @@ layout(set = 0, binding = 6) uniform writeonly restrict image2D img_albedo;
 layout(set = 0, binding = 7) uniform writeonly restrict image2D img_irradiance;
 layout(set = 0, binding = 8) uniform writeonly restrict image2D img_mv;
 
-layout(set = 0, binding = 9, scalar) buffer writeonly restrict buf_gbuf {
-    GBuffer gbuffer[];
-};
+MAKE_GBUFFER_WRITEONLY_LAYOUT(set = 0, binding = 9, gbuffer);
+
 layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
     Hit hits[];
 };
@@ -84,8 +83,7 @@ void main() {
         imageStore(img_mv, pixel, vec4(0));
         imageStore(img_albedo, pixel, vec4(0));
         imageStore(img_irradiance, pixel, vec4(0));
-        const GBuffer gbuf = {0, 0, f16vec2(0), 0};
-        gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
+        gbuffer_store_pixel(gbuffer, pixel, gbuffer_new());
 
         return;
     } else {
@@ -105,17 +103,20 @@ void main() {
         first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
 
         imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
-        hits[gbuffer_index(pixel, resolution)] = first_hit;
-
-        // use prev_pos to account for moving objects seen from the camera.
-        const float vel_z = distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos);
-        GBuffer gbuf = {geo_encode_normal(first_hit.normal), distance(params.cam_x.xyz, first_hit.pos), f16vec2(0), vel_z};
+        hits[image_to_buffer_index(pixel, resolution)] = first_hit;
 
         // Calculate depth gradient
         // use geo normal for depth gradient?
         const vec3 geonormal = geo_decode_normal(first_hit.enc_geonormal);
-        gbuf.grad_z = f16vec2(dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - gbuf.linear_z);
-        gbuffer[gbuffer_index(pixel, resolution)] = gbuf;
+        const float linear_z = distance(params.cam_x.xyz, first_hit.pos);
+
+        gbuffer_store_pixel(gbuffer, pixel, gbuffer_encode(
+                                                           first_hit.normal,
+                                                           linear_z,
+                                                           f16vec2(dot(geonormal, first_hit.pos - params.cam_x.xyz) / vec2(dot(geonormal, r_x), dot(geonormal, r_y)) - linear_z),
+                                                           distance(params.prev_cam_x.xyz, first_hit.prev_pos) - distance(params.cam_x.xyz, first_hit.pos)
+                                                           ));
+
 
         // Store motion vector
         const vec3 old_dir = first_hit.prev_pos - params.prev_cam_x.xyz;

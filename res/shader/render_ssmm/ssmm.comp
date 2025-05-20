@@ -28,7 +28,7 @@ vec3 irr;
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))
-#define first_hit hits[gbuffer_index(pixel, resolution)]
+#define first_hit hits[image_to_buffer_index(pixel, resolution)]
 
 #define mc_state_t SSMCState
 
@@ -79,7 +79,7 @@ mc_state_t mc_state_new() {
 // evaluate hemisphere clamp test (can this light y be seen from x with normal nx?)
 float mc_state_C(mc_state_t s, vec3 x, vec3 nx, ivec2 tc, ivec2 tc0) {
   // return 1.0;
-  GBuffer gbuf = gbuffer[gbuffer_index(tc, resolution)];
+  GBuffer gbuf = gbuffer[image_to_buffer_index(tc, resolution)];
   // gbuf = texelFetch(img_gbuf_in, tc0, 0);
   // const float irr0 = gbuf.w;
   // const float sig0 = sqrt(max(0, gbuf.w - gbuf.z*gbuf.z)); // noise stddev
@@ -116,7 +116,7 @@ void read_neighbour_state(
     vec4 r2 = XorShift32Vec4(seed);
     ivec2 off = ivec2(15.0 * (r0.xy + r0.zw + r1.xy + r1.zw + r2.xy + r2.zw - 3.0));
     float rnd = XorShift32(seed);
-    mc_state_t t2 = prev_ssmc[gbuffer_index(clamp(ivec2(ipos+mv+off), ivec2(0), resolution - 1), resolution)];
+    mc_state_t t2 = prev_ssmc[image_to_buffer_index(clamp(ivec2(ipos+mv+off), ivec2(0), resolution - 1), resolution)];
     float other = mc_state_score(t2, x, n, XorShift32(seed), ivec2(ipos+mv+off), ivec2(ipos+mv));
     if(sum <= 0.0 || rnd < other / (other + sum))
       tent = t2;
@@ -232,7 +232,7 @@ void main() {
             return;
         }
 
-        ssmc[gbuffer_index(pixel, resolution)] = curr;
+        ssmc[image_to_buffer_index(pixel, resolution)] = curr;
 
     }
 

@@ -20,8 +20,8 @@
         },
         {
             "dst": "accum",
-            "dst_input": "gbuf",
-            "src": "gbuf",
+            "dst_input": "gbuffer",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -39,7 +39,7 @@
         {
             "dst": "accum",
             "dst_input": "mv",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "mv"
         },
         {
@@ -50,8 +50,8 @@
         },
         {
             "dst": "accum",
-            "dst_input": "prev_gbuf",
-            "src": "gbuf",
+            "dst_input": "prev_gbuffer",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -75,7 +75,7 @@
         {
             "dst": "add",
             "dst_input": "input_2",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "irradiance"
         },
         {
@@ -87,13 +87,13 @@
         {
             "dst": "denoiser",
             "dst_input": "albedo",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "albedo"
         },
         {
             "dst": "denoiser",
             "dst_input": "gbuffer",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -111,13 +111,13 @@
         {
             "dst": "denoiser",
             "dst_input": "mv",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "mv"
         },
         {
             "dst": "denoiser",
             "dst_input": "prev_gbuffer",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -139,57 +139,57 @@
             "src_output": "out"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "ext",
             "src": "Quake 0",
             "src_output": "ext"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "idx",
             "src": "Quake 0",
             "src_output": "idx"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "prev_vtx",
             "src": "Quake 0",
             "src_output": "prev_vtx"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "render_info",
             "src": "Quake 0",
             "src_output": "render_info"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "resolution",
             "src": "Quake 0",
             "src_output": "resolution"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "textures",
             "src": "Quake 0",
             "src_output": "textures"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "tlas",
             "src": "TLAS builder",
             "src_output": "tlas"
         },
         {
-            "dst": "gbuf",
+            "dst": "gbuffer",
             "dst_input": "vtx",
             "src": "Quake 0",
             "src_output": "vtx"
         },
         {
             "dst": "hud",
-            "dst_input": "gbuf",
-            "src": "gbuf",
+            "dst_input": "gbuffer",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -225,13 +225,13 @@
         {
             "dst": "render_markovchain",
             "dst_input": "gbuffer",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
             "dst": "render_markovchain",
             "dst_input": "hits",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "hits"
         },
         {
@@ -243,7 +243,7 @@
         {
             "dst": "render_markovchain",
             "dst_input": "mv",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "mv"
         },
         {
@@ -296,8 +296,8 @@
         },
         {
             "dst": "volume accum",
-            "dst_input": "gbuf",
-            "src": "gbuf",
+            "dst_input": "gbuffer",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -326,8 +326,8 @@
         },
         {
             "dst": "volume accum",
-            "dst_input": "prev_gbuf",
-            "src": "gbuf",
+            "dst_input": "prev_gbuffer",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -345,7 +345,7 @@
         {
             "dst": "volume denoiser",
             "dst_input": "gbuffer",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -369,7 +369,7 @@
         {
             "dst": "volume denoiser",
             "dst_input": "prev_gbuffer",
-            "src": "gbuf",
+            "src": "gbuffer",
             "src_output": "gbuffer"
         },
         {
@@ -532,7 +532,7 @@
             },
             "type": "FXAA"
         },
-        "gbuf": {
+        "gbuffer": {
             "disable": false,
             "properties": {
                 "enable albedo mipmap": true,

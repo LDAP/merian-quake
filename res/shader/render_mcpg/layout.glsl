@@ -158,9 +158,9 @@ layout(set = 0, binding = 3, scalar) buffer readonly restrict buf_ext_t {
     // extra geo info
     VertexExtraData v[];
 } buf_ext[MAX_GEOMETRIES];
-layout(set = 0, binding = 4, scalar) buffer readonly restrict buf_gbuf {
-    GBuffer gbuffer[];
-};
+
+MAKE_GBUFFER_READONLY_LAYOUT(set = 0, binding = 4, gbuffer);
+
 layout(set = 0, binding = 5, scalar) buffer readonly restrict buf_hits {
     Hit hits[];
 };

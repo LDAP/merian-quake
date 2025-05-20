@@ -43,7 +43,7 @@ RendererSSMM::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{
             {},
-            gbuffer_size((long long)render_width, render_height) * sizeof(SSMCState),
+            image_to_buffer_size((long long)render_width, render_height) * sizeof(SSMCState),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
                 vk::BufferUsageFlagBits::eTransferSrc},
         false);

@@ -16,7 +16,7 @@ vk::BufferCreateInfo make_reservoir_buffer_create_info(const uint32_t render_wid
                                                        const uint32_t render_height) {
     return vk::BufferCreateInfo{
         {},
-        gbuffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
+        image_to_buffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
             vk::BufferUsageFlagBits::eTransferSrc};
 }

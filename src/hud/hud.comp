@@ -8,9 +8,7 @@ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D img_in;
 
-layout(set = 0, binding = 1, scalar) buffer restrict readonly buf_gbuf {
-    GBuffer gbuffer[];
-};
+MAKE_GBUFFER_READONLY_LAYOUT(set = 0, binding = 1, gbuffer);
 
 layout(set = 0, binding = 2) uniform writeonly restrict image2D img_out;
 
@@ -55,7 +53,7 @@ void main() {
     color = mix(color, pc.blend.rgb, pc.blend.a);
 
     if (pc.effect > 0) {
-        const float z = gbuffer[gbuffer_index(pixel, imageSize(img_out))].linear_z;
+        const float z = gbuffer_get_linear_z_pixel(gbuffer, pixel);
         float mu_t;
         vec3 mixcolor;
 
