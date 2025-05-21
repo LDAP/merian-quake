@@ -152,6 +152,7 @@ void main() {
                 if (score_sum == 0 || XorShift32(rng_state) < VOLUME_PHASE_P) {
                     wo = phase_draine_sample(XorShift32Vec2(rng_state), first_wi, DRAINE_G, DRAINE_A);
                     mc_state = mc_state_new();
+                    mc_buffer_index = -1;
                 }
                 
                 // Multiple importance sampling
@@ -209,7 +210,7 @@ void main() {
                 mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
                 mc_static_save(mc_state, current_hit.pos, jittered_normal);
                 mc_adaptive_save(mc_state, current_hit.pos, jittered_normal);
-            } else if (MC_FAST_RECOVERY == 1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {
+            } else if (MC_FAST_RECOVERY == 1 && mc_buffer_index != -1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {
                 // fix slow recovery after light source disappears
                 mc_states[mc_buffer_index].sum_w = 0;
             }
