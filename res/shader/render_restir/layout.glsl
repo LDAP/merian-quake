@@ -34,6 +34,8 @@ layout (constant_id = 26) const int APPLY_MV = 0;
 #include "../hit.glsl.h"
 #include "restir_di_reservoir.glsl.h"
 
+#include "merian-shaders/image_buffer.glsl.h"
+
 layout(push_constant) uniform PushConstant { 
     UniformData params;
 };

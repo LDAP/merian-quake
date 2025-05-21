@@ -1,7 +1,7 @@
 #include "render_ssmm.hpp"
 
 #include "game/quake_node.hpp"
-#include "merian-shaders/gbuffer.glsl.h"
+#include "merian-shaders/image_buffer.glsl.h"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"

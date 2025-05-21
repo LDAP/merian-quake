@@ -7,7 +7,7 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "merian-shaders/gbuffer.glsl.h"
+#include "merian-shaders/image_buffer.glsl.h"
 
 #include <array>
 #include <random>

@@ -20,6 +20,7 @@
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/bsdf_microfacet.glsl"
+#include "merian-shaders/image_buffer.glsl.h"
 
 uint rng_state;
 vec2 moments;

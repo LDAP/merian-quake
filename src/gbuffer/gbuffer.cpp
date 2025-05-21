@@ -7,7 +7,7 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "../../res/shader/hit.glsl.h"
-#include "merian-shaders/gbuffer.glsl.h"
+#include "merian-shaders/image_buffer.glsl.h"
 
 GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {}
 

@@ -22,6 +22,7 @@ layout (constant_id = 10) const float VOLUME_MAX_T = 1000.;
 #include "../config.h"
 #include "../scene_info.glsl.h"
 #include "../hit.glsl.h"
+#include "merian-shaders/image_buffer.glsl.h"
 
 layout(push_constant) uniform PushConstant { 
     UniformData params;
