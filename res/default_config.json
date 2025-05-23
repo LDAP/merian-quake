@@ -420,7 +420,7 @@
                 "adaptivity": 0.9009900093078613,
                 "adaptivity IPR factor": 3.0,
                 "adaptivity percentile lower": 0.1902180016040802,
-                "adaptivity percentile upper": 0.7543479800224304,
+                "adaptivity percentile upper": 0.9065219759941101,
                 "alpha": 0.9509999752044678,
                 "clear event pattern": "/user/clear",
                 "depth threshold": 0.026403000578284264,
@@ -741,9 +741,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 7.237463474273682,
+            "cpu max ms": 344.7829284667969,
             "gpu auto": true,
-            "gpu max ms": 22.302040100097656
+            "gpu max ms": 26.558799743652344
         }
     }
 }
