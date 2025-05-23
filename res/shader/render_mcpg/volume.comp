@@ -197,7 +197,7 @@ void main() {
                 } else {
                     dist = linear_z;
                 }
-                imageStore(img_volume_depth, pixel, vec4(dist, 0, 0, 0));
+                imageStore(img_volume_depth, pixel, vec4(dist, linear_z, 0, 0));
             }
             if (XorShift32(rng_state) < l / (dist_score_sum / DISTANCE_MC_SAMPLES)) {
                 distance_mc_save(dist_mc_state, pixel, grid_max_x);

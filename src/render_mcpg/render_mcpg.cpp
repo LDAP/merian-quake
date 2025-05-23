@@ -47,7 +47,7 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
     con_volume_moments = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
-        "volume_depth", vk::Format::eR32Sfloat, render_width, render_height);
+        "volume_depth", vk::Format::eR16G16Sfloat, render_width, render_height);
     con_volume_mv = merian_nodes::ManagedVkImageOut::compute_read_write_transfer_dst(
         "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height, 1,
         vk::ImageLayout::eTransferDstOptimal);
