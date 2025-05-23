@@ -699,8 +699,8 @@
                 "kaleidoscope: shmem": true,
                 "mv sampling": "center",
                 "normal reject": 3.1415927410125732,
-                "spatial bias": 10.0,
-                "spatial falloff": 1.0,
+                "spatial bias": 8.0,
+                "spatial falloff": 3.0,
                 "z-bias depth": 0.0,
                 "z-bias normals": 0.0
             },
