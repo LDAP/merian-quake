@@ -668,7 +668,7 @@
                 "clear event pattern": "/user/clear",
                 "depth threshold": 0.28402701020240784,
                 "enable motion vectors": true,
-                "extended search": false,
+                "extended search": true,
                 "filter mode": "stochastic bilinear",
                 "firefly filter bias": 0.20000000298023224,
                 "firefly filter enable": true,
@@ -677,7 +677,7 @@
                 "hard clamp": "inf",
                 "max history": "inf",
                 "normal threshold": 3.1415927410125732,
-                "reuse border": false
+                "reuse border": true
             },
             "type": "Accumulate"
         },
@@ -685,22 +685,22 @@
             "disable": false,
             "properties": {
                 "SVGF iterations": 5,
-                "TAA alpha": 0.8109999895095825,
+                "TAA alpha": 0.8040000200271606,
                 "clamping": "min-max",
                 "debug": "none",
-                "depth accept": 100.0,
+                "depth accept": 200.0,
                 "enable motion vectors": true,
                 "filter": "none",
                 "filter depth": 3968.0,
-                "filter luminance": 2.0,
+                "filter luminance": 4.0,
                 "filter normals": 3.1415927410125732,
                 "filter type": "subsampled",
                 "kaleidoscope": false,
                 "kaleidoscope: shmem": true,
                 "mv sampling": "center",
                 "normal reject": 3.1415927410125732,
-                "spatial bias": 8.0,
-                "spatial falloff": 3.0,
+                "spatial bias": 10.0,
+                "spatial falloff": 1.0,
                 "z-bias depth": 0.0,
                 "z-bias normals": 0.0
             },
@@ -741,9 +741,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 579.6173706054688,
+            "cpu max ms": 7.237463474273682,
             "gpu auto": true,
-            "gpu max ms": 32.862159729003906
+            "gpu max ms": 22.302040100097656
         }
     }
 }
