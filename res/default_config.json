@@ -419,9 +419,9 @@
                 "IPR factor": 50.0,
                 "adaptivity": 0.9009900093078613,
                 "adaptivity IPR factor": 3.0,
-                "adaptivity percentile lower": 0.25,
-                "adaptivity percentile upper": 0.949999988079071,
-                "alpha": 0.8989999890327454,
+                "adaptivity percentile lower": 0.1902180016040802,
+                "adaptivity percentile upper": 0.7543479800224304,
+                "alpha": 0.9509999752044678,
                 "clear event pattern": "/user/clear",
                 "depth threshold": 0.026403000578284264,
                 "enable motion vectors": true,
@@ -493,7 +493,8 @@
                 "filter luminance": 3.0,
                 "filter normals": 0.5235987901687622,
                 "filter type": "subsampled",
-                "filter variance": false,
+                "kaleidoscope": false,
+                "kaleidoscope: shmem": true,
                 "mv sampling": "center",
                 "normal reject": 0.5235987901687622,
                 "spatial bias": 8.0,
@@ -694,7 +695,8 @@
                 "filter luminance": 2.0,
                 "filter normals": 3.1415927410125732,
                 "filter type": "subsampled",
-                "filter variance": false,
+                "kaleidoscope": false,
+                "kaleidoscope: shmem": true,
                 "mv sampling": "center",
                 "normal reject": 3.1415927410125732,
                 "spatial bias": 8.0,
@@ -739,9 +741,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 329.9900207519531,
+            "cpu max ms": 579.6173706054688,
             "gpu auto": true,
-            "gpu max ms": 9.033493041992188
+            "gpu max ms": 32.862159729003906
         }
     }
 }
