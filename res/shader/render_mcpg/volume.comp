@@ -123,7 +123,7 @@ void main() {
                 for (int i = 0; i < MC_SAMPLES; i++) {
                     const bool adaptive_grid = XorShift32(rng_state) < MC_SAMPLES_ADAPTIVE_PROB;
 
-                    uint buffer_index, hash;
+                    uint buffer_index; uint16_t hash;
                     if (adaptive_grid) {
                         mc_adaptive_buffer_index(current_hit.pos, -first_wi, buffer_index, hash);
                     } else {
@@ -214,7 +214,7 @@ void main() {
             const float mc_f = yuv_luminance(phase * incident / wo_p);
             if (XorShift32(rng_state) < mc_f / (score_sum / MC_SAMPLES)) {
                 const vec3 jittered_normal = make_frame(-first_wi) * sample_cos(XorShift32Vec2(rng_state));
-                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, (next_hit.pos - next_hit.prev_pos) / TIME_DIFF);
+                mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, f16vec3((next_hit.pos - next_hit.prev_pos) / TIME_DIFF));
                 mc_static_save(mc_state, current_hit.pos, jittered_normal);
                 mc_adaptive_save(mc_state, current_hit.pos, jittered_normal);
             } else if (MC_FAST_RECOVERY == 1 && mc_buffer_index != -1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {

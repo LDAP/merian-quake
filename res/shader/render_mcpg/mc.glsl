@@ -1,5 +1,5 @@
 // Configure ML
-#define ML_MAX_N 1024
+#define ML_MAX_N 1024s
 #define ML_MIN_ALPHA .01
 
 #ifndef MERIAN_QUAKE_ADAPTIVE_GRID_TYPE
@@ -12,7 +12,7 @@
 
 // GENERAL
 
-#define mc_state_new() MCState(vec3(0.0), 0.0, 0, 0.0, vec3(0), 0.0, 0);
+#define mc_state_new() MCState(vec3(0.0), 0.0, 0.0, f16vec3(0), 0.0, 0s, 0s);
 
 // return normalized direction (from pos)
 #define mc_state_dir(mc_state, pos) normalize((mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt) - pos)
@@ -61,9 +61,9 @@ void mc_state_reweight(inout MCState mc_state, const float factor) {
 void mc_state_add_sample(inout MCState mc_state,
                          const vec3 pos,         // position where the ray started
                          const float w,          // goodness
-                         const vec3 target, const vec3 target_mv) {    // ray hit point
+                         const vec3 target, const f16vec3 target_mv) {    // ray hit point
 
-    mc_state.N = min(mc_state.N + 1, ML_MAX_N);
+    mc_state.N = min(mc_state.N + 1s, uint16_t(ML_MAX_N));
     const float alpha = max(1.0 / mc_state.N, ML_MIN_ALPHA);
 
     mc_state.sum_w = mix(mc_state.sum_w, w,          alpha);
@@ -100,27 +100,27 @@ void mc_state_add_sample(inout MCState mc_state,
 #define mc_adaptive_grid_idx_for_level_interpolate(level, pos) grid_idx_interpolate(pos, mc_grid_width_for_level(level), XorShift32(rng_state))
 
 // returns (buffer_index, hash)
-void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint hash) {
+void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer_index, out uint16_t hash) {
     const uint level = mc_adaptive_level_for_pos(pos, XorShift32(rng_state));
     const ivec3 grid_idx = mc_adaptive_grid_idx_for_level_interpolate(level, pos);
     buffer_index = hash_grid_normal_level(grid_idx, normal, level, MC_ADAPTIVE_BUFFER_SIZE);
-    hash = hash2_grid_level(grid_idx, level);
+    hash = uint16_t(hash2_grid_level(grid_idx, level));
 }
 
-void mc_adaptive_finalize_load(inout MCState mc_state, const uint hash) {
+void mc_adaptive_finalize_load(inout MCState mc_state, const uint16_t hash) {
     mc_state.sum_w *= float(hash == mc_state.hash);
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
 void mc_adaptive_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
-    uint buffer_index, hash;
+    uint buffer_index; uint16_t hash;
     mc_adaptive_buffer_index(pos, normal, buffer_index, hash);
     mc_state = mc_states[buffer_index];
     mc_adaptive_finalize_load(mc_state, hash);
 }
 
 void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
-    uint buffer_index, hash;
+    uint buffer_index; uint16_t hash;
     mc_adaptive_buffer_index(pos, normal, buffer_index, hash);
 
     mc_state.hash = hash;
@@ -131,39 +131,39 @@ void mc_adaptive_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
 // STATIC GRID
 
 // returns (buffer_index, hash)
-void mc_static_buffer_index(const vec3 pos, out uint buffer_index, out uint hash) {
+void mc_static_buffer_index(const vec3 pos, out uint buffer_index, out uint16_t hash) {
     const ivec3 grid_idx = grid_idx_interpolate(pos, MC_STATIC_GRID_WIDTH, XorShift32(rng_state));
     buffer_index = hash_grid(grid_idx, MC_STATIC_BUFFER_SIZE) + MC_ADAPTIVE_BUFFER_SIZE;
-    hash = hash2_grid(grid_idx);
+    hash = uint16_t(hash2_grid(grid_idx));
 }
 
-void mc_static_finalize_load(inout MCState mc_state, const uint hash) {
+void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash) {
     mc_state.sum_w *= float(hash == mc_state.hash);
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
-void mc_static_finalize_load(inout MCState mc_state, const uint hash, const vec3 pos, const vec3 normal) {
+void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash, const vec3 pos, const vec3 normal) {
     mc_state.sum_w *= float(hash == mc_state.hash);
     mc_state.sum_w *= float(dot(normal, mc_state_dir(mc_state, pos)) > 0.);
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos) {
-    uint buffer_index, hash;
+    uint buffer_index; uint16_t hash;
     mc_static_buffer_index(pos, buffer_index, hash);
     mc_state = mc_states[buffer_index];
     mc_static_finalize_load(mc_state, hash);
 }
 
 void mc_static_load(out MCState mc_state, const vec3 pos, const vec3 normal) {
-    uint buffer_index, hash;
+    uint buffer_index; uint16_t hash;
     mc_static_buffer_index(pos, buffer_index, hash);
     mc_state = mc_states[buffer_index];
     mc_static_finalize_load(mc_state, hash, pos, normal);
 }
 
 void mc_static_save(in MCState mc_state, const vec3 pos, const vec3 normal) {
-    uint buffer_index, hash;
+    uint buffer_index; uint16_t hash;
     mc_static_buffer_index(pos, buffer_index, hash);
 
     mc_state.hash = hash;

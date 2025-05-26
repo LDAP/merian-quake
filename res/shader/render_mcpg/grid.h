@@ -6,13 +6,13 @@
 struct MCState {
     vec3 w_tgt;
     float sum_w;
-    uint N;
     float w_cos;
 
-    vec3 mv;
+    f16vec3 mv;
     float T;
 
-    uint hash; // grid_idx and level
+    uint16_t N;
+    uint16_t hash; // grid_idx and level
 };
 
 struct LightCacheVertex {
