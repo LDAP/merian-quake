@@ -43,7 +43,8 @@ void main() {
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
     for (int s = 0; s < SURFACE_SPP; s++) {
-        Hit current_hit = first_hit;
+        Hit current_hit;
+        decompress_hit(first_hit, current_hit);
 
         // Camera throughput encoded in albedo
         vec3 current_throughput = vec3(1);

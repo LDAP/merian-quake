@@ -63,7 +63,7 @@ layout(set = 0, binding = 8) uniform writeonly restrict image2D img_mv;
 MAKE_GBUFFER_WRITEONLY_LAYOUT(set = 0, binding = 9, gbuffer);
 
 layout(set = 0, binding = 10, scalar) buffer writeonly restrict buf_hits {
-    Hit hits[];
+    CompressedHit hits[];
 };
 
 #include "merian-shaders/random.glsl"
@@ -104,7 +104,7 @@ void main() {
         first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
 
         imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
-        hits[image_to_buffer_index(pixel, resolution)] = first_hit;
+        compress_hit(first_hit, hits[image_to_buffer_index(pixel, resolution)]);
 
         // Calculate depth gradient
         // use geo normal for depth gradient?

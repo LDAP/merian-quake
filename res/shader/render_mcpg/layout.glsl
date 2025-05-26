@@ -162,7 +162,7 @@ layout(set = 0, binding = 3, scalar) buffer readonly restrict buf_ext_t {
 MAKE_GBUFFER_READONLY_LAYOUT(set = 0, binding = 4, gbuffer);
 
 layout(set = 0, binding = 5, scalar) buffer readonly restrict buf_hits {
-    Hit hits[];
+    CompressedHit hits[];
 };
 layout(set = 0, binding = 6) uniform sampler2D img_tex[MAX_GLTEXTURES];
 layout(set = 0, binding = 7) uniform accelerationStructureEXT tlas;

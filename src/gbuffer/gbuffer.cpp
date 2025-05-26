@@ -34,11 +34,11 @@ GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
     con_hits = std::make_shared<merian_nodes::ManagedVkBufferOut>(
         "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo{{},
-                             image_to_buffer_size(extent.width, extent.height) * sizeof(Hit),
-                             vk::BufferUsageFlagBits::eStorageBuffer |
-                                 vk::BufferUsageFlagBits::eTransferDst |
-                                 vk::BufferUsageFlagBits::eTransferSrc});
+        vk::BufferCreateInfo{
+            {},
+            image_to_buffer_size(extent.width, extent.height) * sizeof(CompressedHit),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
+                vk::BufferUsageFlagBits::eTransferSrc});
 
     return {con_albedo, con_irradiance, con_mv, con_gbuffer, con_hits};
 }
