@@ -25,7 +25,7 @@
 
 bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos) {
 
-    if (mc_f > 0.5 * mc_state.sum_w) {
+    if (mc_f > 1e-3 * mc_state.sum_w) {
         return false;
     }
 
