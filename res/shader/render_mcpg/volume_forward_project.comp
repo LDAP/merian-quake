@@ -23,25 +23,25 @@ void main() {
     }
 
     {
-        vec2 prev_depth_surface_depth = texelFetch(img_prev_volume_depth, pixel, 0).rg;
+        float prev_depth = texelFetch(img_prev_volume_depth, pixel, 0).r;
 
         // forward project depth for better motion vectors for accumulation and distance markov chain access
         const vec3 prev_wi = get_camera_ray_dir(pixel /*+ prev_pixel_offset_blackman_harris(XorShift32Vec2(rng_state))*/, resolution, params.prev_cam_u.xyz, params.prev_cam_w.xyz, FOV_TAN_ALPHA_HALF);
-        const vec3 prev_pos = params.prev_cam_x.xyz + prev_wi * prev_depth_surface_depth.r;
+        const vec3 prev_pos = params.prev_cam_x.xyz + prev_wi * prev_depth;
         const ivec2 new_pixel = ivec2(round(get_camera_pixel(prev_pos - params.cam_x.xyz, resolution, params.cam_u.xyz, params.cam_w.xyz, FOV_TAN_ALPHA_HALF)));
         
         // overwrite mv that are written in quake.comp
         if (all(lessThan(new_pixel, imageSize(img_volume_mv))) && all(greaterThanEqual(new_pixel, vec2(0)))) {
 
             // const float new_pixel_depth =  gbuffer_get_linear_z_pixel(gbuffer, pixel);
-            // if (prev_depth_surface_depth.x > new_pixel_depth) {
+            // if (prev_depth.x > new_pixel_depth) {
             //     return;
             // }
-            // if (abs(prev_depth_surface_depth.y - new_pixel_depth) / max(new_pixel_depth, 1e-5) > .2) {
+            // if (abs(prev_depth.y - new_pixel_depth) / max(new_pixel_depth, 1e-5) > .2) {
             //     return;
             // }
             
-            if (prev_depth_surface_depth.x < 50) {
+            if (prev_depth < 50) {
                 return;
             }
             
