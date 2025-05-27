@@ -40,12 +40,8 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
 
     con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_moments = merian_nodes::ManagedVkImageOut::compute_write(
-        "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
     con_volume = merian_nodes::ManagedVkImageOut::compute_write(
-        "volume", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
-    con_volume_moments = merian_nodes::ManagedVkImageOut::compute_write(
-        "volume_moments", vk::Format::eR32G32Sfloat, render_width, render_height);
+        "volume", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
     con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR16Sfloat, render_width, render_height);
     con_volume_mv = merian_nodes::ManagedVkImageOut::compute_read_write_transfer_dst(
@@ -88,11 +84,8 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
         true);
 
     return {
-        con_irradiance,     con_moments,      con_volume,
-        con_volume_moments, con_volume_depth, con_volume_mv,
-        con_debug,
-
-        con_markovchain,    con_lightcache,   con_volume_distancemc,
+        con_irradiance, con_volume,      con_volume_depth, con_volume_mv,
+        con_debug,      con_markovchain, con_lightcache,   con_volume_distancemc,
     };
 }
 
@@ -234,7 +227,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
     }
 
     // BIND PIPELINE
-    if (io.is_connected(con_irradiance) || io.is_connected(con_moments)) {
+    if (io.is_connected(con_irradiance)) {
         // Surfaces
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "surface");
         cmd->bind(pipe);
@@ -243,7 +236,7 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         cmd->dispatch(io[con_resolution], local_size_x, local_size_y);
     }
 
-    const bool enable_volume = io.is_connected(con_volume) || io.is_connected(con_volume_moments);
+    const bool enable_volume = io.is_connected(con_volume);
 
     if (enable_volume) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy mv for volume");

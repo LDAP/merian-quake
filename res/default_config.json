@@ -26,27 +26,9 @@
         },
         {
             "dst": "accum",
-            "dst_input": "irr",
-            "src": "render_markovchain",
-            "src_output": "irradiance"
-        },
-        {
-            "dst": "accum",
-            "dst_input": "moments_in",
-            "src": "render_markovchain",
-            "src_output": "moments"
-        },
-        {
-            "dst": "accum",
             "dst_input": "mv",
             "src": "gbuffer",
             "src_output": "mv"
-        },
-        {
-            "dst": "accum",
-            "dst_input": "prev_accum",
-            "src": "accum",
-            "src_output": "out_irr"
         },
         {
             "dst": "accum",
@@ -56,9 +38,21 @@
         },
         {
             "dst": "accum",
-            "dst_input": "prev_moments",
+            "dst_input": "prev_history",
             "src": "accum",
-            "src_output": "out_moments"
+            "src_output": "history"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "prev_out",
+            "src": "accum",
+            "src_output": "out"
+        },
+        {
+            "dst": "accum",
+            "dst_input": "src",
+            "src": "render_markovchain",
+            "src_output": "irradiance"
         },
         {
             "dst": "add",
@@ -98,15 +92,9 @@
         },
         {
             "dst": "denoiser",
-            "dst_input": "irr",
+            "dst_input": "history",
             "src": "accum",
-            "src_output": "out_irr"
-        },
-        {
-            "dst": "denoiser",
-            "dst_input": "moments",
-            "src": "accum",
-            "src_output": "out_moments"
+            "src_output": "history"
         },
         {
             "dst": "denoiser",
@@ -124,6 +112,12 @@
             "dst": "denoiser",
             "dst_input": "prev_out",
             "src": "denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "denoiser",
+            "dst_input": "src",
+            "src": "accum",
             "src_output": "out"
         },
         {
@@ -302,27 +296,9 @@
         },
         {
             "dst": "volume accum",
-            "dst_input": "irr",
-            "src": "render_markovchain",
-            "src_output": "volume"
-        },
-        {
-            "dst": "volume accum",
-            "dst_input": "moments_in",
-            "src": "render_markovchain",
-            "src_output": "volume_moments"
-        },
-        {
-            "dst": "volume accum",
             "dst_input": "mv",
             "src": "render_markovchain",
             "src_output": "volume_mv"
-        },
-        {
-            "dst": "volume accum",
-            "dst_input": "prev_accum",
-            "src": "volume accum",
-            "src_output": "out_irr"
         },
         {
             "dst": "volume accum",
@@ -332,9 +308,21 @@
         },
         {
             "dst": "volume accum",
-            "dst_input": "prev_moments",
+            "dst_input": "prev_history",
             "src": "volume accum",
-            "src_output": "out_moments"
+            "src_output": "history"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "prev_out",
+            "src": "volume accum",
+            "src_output": "out"
+        },
+        {
+            "dst": "volume accum",
+            "dst_input": "src",
+            "src": "render_markovchain",
+            "src_output": "volume"
         },
         {
             "dst": "volume denoiser",
@@ -350,15 +338,9 @@
         },
         {
             "dst": "volume denoiser",
-            "dst_input": "irr",
+            "dst_input": "history",
             "src": "volume accum",
-            "src_output": "out_irr"
-        },
-        {
-            "dst": "volume denoiser",
-            "dst_input": "moments",
-            "src": "volume accum",
-            "src_output": "out_moments"
+            "src_output": "history"
         },
         {
             "dst": "volume denoiser",
@@ -376,6 +358,12 @@
             "dst": "volume denoiser",
             "dst_input": "prev_out",
             "src": "volume denoiser",
+            "src_output": "out"
+        },
+        {
+            "dst": "volume denoiser",
+            "dst_input": "src",
+            "src": "volume accum",
             "src_output": "out"
         },
         {
@@ -440,10 +428,10 @@
         },
         "add": {
             "disable": false,
-            "type": "Add",
             "properties": {
-                "number inputs": 3
-            }
+                "number inputs": 10
+            },
+            "type": "Add"
         },
         "beauty image write": {
             "disable": false,
@@ -744,9 +732,9 @@
         "report intervall": 50,
         "run": {
             "cpu auto": true,
-            "cpu max ms": 344.7829284667969,
+            "cpu max ms": 141.87481689453125,
             "gpu auto": true,
-            "gpu max ms": 26.558799743652344
+            "gpu max ms": 21.933399200439453
         }
     }
 }

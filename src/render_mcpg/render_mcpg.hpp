@@ -85,9 +85,7 @@ class RendererMarkovChain : public merian_nodes::Node {
 
     merian_nodes::ManagedVkImageOutHandle con_irradiance;
     merian_nodes::ManagedVkImageOutHandle con_debug;
-    merian_nodes::ManagedVkImageOutHandle con_moments;
     merian_nodes::ManagedVkImageOutHandle con_volume;
-    merian_nodes::ManagedVkImageOutHandle con_volume_moments;
     merian_nodes::ManagedVkImageOutHandle con_volume_depth;
     merian_nodes::ManagedVkImageOutHandle con_volume_mv;
 

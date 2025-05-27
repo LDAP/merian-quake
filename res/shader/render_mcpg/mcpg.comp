@@ -23,7 +23,7 @@
 #include "merian-shaders/image_buffer.glsl.h"
 
 uint rng_state;
-vec2 moments;
+float second_moment;
 vec3 irr;
 
 #include "../config.h"
@@ -38,7 +38,7 @@ vec3 irr;
 
 void main() {
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
-    moments = vec2(0);
+    second_moment = 0.0;
     irr = vec3(0);
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
@@ -193,7 +193,7 @@ void main() {
         if(!any(isinf(contrib)) && !any(isnan(contrib))) {
             irr += contrib;
             const float l = yuv_luminance(contrib);
-            moments += vec2(l, l * l);
+            second_moment += l * l;
         }
     }
 
@@ -203,11 +203,10 @@ void main() {
 
     if (SURFACE_SPP > 0) {
         irr /= SURFACE_SPP;
-        moments /= SURFACE_SPP;
+        second_moment /= SURFACE_SPP;
     }
 
-    imageStore(img_irradiance, pixel, vec4(irr, SURFACE_SPP));
-    imageStore(img_moments, pixel, vec4(moments, 0, 0));
+    imageStore(img_irradiance, pixel, vec4(irr, second_moment));
 
 #if DEBUG_OUTPUT_CONNECTED == 1
         switch(DEBUG_OUTPUT_SELECTOR) {
@@ -244,7 +243,7 @@ void main() {
             }
             case 5: {
                 // -- moments --
-                imageStore(img_debug, pixel, vec4(moments, 0, 1));
+                imageStore(img_debug, pixel, vec4(yuv_luminance(irr), second_moment, 0, 1));
                 break;
             }
             case 6: {

@@ -22,7 +22,7 @@
 
 uint rng_state;
 vec3 irr;
-vec2 moments;
+float second_moment;
 
 #include "../config.h"
 #include "layout.glsl"
@@ -44,7 +44,7 @@ void main() {
     // must equal quake.comp
     rng_state = pcg4d16(uvec4(pixel, params.frame, SEED));
     irr = vec3(0);
-    moments = vec2(0);
+    second_moment = 0.0;
 
     const float linear_z = gbuffer_get_linear_z_pixel(gbuffer, pixel);
     const vec3 first_n = gbuffer_get_normal_pixel(gbuffer, pixel);
@@ -192,7 +192,7 @@ void main() {
         if (!any(isnan(contrib)) && !any(isinf(contrib))) {
             irr += contrib;
             const float l = yuv_luminance(contrib);
-            moments += vec2(l, l * l);
+            second_moment += l * l;
             
             // UPDATE MC FOR CAMERA DISTANCE
             distance_mc_state_add_sample(dist_mc_state, t, l);
@@ -228,8 +228,5 @@ void main() {
     // distance_mc_load(s, pixel, resolution);
     // imageStore(img_debug, pixel, vec4(1 / 1000. * distance_mc_state_get_normal_dist(s).y));
 
-    imageStore(img_volume, pixel, vec4(irr / max(VOLUME_SPP, 1), max(VOLUME_SPP, 1)));
-    imageStore(img_volume_moments, pixel, vec4(moments / max(VOLUME_SPP, 1), 0, 0));
-    
-
+    imageStore(img_volume, pixel, vec4(irr, second_moment) / max(VOLUME_SPP, 1));
 }
