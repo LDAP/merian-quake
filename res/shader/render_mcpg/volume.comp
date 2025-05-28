@@ -78,7 +78,7 @@ void main() {
                     normal_dists[i] = distance_mc_state_get_normal_dist(state);
                 }
 
-                scores[i] = state.sum_w * float(normal_dists[i].x < linear_z);
+                scores[i] = state.sum_w * float(state.sum_w > 0) * float(normal_dists[i].x < linear_z);
                 dist_score_sum += scores[i];
                 if (XorShift32(rng_state) < scores[i] / dist_score_sum) {
                     // we use here that comparison with NaN is false, that happens if candidate_score == 0 and sum == 0; 
@@ -93,9 +93,11 @@ void main() {
                 continue; // TODO: Use transmittance sampling then
             }
 
-            [[unroll]]
-            for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
-                p += (scores[i] > 0 ? scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum : 0);
+            if (dist_score_sum > 0.) {
+                [[unroll]]
+                for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
+                    p += scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum;
+                }
             }
             p = (dist_score_sum > 0 ? (1.0 - DIST_GUIDE_P) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + DIST_GUIDE_P * p;
         }
