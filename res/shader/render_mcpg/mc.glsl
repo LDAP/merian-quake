@@ -108,7 +108,9 @@ void mc_adaptive_buffer_index(const vec3 pos, const vec3 normal, out uint buffer
 }
 
 void mc_adaptive_finalize_load(inout MCState mc_state, const uint16_t hash) {
-    mc_state.sum_w *= float(hash == mc_state.hash);
+    if (mc_state.sum_w < 0 || hash != mc_state.hash) {
+        mc_state.sum_w = 0.;
+    }
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
@@ -138,13 +140,16 @@ void mc_static_buffer_index(const vec3 pos, out uint buffer_index, out uint16_t 
 }
 
 void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash) {
-    mc_state.sum_w *= float(hash == mc_state.hash);
+    if (mc_state.sum_w < 0 || hash != mc_state.hash) {
+        mc_state.sum_w = 0.;
+    }
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
 void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash, const vec3 pos, const vec3 normal) {
-    mc_state.sum_w *= float(hash == mc_state.hash);
-    mc_state.sum_w *= float(dot(normal, mc_state_dir(mc_state, pos)) > 0.);
+    if (mc_state.sum_w < 0 || hash != mc_state.hash || dot(normal, mc_state_dir(mc_state, pos)) <= 0.) {
+        mc_state.sum_w = 0.;
+    }
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
 }
 
