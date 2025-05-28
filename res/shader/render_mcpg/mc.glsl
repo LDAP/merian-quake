@@ -29,12 +29,7 @@ bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, c
         return false;
     }
 
-    if (params.cl_time == mc_state.T) {
-        return false;
-    }
-
     const float cos = dot(wo, mc_state_dir(mc_state, pos));
-
     if (cos < 0.9 + 0.1 * mc_state_mean_cos(mc_state, pos)) {
         // light might still be there 
         return false;
