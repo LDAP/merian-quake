@@ -124,10 +124,11 @@ void main() {
                     break;
 
                 // Multiple importance sampling
-                [[unroll]]
-                for (int i = 0; i < MC_SAMPLES; i++) {
-                    // score_sum > 0 ? results in black artifacts
-                    wo_p += (scores[i] > 0 ? scores[i] * (vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w)) / score_sum : 0);
+                if (score_sum > 0) {
+                    [[unroll]]
+                    for (int i = 0; i < MC_SAMPLES; i++) {
+                        wo_p += scores[i] * vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w) / score_sum;
+                    }
                 }
                 wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)) + (1 - SURF_BSDF_P) * wo_p;
 
