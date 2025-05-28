@@ -17,6 +17,7 @@
 #include "merian-shaders/ray_differential.glsl"
 #include "merian-shaders/raytrace.glsl"
 #include "merian-shaders/textures.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
 
 // assert(alpha != 0)
 #define decode_alpha(enc_alpha) (float16_t(enc_alpha - 1) / 14.hf)
@@ -59,8 +60,8 @@ f16vec3 get_sky(const vec3 w) {
 }
 
 f16vec3 ldr_to_hdr(f16vec3 color) {
-    const float16_t sum = color.x + color.y + color.z;
-    return (sum > 0.hf) ? color.rgb / sum * 10.0hf * (exp2(3.hf * sum) - 1.0hf) : f16vec3(0);
+    const float l = clamp(pow((color.r + color.g + color.b) / 3.hf, .1), 0, 0.99);
+    return sqrt(color) * 2.hf * float16_t(l / (1.0 - l));
 }
 
 // Sets T_MAX and T_MIN accordingly, avoiding unnecessary intersection tests.
