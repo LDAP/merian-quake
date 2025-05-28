@@ -278,14 +278,12 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         cmd->dispatch(io[con_resolution], local_size_x, local_size_y);
     }
 
-    if (dump_mc) {
-        const std::size_t count =
-            std::min(128L * 1024 * 1024 / sizeof(MCState), (std::size_t)mc_adaptive_buffer_size);
+    if (!dumping && dump_mc) {
+        dumping = true;
+        const std::size_t count = mc_adaptive_buffer_size;
         const merian::MemoryAllocationHandle memory = allocator->getStaging()->cmd_from_device(
             cmd, io[con_markovchain], 0, sizeof(MCState) * count);
-        run.add_submit_callback([count, memory](const merian::QueueHandle& queue,
-                                                [[maybe_unused]] merian_nodes::GraphRun& run) {
-            queue->wait_idle();
+        run.sync_to_cpu([count, memory, this]() {
             nlohmann::json j;
 
             MCState* buf = memory->map_as<MCState>();
@@ -301,7 +299,8 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             }
             memory->unmap();
             std::ofstream file("mc_dump.json");
-            file << std::setw(4) << j << '\n';
+            file << std::setw(2) << j << '\n';
+            dumping = false;
         });
 
         dump_mc = false;
@@ -418,8 +417,13 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                           {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance",
                            "moments", "mc cos", "mc N", "mc motion vectors"});
     needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
-    dump_mc = config.config_bool("Download 128MB MC states",
+    if (!dumping) {
+        dump_mc = config.config_bool("Download Adaptive Grid",
                                  "Dumps the states as json into mc_dump.json");
+    } else {
+        config.output_text("Dumping to mc_dump.json...");
+    }
+
 
     // Only require a pipeline recreation
     if (needs_pipeline_rebuild || old_spp != spp || old_max_path_lenght != max_path_length ||
