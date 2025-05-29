@@ -239,9 +239,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
 #endif
 
 #if defined(MERIAN_QUAKE_FIRST_HIT) && ENABLE_ALBEDO_MIPMAP
-        const f16vec4 albedo_texture = f16vec4(textureGrad(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, grad_x, grad_y));
+        const f16vec4 albedo_texture = pow(f16vec4(textureGrad(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, grad_x, grad_y)), f16vec4(1. / 1.2));
 #else
-        const f16vec4 albedo_texture = f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0));
+        const f16vec4 albedo_texture = pow(f16vec4(textureLod(img_tex[nonuniformEXT(min(extra_data.texnum_alpha & 0xfff, MAX_GLTEXTURES - 1))], st, 0)), f16vec4(1. / 1.2));
 #endif
 
 

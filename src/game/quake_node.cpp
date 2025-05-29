@@ -802,17 +802,15 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
             render_info.uniform.prev_cam_w_mu_sy.a = mu_s_div_mu_t.g * mu_t;
             render_info.uniform.prev_cam_u_mu_sz.a = mu_s_div_mu_t.b * mu_t;
         } else {
-            render_info.uniform.cam_x_mu_t.a = Fog_GetDensity();
-            render_info.uniform.cam_x_mu_t.a *= render_info.uniform.cam_x_mu_t.a;
-            render_info.uniform.cam_x_mu_t.a *= 0.1;
+            render_info.uniform.cam_x_mu_t.a = std::pow(Fog_GetDensity(), 2.f) * 0.1f;
 
             const float* fog_color = Fog_GetColor();
             render_info.uniform.prev_cam_x_mu_sx.a =
-                fog_color[0] * render_info.uniform.cam_x_mu_t.a;
+                std::pow(fog_color[0], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
             render_info.uniform.prev_cam_w_mu_sy.a =
-                fog_color[1] * render_info.uniform.cam_x_mu_t.a;
+                std::pow(fog_color[1], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
             render_info.uniform.prev_cam_u_mu_sz.a =
-                fog_color[2] * render_info.uniform.cam_x_mu_t.a;
+                std::pow(fog_color[2], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
         }
         {
             const float time_diff = cl.time - render_info.uniform.cl_time;
