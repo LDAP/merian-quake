@@ -6,7 +6,7 @@
 #include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian-nodes/connectors/special_static_out.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_out.hpp"
-#include "merian-nodes/connectors/vk_texture_array_out.hpp"
+ #include "merian-nodes/connectors/unmanaged_vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/nodes/as_builder/device_as_builder.hpp"
 
@@ -182,7 +182,7 @@ class QuakeNode : public merian_nodes::Node {
     // clang-format off
     merian_nodes::SpecialStaticOutHandle<vk::Extent3D> con_resolution;
     merian_nodes::PtrOutHandle<QuakeRenderInfo> con_render_info = merian_nodes::PtrOut<QuakeRenderInfo>::create("render_info");
-    merian_nodes::VkTextureArrayOutHandle con_textures = merian_nodes::VkTextureArrayOut::create("textures", MAX_GLTEXTURES);
+    merian_nodes::UnmanagedVkImageOutHandle con_textures = merian_nodes::UnmanagedVkImageOut::create("textures", MAX_GLTEXTURES);
 
     merian_nodes::VkBufferArrayOutHandle con_vtx = merian_nodes::VkBufferArrayOut::create("vtx", MAX_GEOMETRIES);
     merian_nodes::VkBufferArrayOutHandle con_prev_vtx = merian_nodes::VkBufferArrayOut::create("prev_vtx", MAX_GEOMETRIES);

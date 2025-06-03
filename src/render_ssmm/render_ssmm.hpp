@@ -5,7 +5,7 @@
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
-#include "merian-nodes/connectors/vk_texture_array_in.hpp"
+ 
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
 #include "merian-nodes/graph/node.hpp"
@@ -58,8 +58,8 @@ class RendererSSMM : public merian_nodes::Node {
         merian_nodes::ManagedVkBufferIn::compute_read("gbuffer");
     merian_nodes::ManagedVkBufferInHandle con_hits =
         merian_nodes::ManagedVkBufferIn::compute_read("hits");
-    merian_nodes::VkTextureArrayInHandle con_textures =
-        merian_nodes::VkTextureArrayIn::compute_read("textures");
+    merian_nodes::VkTextureInHandle con_textures =
+        merian_nodes::VkTextureIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
     merian_nodes::VkTextureInHandle con_mv =
         merian_nodes::VkTextureIn::compute_read("mv");
