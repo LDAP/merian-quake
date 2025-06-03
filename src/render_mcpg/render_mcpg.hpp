@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
@@ -73,10 +73,10 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian_nodes::VkTextureArrayInHandle con_textures =
         merian_nodes::VkTextureArrayIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
-    merian_nodes::ManagedVkImageInHandle con_prev_volume_depth =
-        merian_nodes::ManagedVkImageIn::compute_read("prev_volume_depth", 1);
-    merian_nodes::ManagedVkImageInHandle con_mv =
-        merian_nodes::ManagedVkImageIn::transfer_src("mv");
+    merian_nodes::VkTextureInHandle con_prev_volume_depth =
+        merian_nodes::VkTextureIn::compute_read("prev_volume_depth", 1);
+    merian_nodes::VkTextureInHandle con_mv =
+        merian_nodes::VkTextureIn::transfer_src("mv");
 
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");

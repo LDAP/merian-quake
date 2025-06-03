@@ -19,8 +19,8 @@ if get_option('buildtype').startswith('debug')
 endif
 
 if get_option('buildtype') == 'debug'
-  add_project_arguments('-fsanitize=address,undefined', language : 'cpp')
-  add_project_link_arguments('-fsanitize=address,undefined', language : 'cpp')
+  #add_project_arguments('-fsanitize=address,undefined', language : 'cpp')
+  #add_project_link_arguments('-fsanitize=address,undefined', language : 'cpp')
 endif
 
 # Dependencies

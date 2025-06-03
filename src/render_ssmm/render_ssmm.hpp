@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
@@ -61,8 +61,8 @@ class RendererSSMM : public merian_nodes::Node {
     merian_nodes::VkTextureArrayInHandle con_textures =
         merian_nodes::VkTextureArrayIn::compute_read("textures");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
-    merian_nodes::ManagedVkImageInHandle con_mv =
-        merian_nodes::ManagedVkImageIn::compute_read("mv");
+    merian_nodes::VkTextureInHandle con_mv =
+        merian_nodes::VkTextureIn::compute_read("mv");
     merian_nodes::ManagedVkBufferInHandle con_prev_ssmc =
         merian_nodes::ManagedVkBufferIn::compute_read("prev_ssmc", 1);
 
