@@ -4,6 +4,7 @@
 
 #include "merian-nodes/graph/graph.hpp"
 #include "merian/io/file_loader.hpp"
+#include "merian/utils/imgui_spdlog_sink.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/utils/properties_imgui.hpp"
@@ -136,6 +137,9 @@ static void signal_handler(int signal) {
 
 int main(const int argc, const char** argv) {
     spdlog::set_level(spdlog::level::trace);
+    std::shared_ptr<merian::ImguiSpdlogSink> imgui_spdlog =
+        std::make_shared<merian::ImguiSpdlogSink>();
+    spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
     std::shared_ptr<merian::ExtensionGLFW> ext_glfw;
     auto resources = std::make_shared<merian::ExtensionResources>();
@@ -239,6 +243,11 @@ int main(const int argc, const char** argv) {
                          NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
             config_manager.get(config);
+            if (ImGui::TreeNodeEx("Log", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed,
+                                  "%s", "Log")) {
+                imgui_spdlog->imgui_draw_log();
+                ImGui::TreePop();
+            }
             ImGui::End();
             ImGui::PopStyleVar();
 

@@ -1,11 +1,11 @@
 #include "quake_helpers.hpp"
 
+#include "../../res/shader/config.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "merian/utils/bitpacking.hpp"
 #include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/xorshift.hpp"
-#include "../../res/shader/config.h"
 
 #include <algorithm>
 #include <array>
@@ -110,10 +110,11 @@ void add_particles(std::vector<float>& vtx,
         glm::vec3 vert[4];
         glm::vec3 prev_vert[4];
         for (int l = 0; l < 3; l++) {
-            const float particle_offset = 2 * (xrand.get() - 0.5) + 2 * (xrand.get() - 0.5);
-            const double rand_angle = xrand.get();
-            const glm::vec3 rand_v =
-                glm::normalize(glm::vec3(xrand.get(), xrand.get(), xrand.get()));
+            const float particle_offset =
+                2 * (xrand.next_double() - 0.5) + 2 * (xrand.next_double() - 0.5);
+            const double rand_angle = xrand.next_double();
+            const glm::vec3 rand_v = glm::normalize(
+                glm::vec3(xrand.next_double(), xrand.next_double(), xrand.next_double()));
 
             const glm::mat4 rotation = glm::rotate<float>(
                 glm::identity<glm::mat4>(),
@@ -125,8 +126,9 @@ void add_particles(std::vector<float>& vtx,
                     M_PI,
                 rand_v);
             for (int k = 0; k < 4; k++) {
-                const float vertex_offset = 0.5 * ((xrand.get() - 0.5) + (xrand.get() - 0.5));
-                const float rand_offset_scale = (float)xrand.get();
+                const float vertex_offset =
+                    0.5 * ((xrand.next_double() - 0.5) + (xrand.next_double() - 0.5));
+                const float rand_offset_scale = (float)xrand.next_double();
 
                 vert[k] = *merian::as_vec3(p->org) + particle_offset +
                           glm::vec3(rotation * glm::vec4(scale * voff[k] * (1 + rand_offset_scale) +
@@ -189,14 +191,14 @@ void add_particles(std::vector<float>& vtx,
                                    *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]])));
                 const uint32_t enc_n = merian::encode_normal(n);
 
-                ext.emplace_back(texnum, texnum_fb, enc_n, enc_n, enc_n,
+                ext.emplace_back(texnum, texnum_fb, enc_n, enc_n, enc_n, merian::float_to_half(0),
+                                 merian::float_to_half(1), merian::float_to_half(0),
                                  merian::float_to_half(0), merian::float_to_half(1),
-                                 merian::float_to_half(0), merian::float_to_half(0),
-                                 merian::float_to_half(1), merian::float_to_half(0));
+                                 merian::float_to_half(0));
             } else {
                 for (int i = 0; i < 3; i++)
-                    color_bytes[0] =
-                        std::clamp(color_bytes[0] * (1 + xrand.get() * 0.1 - 0.05), 0., 255.);
+                    color_bytes[0] = std::clamp(
+                        color_bytes[0] * (1 + xrand.next_double() * 0.1 - 0.05), 0., 255.);
 
                 uint32_t c_fb = 0;
                 if (0.299 * color_bytes[0] + 0.587 * color_bytes[1] + 0.114 * color_bytes[2] >
@@ -345,19 +347,14 @@ void add_geo_alias(entity_t* ent,
             n2 = tmpn[indexes[3 * i + 2]];
         }
 
-        ext.emplace_back(texnum_alpha, fb_texnum, n0, n1, n2,
-                         merian::float_to_half((desc[indexes[3 * i + 0]].st[0] + 0.5) /
-                                                     (float)hdr->skinwidth),
-                         merian::float_to_half((desc[indexes[3 * i + 0]].st[1] + 0.5) /
-                                                     (float)hdr->skinheight),
-                         merian::float_to_half((desc[indexes[3 * i + 1]].st[0] + 0.5) /
-                                                     (float)hdr->skinwidth),
-                         merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) /
-                                                     (float)hdr->skinheight),
-                         merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) /
-                                                     (float)hdr->skinwidth),
-                         merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) /
-                                                     (float)hdr->skinheight));
+        ext.emplace_back(
+            texnum_alpha, fb_texnum, n0, n1, n2,
+            merian::float_to_half((desc[indexes[3 * i + 0]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 0]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half((desc[indexes[3 * i + 1]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 1]].st[1] + 0.5) / (float)hdr->skinheight),
+            merian::float_to_half((desc[indexes[3 * i + 2]].st[0] + 0.5) / (float)hdr->skinwidth),
+            merian::float_to_half((desc[indexes[3 * i + 2]].st[1] + 0.5) / (float)hdr->skinheight));
     }
 }
 
