@@ -96,8 +96,9 @@ void main() {
             if (dist_score_sum > 0.) {
                 [[unroll]]
                 for (int i = 0; i < DISTANCE_MC_SAMPLES; i++) {
-                    p += scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t) / dist_score_sum;
+                    p += scores[i] * sample_normal_pdf(normal_dists[i].x, normal_dists[i].y, t);
                 }
+                p /= dist_score_sum;
             }
             p = (dist_score_sum > 0 ? (1.0 - DIST_GUIDE_P) : 1.0) * transmittance_pdf2(t, MU_T, xi_max) + DIST_GUIDE_P * p;
         }
@@ -167,8 +168,9 @@ void main() {
                 if (score_sum > 0) {
                     [[unroll]]
                     for (int i = 0; i < MC_SAMPLES; i++) {
-                        wo_p += scores[i] * vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w) / score_sum;
+                        wo_p += scores[i] * vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w);
                     }
+                    wo_p /= score_sum;
                 }
                 wo_p = (score_sum > 0 ? VOLUME_PHASE_P : 1.0) * phase_draine_eval(dot(first_wi, wo), DRAINE_G, DRAINE_A) + (1 - VOLUME_PHASE_P) * wo_p;
             }
