@@ -109,29 +109,61 @@ void main() {
                     }
                 }
 
-                if (score_sum == 0 || XorShift32(rng_state) < SURF_BSDF_P) {
+                if (score_sum == 0) {
                     // BSDF Sampling
                     wo = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
+                    wo_p = bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness));
                     mc_state = mc_state_new();
                     mc_buffer_index = -1;
                 } else {
-                    wo = vmf_sample(vmfs[0].xyz, vmfs[0].w, XorShift32Vec2(rng_state));
-                }
-                wodotn = dot(wo, current_hit.normal);
+                    // Sebastians RIS scheme for path guiding
+                    const vec3 c1 = vmf_sample(vmfs[0].xyz, vmfs[0].w, XorShift32Vec2(rng_state)); // already resampled in the loop above.
+                    const vec3 c2 = bsdf_ggx_diffuse_mix_sample(current_hit.wi, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), XorShift32Vec3(rng_state));
 
+                    float g_c1 = 0;
+                    float g_c2 = 0;
+                    for (int i = 0; i < MC_SAMPLES; i++) {
+                        g_c1 += scores[i] * vmf_pdf(c1, vmfs[i].xyz, vmfs[i].w);
+                        g_c2 += scores[i] * vmf_pdf(c2, vmfs[i].xyz, vmfs[i].w);
+                    }
+
+                    const float t_c1 = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, c1, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02) * (SURF_BSDF_P * INV_FOUR_PI + (1 - SURF_BSDF_P) * g_c1 / score_sum);
+                    const float t_c2 = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, c2, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02) * (SURF_BSDF_P * INV_FOUR_PI + (1 - SURF_BSDF_P) * g_c2 / score_sum);
+                
+                    const float p_c1 = 0.5 * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, c1, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)) + 0.5 * g_c1 / score_sum;
+                    const float p_c2 = 0.5 * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, c2, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)) + 0.5 * g_c2 / score_sum;
+                
+                    const float w1 = t_c1 / p_c1;
+                    const float w2 = t_c2 / p_c2;
+
+                    wo = c1;
+                    wo_p = p_c1 * w1 * 2 / (w1 + w2);
+                    if (XorShift32(rng_state) < w2 / (w1 + w2)) {
+                        // resampling
+                        
+                        wo = c2; // => use bsdf
+                        wo_p = p_c2 * w2 * 2 / (w1 + w2);
+                        mc_state = mc_state_new();
+                        mc_buffer_index = -1;
+                    }
+
+
+                }
+
+                wodotn = dot(wo, current_hit.normal);
                 // ray is below geometric surface
                 if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
                     break;
 
-                // Multiple importance sampling
-                if (score_sum > 0) {
-                    [[unroll]]
-                    for (int i = 0; i < MC_SAMPLES; i++) {
-                        wo_p += scores[i] * vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w);
-                    }
-                    wo_p /= score_sum;
-                }
-                wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)) + (1 - SURF_BSDF_P) * wo_p;
+                // // Multiple importance sampling
+                // if (score_sum > 0) {
+                //     [[unroll]]
+                //     for (int i = 0; i < MC_SAMPLES; i++) {
+                //         wo_p += scores[i] * vmf_pdf(wo, vmfs[i].xyz, vmfs[i].w);
+                //     }
+                //     wo_p /= score_sum;
+                // }
+                // wo_p = (score_sum > 0 ? SURF_BSDF_P : 1.0) * bsdf_ggx_diffuse_mix_pdf(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness)) + (1 - SURF_BSDF_P) * wo_p;
 
             }
 #endif
