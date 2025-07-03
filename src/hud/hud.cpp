@@ -3,7 +3,7 @@
 #include "merian/utils/glm.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
 
 extern "C" {
 
@@ -28,7 +28,7 @@ QuakeHud::~QuakeHud() {}
 std::vector<merian_nodes::InputConnectorHandle> QuakeHud::describe_inputs() {
     return {
         con_src,
-        merian_nodes::ManagedVkBufferIn::compute_read("gbuf"),
+        merian_nodes::VkBufferIn::compute_read("gbuf"),
     };
 }
 
