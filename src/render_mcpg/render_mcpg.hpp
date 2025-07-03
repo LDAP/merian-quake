@@ -4,7 +4,7 @@
 #include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
-#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
+
  
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
@@ -57,14 +57,14 @@ class RendererMarkovChain : public merian_nodes::Node {
     merian::ShaderModuleHandle volume_shader;
     merian::ShaderModuleHandle volume_forward_project_shader;
 
-    merian_nodes::VkBufferArrayInHandle con_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("vtx");
-    merian_nodes::VkBufferArrayInHandle con_prev_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("prev_vtx");
-    merian_nodes::VkBufferArrayInHandle con_idx =
-        merian_nodes::VkBufferArrayIn::compute_read("idx");
-    merian_nodes::VkBufferArrayInHandle con_ext =
-        merian_nodes::VkBufferArrayIn::compute_read("ext");
+    merian_nodes::VkBufferInHandle con_vtx =
+        merian_nodes::VkBufferIn::compute_read("vtx");
+    merian_nodes::VkBufferInHandle con_prev_vtx =
+        merian_nodes::VkBufferIn::compute_read("prev_vtx");
+    merian_nodes::VkBufferInHandle con_idx =
+        merian_nodes::VkBufferIn::compute_read("idx");
+    merian_nodes::VkBufferInHandle con_ext =
+        merian_nodes::VkBufferIn::compute_read("ext");
     merian_nodes::VkBufferInHandle con_gbuffer =
         merian_nodes::VkBufferIn::compute_read("gbuffer");
     merian_nodes::VkBufferInHandle con_hits =
