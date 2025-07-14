@@ -12,6 +12,7 @@ project(
 
 data_subdir = join_paths(get_option('datadir'), meson.project_name())
 add_project_arguments('-DMERIAN_QUAKE_DATA_DIR="@0@"'.format(join_paths(join_paths(get_option('prefix'), data_subdir))), language : 'cpp')
+add_project_arguments('-DMERIAN_QUAKE_PROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
 
 # Debug configuration
 if get_option('buildtype').startswith('debug')
