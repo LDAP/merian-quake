@@ -173,7 +173,12 @@ int main(const int argc, const char** argv) {
         context->file_loader.add_search_path(*dev_data_dir);
     }
     context->file_loader.add_search_path(MERIAN_QUAKE_DATA_DIR);
-    context->file_loader.add_search_path(merian::FileLoader::install_datadir() / std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+    if (const auto prefix = merian::FileLoader::portable_prefix(); prefix)
+        context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
+                                             std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+    if (const auto prefix = merian::FileLoader::install_prefix(); prefix)
+        context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
+                                             std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
     merian_nodes::Graph<> graph(context, alloc);
 
