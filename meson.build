@@ -19,11 +19,6 @@ if get_option('buildtype').startswith('debug')
   add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
 endif
 
-if get_option('buildtype') == 'debug'
-  add_project_arguments('-fsanitize=address,undefined', language : 'cpp')
-  add_project_link_arguments('-fsanitize=address,undefined', language : 'cpp')
-endif
-
 # Dependencies
 merian_subp = subproject('merian')
 merian = merian_subp.get_variable('merian_dep')
