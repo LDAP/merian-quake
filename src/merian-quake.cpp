@@ -1,8 +1,7 @@
-#include "gbuffer/gbuffer.hpp"
 #include "imgui.h"
+#include "merian-nodes/graph/graph_description.hpp"
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 
-#include "merian-nodes/graph/graph.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/imgui_spdlog_sink.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
@@ -21,8 +20,6 @@
 
 #include <csignal>
 #include <merian/vk/window/imgui_context.hpp>
-
-#include "configuration.hpp"
 
 #include "game/quake_node.hpp"
 #include "hud/hud.hpp"
@@ -51,6 +48,10 @@ extern cvar_t con_notifytime;
 #define NUM_CON_TIMES 4
 extern float con_times[NUM_CON_TIMES];
 }
+
+static const char* CONFIG_NAME = "merian-quake.json";
+static const char* FALLBACK_CONFIG_NAME = "default_config.json";
+static const char* CONFIG_PATH_ENV_VAR = "MERIAN_QUAKE_CONFIG_PATH";
 
 static void QuakeMessageOverlay() {
     const ImGuiWindowFlags window_flags =
@@ -180,99 +181,111 @@ int main(const int argc, const char** argv) {
         context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
                                              std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
-    merian_nodes::Graph<> graph(context, alloc);
-
-    graph.get_registry().register_node<QuakeNode>(merian_nodes::NodeRegistry::NodeInfo{
-        "Quake", "Extract geometry info from Quake",
-        [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
-    graph.get_registry().register_node<merian::QuakeHud>(merian_nodes::NodeRegistry::NodeInfo{
-        "Hud", "Show gamestate and apply screen effects.",
-        [=]() { return std::make_shared<merian::QuakeHud>(context); }});
-    graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
-        "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
-        [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
-    graph.get_registry().register_node<RendererRESTIR>(merian_nodes::NodeRegistry::NodeInfo{
-        "Renderer (RESTIR)", "Renders a scene using RESTIR.",
-        [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
-    graph.get_registry().register_node<GBuffer>(
-        merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
-                                             [=]() { return std::make_shared<GBuffer>(context); }});
-    graph.get_registry().register_node<RendererSSMM>(
-        {"Renderer (SSMM)",
-         "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)",
-         [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
-
-    // this also creates all nodes in the graph.
-    ConfigurationManager config_manager(graph, context->file_loader);
-    config_manager.load();
-
-    std::shared_ptr<merian_nodes::GLFWWindow> output =
-        graph.find_node_for_identifier_and_type<merian_nodes::GLFWWindow>("output");
-    std::shared_ptr<QuakeNode> quake =
-        graph.find_node_for_identifier_and_type<QuakeNode>("Quake 0");
-
-    merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
-    if (output && quake && output->get_window()) {
-        controller = std::make_shared<merian::GLFWInputController>(output->get_window());
-        quake->set_controller(controller);
+    std::string config_path = (std::getenv(CONFIG_PATH_ENV_VAR) != nullptr)
+                                  ? std::getenv(CONFIG_PATH_ENV_VAR)
+                                  : CONFIG_NAME;
+    if (std::filesystem::exists(config_path)) {
+        SPDLOG_INFO("loading config {}", config_path);
+    } else {
+        auto default_config = context->file_loader.find_file(FALLBACK_CONFIG_NAME);
+        assert(default_config.has_value());
+        config_path = default_config.value().string();
+        SPDLOG_DEBUG("loading default config {}", FALLBACK_CONFIG_NAME);
     }
+    merian_nodes::GraphDescription graph_description = merian_nodes::GraphDescription::from_file(config_path);
 
-    merian::ImGuiProperties config;
-    merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
-    merian::GLFWImGui imgui(context, debug_ctx, true);
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->AddFontDefault();
-    quake_font_sm = io.Fonts->AddFontFromFileTTF(
-        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 26);
-    quake_font_lg = io.Fonts->AddFontFromFileTTF(
-        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 46);
-    merian::Stopwatch frametime;
-    if (output) {
-        output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
-                                          const merian::SwapchainAcquireResult& aquire_result) {
-            imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
+    // graph.get_registry().register_node<QuakeNode>(merian_nodes::NodeRegistry::NodeInfo{
+    //     "Quake", "Extract geometry info from Quake",
+    //     [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
+    // graph.get_registry().register_node<merian::QuakeHud>(merian_nodes::NodeRegistry::NodeInfo{
+    //     "Hud", "Show gamestate and apply screen effects.",
+    //     [=]() { return std::make_shared<merian::QuakeHud>(context); }});
+    // graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
+    //     "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
+    //     [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
+    // graph.get_registry().register_node<RendererRESTIR>(merian_nodes::NodeRegistry::NodeInfo{
+    //     "Renderer (RESTIR)", "Renders a scene using RESTIR.",
+    //     [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
+    // graph.get_registry().register_node<GBuffer>(
+    //     merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
+    //                                          [=]() { return std::make_shared<GBuffer>(context);
+    //                                          }});
+    // graph.get_registry().register_node<RendererSSMM>(
+    //     {"Renderer (SSMM)",
+    //      "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)",
+    //      [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
 
-            float alpha = 1.0;
-            if (controller->get_raw_mouse_input()) {
-                ImGui::GetIO().ClearInputMouse();
-                ImGui::GetIO().ClearInputKeys();
-                alpha = 0.2;
-            }
+    // // this also creates all nodes in the graph.
+    // ConfigurationManager config_manager(graph, context->file_loader);
+    // config_manager.load();
 
-            const double frametime_ms = frametime.millis();
-            frametime.reset();
+    // std::shared_ptr<merian_nodes::GLFWWindow> output =
+    //     graph.find_node_for_identifier_and_type<merian_nodes::GLFWWindow>("output");
+    // std::shared_ptr<QuakeNode> quake =
+    //     graph.find_node_for_identifier_and_type<QuakeNode>("Quake 0");
 
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-            ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
-                                     frametime_ms, 1000 / frametime_ms)
-                             .c_str(),
-                         NULL, ImGuiWindowFlags_NoFocusOnAppearing);
+    // merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
+    // if (output && quake && output->get_window()) {
+    //     controller = std::make_shared<merian::GLFWInputController>(output->get_window());
+    //     quake->set_controller(controller);
+    // }
 
-            config_manager.get(config);
-            if (ImGui::TreeNodeEx("Log", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed,
-                                  "%s", "Log")) {
-                imgui_spdlog->imgui_draw_log();
-                ImGui::TreePop();
-            }
-            ImGui::End();
-            ImGui::PopStyleVar();
+    // merian::ImGuiProperties config;
+    // merian::ImGuiContextWrapperHandle debug_ctx =
+    // std::make_shared<merian::ImGuiContextWrapper>(); merian::GLFWImGui imgui(context, debug_ctx,
+    // true); ImGuiIO& io = ImGui::GetIO(); io.Fonts->AddFontDefault(); quake_font_sm =
+    // io.Fonts->AddFontFromFileTTF(
+    //     context->file_loader.find_file("dpquake.ttf")->string().c_str(), 26);
+    // quake_font_lg = io.Fonts->AddFontFromFileTTF(
+    //     context->file_loader.find_file("dpquake.ttf")->string().c_str(), 46);
+    // merian::Stopwatch frametime;
+    // if (output) {
+    //     output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
+    //                                       const merian::SwapchainAcquireResult& aquire_result) {
+    //         imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
 
-            QuakeMessageOverlay();
+    //         float alpha = 1.0;
+    //         if (controller->get_raw_mouse_input()) {
+    //             ImGui::GetIO().ClearInputMouse();
+    //             ImGui::GetIO().ClearInputKeys();
+    //             alpha = 0.2;
+    //         }
 
-            imgui.render(cmd);
-            controller->set_active(
-                controller->get_raw_mouse_input() ||
-                !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
-        });
-    }
+    //         const double frametime_ms = frametime.millis();
+    //         frametime.reset();
 
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
+    //         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
+    //         ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
+    //                                  frametime_ms, 1000 / frametime_ms)
+    //                          .c_str(),
+    //                      NULL, ImGuiWindowFlags_NoFocusOnAppearing);
 
-    graph.set_on_run_starting([](merian_nodes::GraphRun&) { glfwPollEvents(); });
-    while (!stop) {
-        graph.run();
-    }
+    //         config_manager.get(config);
+    //         if (ImGui::TreeNodeEx("Log", ImGuiTreeNodeFlags_DefaultOpen |
+    //         ImGuiTreeNodeFlags_Framed,
+    //                               "%s", "Log")) {
+    //             imgui_spdlog->imgui_draw_log();
+    //             ImGui::TreePop();
+    //         }
+    //         ImGui::End();
+    //         ImGui::PopStyleVar();
 
-    config_manager.store();
+    //         QuakeMessageOverlay();
+
+    //         imgui.render(cmd);
+    //         controller->set_active(
+    //             controller->get_raw_mouse_input() ||
+    //             !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
+    //     });
+    // }
+
+    // std::signal(SIGINT, signal_handler);
+    // std::signal(SIGTERM, signal_handler);
+
+    // graph.set_on_run_starting([](merian_nodes::GraphRun&) { glfwPollEvents(); });
+    // while (!stop) {
+    //     graph.run();
+    // }
+
+    // config_manager.store();
 }
