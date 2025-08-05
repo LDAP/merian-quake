@@ -34,7 +34,7 @@ std::vector<merian_nodes::InputConnectorHandle> QuakeHud::describe_inputs() {
 
 std::vector<merian_nodes::OutputConnectorHandle>
 QuakeHud::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
-    extent = io_layout[con_src]->create_info.extent;
+    extent = io_layout[con_src]->get_create_info().extent;
     return {
         merian_nodes::ManagedVkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
                                                        extent),

@@ -1,6 +1,7 @@
 #include "render_mcpg.hpp"
 
 #include "game/quake_node.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"

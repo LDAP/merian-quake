@@ -1,12 +1,12 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
-#include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
-#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
-#include "merian-nodes/connectors/vk_texture_array_in.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
 #include "game/quake_node.hpp"
@@ -44,18 +44,18 @@ class GBuffer : public merian_nodes::Node {
 
     merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian_nodes::VkTextureArrayInHandle con_textures =
-        merian_nodes::VkTextureArrayIn::compute_read("textures");
+    merian_nodes::VkSampledImageInHandle con_textures =
+        merian_nodes::VkSampledImageIn::compute_read("textures");
     merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
-    merian_nodes::VkBufferArrayInHandle con_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("vtx");
-    merian_nodes::VkBufferArrayInHandle con_prev_vtx =
-        merian_nodes::VkBufferArrayIn::compute_read("prev_vtx");
-    merian_nodes::VkBufferArrayInHandle con_idx =
-        merian_nodes::VkBufferArrayIn::compute_read("idx");
-    merian_nodes::VkBufferArrayInHandle con_ext =
-        merian_nodes::VkBufferArrayIn::compute_read("ext");
+    merian_nodes::VkBufferInHandle con_vtx =
+        merian_nodes::VkBufferIn::compute_read("vtx");
+    merian_nodes::VkBufferInHandle con_prev_vtx =
+        merian_nodes::VkBufferIn::compute_read("prev_vtx");
+    merian_nodes::VkBufferInHandle con_idx =
+        merian_nodes::VkBufferIn::compute_read("idx");
+    merian_nodes::VkBufferInHandle con_ext =
+        merian_nodes::VkBufferIn::compute_read("ext");
     merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
 
     merian_nodes::ManagedVkImageOutHandle con_albedo;

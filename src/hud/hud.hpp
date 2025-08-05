@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian {
@@ -42,8 +42,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian_nodes::ManagedVkImageInHandle con_src =
-        merian_nodes::ManagedVkImageIn::compute_read("src");
+    merian_nodes::VkSampledImageInHandle con_src = merian_nodes::VkSampledImageIn::compute_read("src");
 
     SpecializationInfoHandle spec_info;
 
