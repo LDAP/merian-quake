@@ -695,7 +695,8 @@ void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
 
         merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
             cmd, tex.cpu_tex.data(), tex.width, tex.height, mag_filter, vk::Filter::eLinear,
-            !tex.linear, tex.name, (tex.flags & TEXPREF_MIPMAP) != 0u);
+            !tex.linear, tex.name, (tex.flags & TEXPREF_MIPMAP) != 0u,
+            vk::ImageUsageFlagBits::eTransferSrc);
         io[con_textures].set(texnum, gpu_tex, cmd, vk::AccessFlagBits2::eTransferWrite,
                              vk::PipelineStageFlagBits2::eTransfer);
     }
