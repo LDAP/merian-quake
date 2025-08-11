@@ -7,7 +7,8 @@ project(
         'cpp_std=c++20',
         'b_ndebug=if-release',
         'buildtype=release',
-    ]
+    ],
+    meson_version: '>=1.2.0',
 )
 
 data_subdir = join_paths(get_option('datadir'), meson.project_name())
