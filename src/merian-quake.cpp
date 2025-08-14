@@ -182,22 +182,22 @@ int main(const int argc, const char** argv) {
 
     merian_nodes::Graph<> graph(context, alloc);
 
-    graph.get_registry().register_node<QuakeNode>(merian_nodes::NodeRegistry::NodeInfo{
+    graph.get_registry().register_node_type<QuakeNode>(merian_nodes::NodeRegistry::NodeTypeInfo{
         "Quake", "Extract geometry info from Quake",
         [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
-    graph.get_registry().register_node<merian::QuakeHud>(merian_nodes::NodeRegistry::NodeInfo{
+    graph.get_registry().register_node_type<merian::QuakeHud>(merian_nodes::NodeRegistry::NodeTypeInfo{
         "Hud", "Show gamestate and apply screen effects.",
         [=]() { return std::make_shared<merian::QuakeHud>(context); }});
-    graph.get_registry().register_node<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeInfo{
+    graph.get_registry().register_node_type<RendererMarkovChain>(merian_nodes::NodeRegistry::NodeTypeInfo{
         "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
         [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
-    graph.get_registry().register_node<RendererRESTIR>(merian_nodes::NodeRegistry::NodeInfo{
+    graph.get_registry().register_node_type<RendererRESTIR>(merian_nodes::NodeRegistry::NodeTypeInfo{
         "Renderer (RESTIR)", "Renders a scene using RESTIR.",
         [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
-    graph.get_registry().register_node<GBuffer>(
-        merian_nodes::NodeRegistry::NodeInfo{"GBuffer", "Generates the GBuffer for Quake.",
+    graph.get_registry().register_node_type<GBuffer>(
+        merian_nodes::NodeRegistry::NodeTypeInfo{"GBuffer", "Generates the GBuffer for Quake.",
                                              [=]() { return std::make_shared<GBuffer>(context); }});
-    graph.get_registry().register_node<RendererSSMM>(
+    graph.get_registry().register_node_type<RendererSSMM>(
         {"Renderer (SSMM)",
          "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)",
          [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
