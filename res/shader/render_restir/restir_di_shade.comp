@@ -10,7 +10,7 @@
 #include "merian-shaders/bsdf_diffuse.glsl"
 #include "merian-shaders/bsdf_ggx.glsl"
 #include "merian-shaders/normal_encode.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 #define pixel ivec2(gl_GlobalInvocationID)
 #define resolution ivec2(imageSize(img_irradiance))

@@ -2,7 +2,7 @@
 #define _MERIAN_QUAKE_RESTIR_DI_COMMOON_
 
 #include "merian-shaders/bsdf_ggx.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 float restir_di_target_pdf(const ReSTIRDISample y, const Hit surface) {
     const vec3 wo = normalize(y.pos - surface.pos);

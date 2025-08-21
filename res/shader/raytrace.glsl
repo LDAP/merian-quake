@@ -17,7 +17,7 @@
 #include "merian-shaders/ray_differential.glsl"
 #include "merian-shaders/raytrace.glsl"
 #include "merian-shaders/textures.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 // assert(alpha != 0)
 #define decode_alpha(enc_alpha) (float16_t(enc_alpha - 1) / 14.hf)
