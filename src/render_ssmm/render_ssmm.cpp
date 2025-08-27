@@ -98,7 +98,7 @@ void RendererSSMM::process(merian_nodes::GraphRun& run,
         };
 
         merian::CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_defines(additional_macro_definitions);
+        compilation_session_desc.set_preprocessor_macros(additional_macro_definitions);
 
         rt_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
             context, "shader/render_ssmm/ssmm.comp", compilation_session_desc);
