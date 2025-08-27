@@ -14,30 +14,33 @@
 
 vk::BufferCreateInfo make_reservoir_buffer_create_info(const uint32_t render_width,
                                                        const uint32_t render_height) {
-    return vk::BufferCreateInfo{
-        {},
-        image_to_buffer_size((unsigned long)render_width, render_height) * sizeof(ReSTIRDIReservoir),
-        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
-            vk::BufferUsageFlagBits::eTransferSrc};
+    return vk::BufferCreateInfo{{},
+                                image_to_buffer_size((unsigned long)render_width, render_height) *
+                                    sizeof(ReSTIRDIReservoir),
+                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                    vk::BufferUsageFlagBits::eTransferDst |
+                                    vk::BufferUsageFlagBits::eTransferSrc};
 }
 
 RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
                                const merian::ResourceAllocatorHandle& allocator)
     : Node(), context(context), allocator(allocator) {
 
-    const auto shader_compiler = merian::ShaderCompiler::get(context);
+    const auto shader_compiler = merian::GLSLShaderCompiler::get();
+    merian::CompilationSessionDescription compilation_session_desc(context);
 
     // PIPELINE CREATION
     generate_samples_shader = shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_restir/restir_di_generate_samples_bsdf.comp");
+        context, "shader/render_restir/restir_di_generate_samples_bsdf.comp",
+        compilation_session_desc);
     temporal_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_restir/restir_di_temporal_reuse.comp");
+        context, "shader/render_restir/restir_di_temporal_reuse.comp", compilation_session_desc);
     spatial_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_restir/restir_di_spatial_reuse.comp");
+        context, "shader/render_restir/restir_di_spatial_reuse.comp", compilation_session_desc);
     shade_shader = shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_restir/restir_di_shade.comp");
+        context, "shader/render_restir/restir_di_shade.comp", compilation_session_desc);
     clear_shader = shader_compiler->find_compile_glsl_to_shadermodule(
-        context, "shader/render_restir/restir_di_clear.comp");
+        context, "shader/render_restir/restir_di_clear.comp", compilation_session_desc);
 
     reservoir_pingpong_layout =
         merian::DescriptorSetLayoutBuilder()
@@ -285,9 +288,10 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_percent("boiling filter strength", boiling_filter_strength,
                               "Discard the upper X percent of samples. Disable with 0.0.");
-    recreate_pipeline |= config.config_bool("apply mv", apply_mv,
-                                            "Estimates the new sample position from geometry "
-                                            "movement. Reduces flickering but introduces bias in motion.");
+    recreate_pipeline |=
+        config.config_bool("apply mv", apply_mv,
+                           "Estimates the new sample position from geometry "
+                           "movement. Reduces flickering but introduces bias in motion.");
 
     config.st_separate("Spatial Reuse");
     recreate_pipeline |=

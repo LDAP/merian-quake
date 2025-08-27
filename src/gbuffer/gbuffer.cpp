@@ -73,13 +73,13 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
     QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 
     if (!pipe || render_info.constant_data_update) {
+        merian::CompilationSessionDescription compilation_session_desc(context);
+        compilation_session_desc["ENABLE_ALBEDO_MIPMAP"] =
+            std::to_string(static_cast<int>(enable_albedo_mipmap));
+        compilation_session_desc["ENABLE_EMISSION_MIPMAP"] =
+            std::to_string(static_cast<int>(enable_emission_mipmap));
         shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-            context, "shader/gbuffer/gbuffer.comp", std::nullopt, {},
-            {
-                {"ENABLE_ALBEDO_MIPMAP", std::to_string(static_cast<int>(enable_albedo_mipmap))},
-                {"ENABLE_EMISSION_MIPMAP",
-                 std::to_string(static_cast<int>(enable_emission_mipmap))},
-            });
+            context, "shader/gbuffer/gbuffer.comp", compilation_session_desc);
 
         auto pipe_builder = merian::PipelineLayoutBuilder(context);
         pipe_builder.add_push_constant<QuakeNode::UniformData>();

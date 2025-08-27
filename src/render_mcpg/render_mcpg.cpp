@@ -171,19 +171,19 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
         };
 
+        merian::CompilationSessionDescription compilation_session_desc(context);
+        compilation_session_desc.set_preprocessor_defines(additional_macro_definitions);
+
         rt_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-            context, "shader/render_mcpg/mcpg.comp", std::nullopt, {},
-            additional_macro_definitions);
+            context, "shader/render_mcpg/mcpg.comp", compilation_session_desc);
         clear_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-            context, "shader/render_mcpg/clear.comp", std::nullopt, {},
-            additional_macro_definitions);
+            context, "shader/render_mcpg/clear.comp", compilation_session_desc);
         volume_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-            context, "shader/render_mcpg/volume.comp", std::nullopt, {},
-            additional_macro_definitions);
+            context, "shader/render_mcpg/volume.comp", compilation_session_desc);
         volume_forward_project_shader =
             run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-                context, "shader/render_mcpg/volume_forward_project.comp", std::nullopt, {},
-                additional_macro_definitions);
+                context, "shader/render_mcpg/volume_forward_project.comp",
+                compilation_session_desc);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
 
@@ -420,11 +420,10 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
     needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
     if (!dumping) {
         dump_mc = config.config_bool("Download Adaptive Grid",
-                                 "Dumps the states as json into mc_dump.json");
+                                     "Dumps the states as json into mc_dump.json");
     } else {
         config.output_text("Dumping to mc_dump.json...");
     }
-
 
     // Only require a pipeline recreation
     if (needs_pipeline_rebuild || old_spp != spp || old_max_path_lenght != max_path_length ||
