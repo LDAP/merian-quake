@@ -16,13 +16,12 @@ extern mleaf_t* r_viewleaf;
 namespace merian {
 
 QuakeHud::QuakeHud(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
-    shader = ShaderModule::create(
-        context, merian_quake_hud_comp_spv(), merian_quake_hud_comp_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
-    spec_info = spec_builder.build();
+    shader =
+        EntryPoint::create(context, merian_quake_hud_comp_spv(), merian_quake_hud_comp_spv_size(),
+                           "main", vk::ShaderStageFlagBits::eCompute, spec_builder.build());
 }
 
 QuakeHud::~QuakeHud() {}
@@ -41,11 +40,6 @@ QuakeHud::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
         merian_nodes::ManagedVkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
                                                        extent),
     };
-}
-
-SpecializationInfoHandle
-QuakeHud::get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io) noexcept {
-    return spec_info;
 }
 
 const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun& run,
@@ -82,7 +76,7 @@ QuakeHud::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle QuakeHud::get_shader_module() {
+EntryPointHandle QuakeHud::get_entry_point() {
     return shader;
 }
 

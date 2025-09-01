@@ -11,7 +11,7 @@
 
 #include "game/quake_node.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 class GBuffer : public merian_nodes::Node {
 
@@ -66,7 +66,7 @@ class GBuffer : public merian_nodes::Node {
     merian_nodes::ManagedVkBufferOutHandle con_hits;
 
     vk::Extent3D extent;
-    merian::ShaderModuleHandle shader;
+    merian::EntryPointHandle shader;
 
     merian::DescriptorSetLayoutHandle descriptor_set_layout;
     merian::PipelineHandle pipe;

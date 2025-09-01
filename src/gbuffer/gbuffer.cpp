@@ -78,7 +78,7 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
             std::to_string(static_cast<int>(enable_albedo_mipmap));
         compilation_session_desc["ENABLE_EMISSION_MIPMAP"] =
             std::to_string(static_cast<int>(enable_emission_mipmap));
-        shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/gbuffer/gbuffer.comp", compilation_session_desc);
 
         auto pipe_builder = merian::PipelineLayoutBuilder(context);
@@ -103,15 +103,15 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
 
         spec_builder.add_entry(render_info.constant.volume_max_t);
 
-        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader, spec_builder.build());
+        pipe = merian::ComputePipeline::create(pipe_layout, shader, spec_builder.build());
 
         // CLEAR PIPE
         auto clear_spec_builder = merian::SpecializationInfoBuilder();
         clear_spec_builder.add_entry(local_size_x, local_size_y);
         clear_spec_builder.add_entry(true);
 
-        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, shader,
-                                                               clear_spec_builder.build());
+        clear_pipe =
+            merian::ComputePipeline::create(pipe_layout, shader, clear_spec_builder.build());
     }
 
     merian::PipelineHandle current_pipe;

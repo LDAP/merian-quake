@@ -13,7 +13,7 @@
 #include "game/quake_node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 class RendererMarkovChain : public merian_nodes::Node {
   public:
@@ -52,10 +52,10 @@ class RendererMarkovChain : public merian_nodes::Node {
     const merian::ContextHandle context;
     const merian::ResourceAllocatorHandle allocator;
 
-    merian::ShaderModuleHandle rt_shader;
-    merian::ShaderModuleHandle clear_shader;
-    merian::ShaderModuleHandle volume_shader;
-    merian::ShaderModuleHandle volume_forward_project_shader;
+    merian::EntryPointHandle rt_shader;
+    merian::EntryPointHandle clear_shader;
+    merian::EntryPointHandle volume_shader;
+    merian::EntryPointHandle volume_forward_project_shader;
 
     merian_nodes::VkBufferInHandle con_vtx = merian_nodes::VkBufferIn::compute_read("vtx");
     merian_nodes::VkBufferInHandle con_prev_vtx =

@@ -28,27 +28,23 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     std::vector<merian_nodes::OutputConnectorHandle>
     describe_outputs(const merian_nodes::NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle
-    get_specialization_info([[maybe_unused]] const merian_nodes::NodeIO& io) noexcept override;
-
     const void* get_push_constant(merian_nodes::GraphRun& run,
                                   const merian_nodes::NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian_nodes::VkSampledImageInHandle con_src = merian_nodes::VkSampledImageIn::compute_read("src");
-
-    SpecializationInfoHandle spec_info;
+    merian_nodes::VkSampledImageInHandle con_src =
+        merian_nodes::VkSampledImageIn::compute_read("src");
 
     vk::Extent3D extent;
     PushConstant pc;
-    ShaderModuleHandle shader;
+    EntryPointHandle shader;
 };
 
 } // namespace merian

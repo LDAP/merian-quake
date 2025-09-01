@@ -100,9 +100,9 @@ void RendererSSMM::process(merian_nodes::GraphRun& run,
         merian::CompilationSessionDescription compilation_session_desc(context);
         compilation_session_desc.set_preprocessor_macros(additional_macro_definitions);
 
-        rt_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        rt_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_ssmm/ssmm.comp", compilation_session_desc);
-        clear_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        clear_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_ssmm/clear.comp", compilation_session_desc);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
@@ -111,8 +111,8 @@ void RendererSSMM::process(merian_nodes::GraphRun& run,
 
         auto spec = spec_builder.build();
 
-        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec);
-        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader, spec);
+        pipe = merian::ComputePipeline::create(pipe_layout, rt_shader, spec);
+        clear_pipe = merian::ComputePipeline::create(pipe_layout, clear_shader, spec);
     }
 
     // RESET MARKOV CHAINS AT ITERATION 0 and 1 (also clear previous frame)

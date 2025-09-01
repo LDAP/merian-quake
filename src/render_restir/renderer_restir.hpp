@@ -56,11 +56,11 @@ class RendererRESTIR : public merian_nodes::Node {
     const merian::ContextHandle context;
     const merian::ResourceAllocatorHandle allocator;
 
-    merian::ShaderModuleHandle generate_samples_shader;
-    merian::ShaderModuleHandle temporal_reuse_shader;
-    merian::ShaderModuleHandle spatial_reuse_shader;
-    merian::ShaderModuleHandle shade_shader;
-    merian::ShaderModuleHandle clear_shader;
+    merian::EntryPointHandle generate_samples_shader;
+    merian::EntryPointHandle temporal_reuse_shader;
+    merian::EntryPointHandle spatial_reuse_shader;
+    merian::EntryPointHandle shade_shader;
+    merian::EntryPointHandle clear_shader;
 
     merian_nodes::VkBufferInHandle con_vtx = merian_nodes::VkBufferIn::compute_read("vtx");
     merian_nodes::VkBufferInHandle con_prev_vtx =

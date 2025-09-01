@@ -174,16 +174,14 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
         merian::CompilationSessionDescription compilation_session_desc(context);
         compilation_session_desc.set_preprocessor_macros(additional_macro_definitions);
 
-        rt_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        rt_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_mcpg/mcpg.comp", compilation_session_desc);
-        clear_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        clear_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_mcpg/clear.comp", compilation_session_desc);
-        volume_shader = run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
+        volume_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_mcpg/volume.comp", compilation_session_desc);
-        volume_forward_project_shader =
-            run.get_shader_compiler()->find_compile_glsl_to_shadermodule(
-                context, "shader/render_mcpg/volume_forward_project.comp",
-                compilation_session_desc);
+        volume_forward_project_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
+            context, "shader/render_mcpg/volume_forward_project.comp", compilation_session_desc);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
 
@@ -191,11 +189,11 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
 
         auto spec = spec_builder.build();
 
-        pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, rt_shader, spec);
-        clear_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader, spec);
-        volume_pipe = std::make_shared<merian::ComputePipeline>(pipe_layout, volume_shader, spec);
-        volume_forward_project_pipe = std::make_shared<merian::ComputePipeline>(
-            pipe_layout, volume_forward_project_shader, spec);
+        pipe = merian::ComputePipeline::create(pipe_layout, rt_shader, spec);
+        clear_pipe = merian::ComputePipeline::create(pipe_layout, clear_shader, spec);
+        volume_pipe = merian::ComputePipeline::create(pipe_layout, volume_shader, spec);
+        volume_forward_project_pipe =
+            merian::ComputePipeline::create(pipe_layout, volume_forward_project_shader, spec);
     }
 
     // RESET MARKOV CHAINS AT ITERATION 0

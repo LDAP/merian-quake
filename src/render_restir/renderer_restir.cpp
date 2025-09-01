@@ -30,16 +30,16 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
     merian::CompilationSessionDescription compilation_session_desc(context);
 
     // PIPELINE CREATION
-    generate_samples_shader = shader_compiler->find_compile_glsl_to_shadermodule(
+    generate_samples_shader = shader_compiler->find_compile_glsl_to_entry_point(
         context, "shader/render_restir/restir_di_generate_samples_bsdf.comp",
         compilation_session_desc);
-    temporal_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
+    temporal_reuse_shader = shader_compiler->find_compile_glsl_to_entry_point(
         context, "shader/render_restir/restir_di_temporal_reuse.comp", compilation_session_desc);
-    spatial_reuse_shader = shader_compiler->find_compile_glsl_to_shadermodule(
+    spatial_reuse_shader = shader_compiler->find_compile_glsl_to_entry_point(
         context, "shader/render_restir/restir_di_spatial_reuse.comp", compilation_session_desc);
-    shade_shader = shader_compiler->find_compile_glsl_to_shadermodule(
+    shade_shader = shader_compiler->find_compile_glsl_to_entry_point(
         context, "shader/render_restir/restir_di_shade.comp", compilation_session_desc);
-    clear_shader = shader_compiler->find_compile_glsl_to_shadermodule(
+    clear_shader = shader_compiler->find_compile_glsl_to_entry_point(
         context, "shader/render_restir/restir_di_clear.comp", compilation_session_desc);
 
     reservoir_pingpong_layout =
@@ -172,15 +172,13 @@ void RendererRESTIR::process(merian_nodes::GraphRun& run,
         auto spec = spec_builder.build();
 
         pipelines.generate_samples =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, generate_samples_shader, spec);
+            merian::ComputePipeline::create(pipe_layout, generate_samples_shader, spec);
         pipelines.temporal_reuse =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, temporal_reuse_shader, spec);
+            merian::ComputePipeline::create(pipe_layout, temporal_reuse_shader, spec);
         pipelines.spatial_reuse =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, spatial_reuse_shader, spec);
-        pipelines.shade =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, shade_shader, spec);
-        pipelines.clear =
-            std::make_shared<merian::ComputePipeline>(pipe_layout, clear_shader, spec);
+            merian::ComputePipeline::create(pipe_layout, spatial_reuse_shader, spec);
+        pipelines.shade = merian::ComputePipeline::create(pipe_layout, shade_shader, spec);
+        pipelines.clear = merian::ComputePipeline::create(pipe_layout, clear_shader, spec);
 
         pipelines.recreate = false;
     }
