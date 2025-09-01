@@ -34,7 +34,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
 
-    EntryPointHandle get_entry_point() override;
+    SpecializedEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -44,7 +44,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
 
     vk::Extent3D extent;
     PushConstant pc;
-    EntryPointHandle shader;
+    SpecializedEntryPointHandle shader;
 };
 
 } // namespace merian
