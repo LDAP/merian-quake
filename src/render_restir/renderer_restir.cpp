@@ -27,20 +27,20 @@ RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
     : Node(), context(context), allocator(allocator) {
 
     const auto shader_compiler = merian::GLSLShaderCompiler::get();
-    merian::CompilationSessionDescription compilation_session_desc(context);
+    merian::ShaderCompileContextHandle compile_context =
+        merian::ShaderCompileContext::create(context);
 
     // PIPELINE CREATION
     generate_samples_shader = shader_compiler->find_compile_glsl_to_entry_point(
-        context, "shader/render_restir/restir_di_generate_samples_bsdf.comp",
-        compilation_session_desc);
+        context, "shader/render_restir/restir_di_generate_samples_bsdf.comp", compile_context);
     temporal_reuse_shader = shader_compiler->find_compile_glsl_to_entry_point(
-        context, "shader/render_restir/restir_di_temporal_reuse.comp", compilation_session_desc);
+        context, "shader/render_restir/restir_di_temporal_reuse.comp", compile_context);
     spatial_reuse_shader = shader_compiler->find_compile_glsl_to_entry_point(
-        context, "shader/render_restir/restir_di_spatial_reuse.comp", compilation_session_desc);
+        context, "shader/render_restir/restir_di_spatial_reuse.comp", compile_context);
     shade_shader = shader_compiler->find_compile_glsl_to_entry_point(
-        context, "shader/render_restir/restir_di_shade.comp", compilation_session_desc);
+        context, "shader/render_restir/restir_di_shade.comp", compile_context);
     clear_shader = shader_compiler->find_compile_glsl_to_entry_point(
-        context, "shader/render_restir/restir_di_clear.comp", compilation_session_desc);
+        context, "shader/render_restir/restir_di_clear.comp", compile_context);
 
     reservoir_pingpong_layout =
         merian::DescriptorSetLayoutBuilder()

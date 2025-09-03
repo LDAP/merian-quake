@@ -76,7 +76,7 @@ QuakeHud::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-SpecializedEntryPointHandle QuakeHud::get_entry_point() {
+VulkanEntryPointHandle QuakeHud::get_entry_point() {
     return shader;
 }
 

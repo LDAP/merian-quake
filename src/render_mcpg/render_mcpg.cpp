@@ -171,17 +171,18 @@ void RendererMarkovChain::process(merian_nodes::GraphRun& run,
             {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
         };
 
-        merian::CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_macros(additional_macro_definitions);
+        merian::ShaderCompileContextHandle compile_context =
+            merian::ShaderCompileContext::create(context);
+        compile_context->set_preprocessor_macros(additional_macro_definitions);
 
         rt_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_mcpg/mcpg.comp", compilation_session_desc);
+            context, "shader/render_mcpg/mcpg.comp", compile_context);
         clear_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_mcpg/clear.comp", compilation_session_desc);
+            context, "shader/render_mcpg/clear.comp", compile_context);
         volume_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_mcpg/volume.comp", compilation_session_desc);
+            context, "shader/render_mcpg/volume.comp", compile_context);
         volume_forward_project_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_mcpg/volume_forward_project.comp", compilation_session_desc);
+            context, "shader/render_mcpg/volume_forward_project.comp", compile_context);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
 

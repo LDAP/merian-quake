@@ -97,13 +97,14 @@ void RendererSSMM::process(merian_nodes::GraphRun& run,
             {"SEED", std::to_string(seed)},
         };
 
-        merian::CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_macros(additional_macro_definitions);
+        merian::ShaderCompileContextHandle compile_context =
+            merian::ShaderCompileContext::create(context);
+        compile_context->set_preprocessor_macros(additional_macro_definitions);
 
         rt_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_ssmm/ssmm.comp", compilation_session_desc);
+            context, "shader/render_ssmm/ssmm.comp", compile_context);
         clear_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
-            context, "shader/render_ssmm/clear.comp", compilation_session_desc);
+            context, "shader/render_ssmm/clear.comp", compile_context);
 
         auto spec_builder = merian::SpecializationInfoBuilder();
 
