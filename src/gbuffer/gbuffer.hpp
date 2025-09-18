@@ -11,7 +11,7 @@
 
 #include "game/quake_node.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/entry_point.hpp"
+#include "merian/shader/entry_point.hpp"
 
 class GBuffer : public merian_nodes::Node {
 

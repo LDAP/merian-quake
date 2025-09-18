@@ -5,7 +5,7 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/shader/shader_module.hpp"
 
 #include "../../res/shader/render_ssmm/ssmc_state.h"
 
