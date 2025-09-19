@@ -684,6 +684,8 @@ void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
                                 const merian_nodes::NodeIO& io) {
 
     for (const auto& [texnum, tex] : pending_uploads) {
+        SPDLOG_DEBUG("uploading texture {}", texnum);
+
         vk::Filter mag_filter;
         if (default_filtering == 0) {
             mag_filter =
