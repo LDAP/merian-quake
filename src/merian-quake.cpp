@@ -149,8 +149,9 @@ int main(const int argc, const char** argv) {
     auto ext_push_desc = std::make_shared<merian::ExtensionVkPushDescriptor>();
     auto ext_core = std::make_shared<merian::ExtensionVkCore>();
     auto ext_float = std::make_shared<merian::ExtensionVkFloatAtomics>();
+    auto ext_desc_buf = std::make_shared<merian::ExtensionVkDescriptorBuffer>();
     std::vector<std::shared_ptr<merian::Extension>> extensions = {
-        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core, ext_float};
+        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core, ext_float, ext_desc_buf};
 
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
