@@ -136,6 +136,18 @@ static void signal_handler(int signal) {
 }
 
 int main(const int argc, const char** argv) {
+    merian::float3x2 m1(1, 2,
+                        3, 4,
+                        5, 6);
+    merian::float2x2 m2(7, 8,
+                        9, 10);
+
+    fmt::print("{}\n", m1);
+    fmt::print("{}\n", m2);
+    fmt::print("{}\n", merian::mul1(m1,m2));
+
+    return 0;
+
     spdlog::set_level(spdlog::level::trace);
     std::shared_ptr<merian::ImguiSpdlogSink> imgui_spdlog =
         std::make_shared<merian::ImguiSpdlogSink>();
