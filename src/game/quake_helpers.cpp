@@ -1,15 +1,15 @@
 #include "quake_helpers.hpp"
 
 #include "../../res/shader/config.h"
-#include "glm/ext/matrix_transform.hpp"
+
 #include "merian/utils/bitpacking.hpp"
-#include "merian/utils/glm.hpp"
 #include "merian/utils/normal_encoding.hpp"
+#include "merian/utils/vector_matrix.hpp"
 #include "merian/utils/xorshift.hpp"
 
 #include <algorithm>
 #include <array>
-#include <glm/glm.hpp>
+#include <cassert>
 #include <mutex>
 #include <vector>
 
@@ -56,7 +56,7 @@ void add_particles(std::vector<float>& vtx,
                    const bool no_random,
                    const double prev_cl_time) {
 
-    static const glm::vec3 voff[4] = {
+    static const merian::float3 voff[4] = {
         {0.0, 1.0, 0.0},
         {-0.5, -0.5, 0.87},
         {-0.5, -0.5, -0.87},
@@ -107,38 +107,40 @@ void add_particles(std::vector<float>& vtx,
             scale *= 2.0;
         }
 
-        glm::vec3 vert[4];
-        glm::vec3 prev_vert[4];
+        float velocity = merian::length(merian::as_float3(p->vel));
+        merian::float3 origin = merian::as_float3(p->org);
+        merian::float3 prev_origin = merian::as_float3(p->mv_prev_origin);
+
+        merian::float3 vert[4];
+        merian::float3 prev_vert[4];
         for (int l = 0; l < 3; l++) {
             const float particle_offset =
                 2 * (xrand.next_double() - 0.5) + 2 * (xrand.next_double() - 0.5);
             const double rand_angle = xrand.next_double();
-            const glm::vec3 rand_v = glm::normalize(
-                glm::vec3(xrand.next_double(), xrand.next_double(), xrand.next_double()));
+            const merian::float3 rand_v = normalize(
+                merian::float3(xrand.next_double(), xrand.next_double(), xrand.next_double()));
 
-            const glm::mat4 rotation = glm::rotate<float>(
-                glm::identity<glm::mat4>(),
-                (rand_angle + cl.time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 * M_PI,
-                rand_v);
-            const glm::mat4 prev_rotation = glm::rotate<float>(
-                glm::identity<glm::mat4>(),
-                (rand_angle + prev_cl_time * 0.001 * glm::length(*merian::as_vec3(p->vel))) * 2 *
-                    M_PI,
-                rand_v);
+            const merian::float4x4 rotation =
+                merian::rotation(rand_v, (rand_angle + cl.time * 0.001 * velocity) * 2 * M_PI);
+            const merian::float4x4 prev_rotation =
+                merian::rotation(rand_v, (rand_angle + prev_cl_time * 0.001 * velocity) * 2 * M_PI);
             for (int k = 0; k < 4; k++) {
                 const float vertex_offset =
                     0.5 * ((xrand.next_double() - 0.5) + (xrand.next_double() - 0.5));
                 const float rand_offset_scale = (float)xrand.next_double();
 
-                vert[k] = *merian::as_vec3(p->org) + particle_offset +
-                          glm::vec3(rotation * glm::vec4(scale * voff[k] * (1 + rand_offset_scale) +
-                                                             vertex_offset,
-                                                         1));
+                vert[k] =
+                    origin + particle_offset +
+                    merian::mul(rotation,
+                                merian::float4(
+                                    scale * voff[k] * (1 + rand_offset_scale) + vertex_offset, 1))
+                        .xyz();
                 prev_vert[k] =
-                    *merian::as_vec3(p->mv_prev_origin) + particle_offset +
-                    glm::vec3(
-                        prev_rotation *
-                        glm::vec4(scale * voff[k] * (1 + rand_offset_scale) + vertex_offset, 1));
+                    prev_origin + particle_offset +
+                    merian::mul(prev_rotation,
+                                merian::float4(
+                                    scale * voff[k] * (1 + rand_offset_scale) + vertex_offset, 1))
+                        .xyz();
             }
         }
 
@@ -184,11 +186,11 @@ void add_particles(std::vector<float>& vtx,
         for (int k = 0; k < 4; k++) {
             if (texnum) {
                 // texture patch
-                const glm::vec3 n = glm::normalize(
-                    glm::cross(*merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 2]]) -
-                                   *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]]),
-                               *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k + 1]]) -
-                                   *merian::as_vec3(&vtx[3 * idx[idx_size + 3 * k]])));
+                const merian::float3 n = merian::normalize(
+                    merian::cross(merian::as_float3(&vtx[3 * idx[idx_size + 3 * k + 2]]) -
+                                      merian::as_float3(&vtx[3 * idx[idx_size + 3 * k]]),
+                                  merian::as_float3(&vtx[3 * idx[idx_size + 3 * k + 1]]) -
+                                      merian::as_float3(&vtx[3 * idx[idx_size + 3 * k]])));
                 const uint32_t enc_n = merian::encode_normal(n);
 
                 ext.emplace_back(texnum, texnum_fb, enc_n, enc_n, enc_n, merian::float_to_half(0),
@@ -245,22 +247,20 @@ void add_geo_alias(entity_t* ent,
         return;
 
     // makes gun fov independent
-    glm::vec3 fovscale(1.);
+    merian::float3 fovscale(1.);
     if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
 
-    glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
+    merian::float4x4 mat_prev_model = merian::identity();
     AngleVectors(ent->mv_prev_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
-    mat_prev_model[3] = glm::vec4(*merian::as_vec3(ent->mv_prev_origin), 1);
+    mat_prev_model[3] = merian::float4(merian::as_float3(ent->mv_prev_origin), 1);
     mat_prev_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
     mat_prev_model =
-        mat_prev_model *
-        glm::translate(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale_origin) * fovscale);
-    mat_prev_model = mat_prev_model * glm::scale(glm::identity<glm::mat4>(),
-                                                 *merian::as_vec3(hdr->scale) * fovscale);
+        mat_prev_model * merian::translation(merian::as_float3(hdr->scale_origin) * fovscale);
+    mat_prev_model = mat_prev_model * merian::scale(merian::as_float3(hdr->scale) * fovscale);
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -268,20 +268,19 @@ void add_geo_alias(entity_t* ent,
 
     // angles: pitch yaw roll. axes: right fwd up
     lerpdata.angles[0] *= -1;
-    glm::mat4 mat_model = glm::identity<glm::mat4>();
-    glm::vec3 pos_pose1, pos_pose2;
+    merian::float4x4 mat_model = merian::identity();
+    merian::float3 pos_pose1, pos_pose2;
 
     AngleVectors(lerpdata.angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
-    mat_model[3] = glm::vec4(*merian::as_vec3(lerpdata.origin), 1);
+    mat_model[3] = merian::float4(merian::as_float3(lerpdata.origin), 1);
     mat_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_model = mat_model * glm::translate(glm::identity<glm::mat4>(),
-                                           *merian::as_vec3(hdr->scale_origin) * fovscale);
-    mat_model =
-        mat_model * glm::scale(glm::identity<glm::mat4>(), *merian::as_vec3(hdr->scale) * fovscale);
+    mat_model = mat_model * merian::translation(merian::as_float3(hdr->scale_origin) * fovscale);
+    mat_model = mat_model * merian::scale(merian::as_float3(hdr->scale) * fovscale);
 
-    const glm::mat3 mat_model_inv_t = glm::transpose(glm::inverse(mat_model));
+    const merian::float3x3 mat_model_inv_t =
+        merian::float3x3(merian::transpose(merian::inverse(mat_model)));
 
     uint32_t vtx_cnt = vtx.size() / 3;
     for (int v = 0; v < hdr->numverts_vbo; v++) {
@@ -293,13 +292,17 @@ void add_geo_alias(entity_t* ent,
             pos_pose2[k] = trivertexes[i_pose2].v[k];
         }
         // convert to world space
-        const glm::vec3 world_pos =
-            mat_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, lerpdata.blend), 1.0);
+        const merian::float3 world_pos =
+            merian::mul(mat_model,
+                        merian::float4(merian::lerp(pos_pose1, pos_pose2, lerpdata.blend), 1.0))
+                .xyz();
         for (int k = 0; k < 3; k++)
             vtx.emplace_back(world_pos[k]);
 
-        const glm::vec3 old_world_pos =
-            mat_prev_model * glm::vec4(glm::mix(pos_pose1, pos_pose2, ent->mv_prev_blend), 1.0);
+        const merian::float3 old_world_pos =
+            merian::mul(mat_prev_model,
+                        merian::float4(merian::lerp(pos_pose1, pos_pose2, ent->mv_prev_blend), 1.0))
+                .xyz();
         for (int k = 0; k < 3; k++)
             prev_vtx.emplace_back(old_world_pos[k]);
     }
@@ -316,19 +319,19 @@ void add_geo_alias(entity_t* ent,
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
         int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
-        const glm::vec3* n_pose1 =
-            merian::as_vec3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
-        const glm::vec3* n_pose2 =
-            merian::as_vec3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
+        const merian::float3 n_pose1 =
+            merian::as_float3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
+        const merian::float3 n_pose2 =
+            merian::as_float3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
         // convert to worldspace
-        const glm::vec3 world_n =
-            glm::normalize(mat_model_inv_t * glm::mix(*n_pose1, *n_pose2, lerpdata.blend));
+        const merian::float3 world_n = merian::normalize(
+            merian::mul(mat_model_inv_t, merian::lerp(n_pose1, n_pose2, lerpdata.blend)));
         tmpn[v] = merian::encode_normal(world_n);
     }
 
     // add extra data for each primitive
     for (int i = 0; i < hdr->numindexes / 3; i++) {
-        const int sk = glm::clamp(ent->skinnum, 0, hdr->numskins - 1),
+        const int sk = std::clamp(ent->skinnum, 0, hdr->numskins - 1),
                   fm = ((int)(cl.time * 10)) & 3;
         const uint16_t texnum_alpha = make_texnum_alpha(hdr->gltextures[sk][fm]);
         const uint16_t fb_texnum = hdr->fbtextures[sk][fm] ? hdr->fbtextures[sk][fm]->texnum : 0;
@@ -369,12 +372,12 @@ void add_geo_brush(entity_t* ent,
     assert(m->type == mod_brush);
 
     std::array<float, 3> angles = {-ent->angles[0], ent->angles[1], ent->angles[2]};
-    glm::mat4 mat_model = glm::identity<glm::mat4>();
+    merian::float4x4 mat_model = merian::identity();
     AngleVectors(angles.data(), &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
     mat_model[1] *= -1;
     VectorCopy(ent->origin, &mat_model[3].x);
 
-    glm::mat4 mat_prev_model = glm::identity<glm::mat4>();
+    merian::float4x4 mat_prev_model = merian::identity();
     std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1],
                                         ent->mv_prev_angles[2]};
     AngleVectors(prev_angles.data(), &mat_prev_model[0].x, &mat_prev_model[1].x,
@@ -407,9 +410,12 @@ void add_geo_brush(entity_t* ent,
         while (p) {
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
-                const glm::vec3 coord = mat_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
-                const glm::vec3 prev_coord =
-                    mat_prev_model * glm::vec4(*merian::as_vec3(p->verts[k]), 1.0);
+                const merian::float3 coord =
+                    merian::mul(mat_model, merian::float4(merian::as_float3(p->verts[k]), 1.0))
+                        .xyz();
+                const merian::float3 prev_coord =
+                    merian::mul(mat_prev_model, merian::float4(merian::as_float3(p->verts[k]), 1.0))
+                        .xyz();
 
                 for (int l = 0; l < 3; l++) {
                     vtx.emplace_back(coord[l]);
@@ -476,15 +482,15 @@ void add_geo_sprite(entity_t* ent,
                     std::vector<VertexExtraData>& ext) {
     assert(m->type == mod_sprite);
 
-    glm::vec3 v_forward, v_right, v_up;
+    merian::float3 v_forward, v_right, v_up;
     msprite_t* psprite;
     mspriteframe_t* frame;
-    glm::vec3 s_up, s_right;
+    merian::float3 s_up, s_right;
     float angle, sr, cr;
     float scale = ENTSCALE_DECODE(ent->scale);
 
     // pretty much from r_sprite:
-    glm::vec3 vpn, vright, vup, r_origin;
+    merian::float3 vpn, vright, vup, r_origin;
     VectorCopy(r_refdef.vieworg, r_origin);
     AngleVectors(r_refdef.viewangles, &vpn.x, &vright.x, &vup.x);
 
@@ -499,7 +505,7 @@ void add_geo_sprite(entity_t* ent,
         v_up[0] = 0;
         v_up[1] = 0;
         v_up[2] = 1;
-        v_right = glm::normalize(glm::cross(vpn, v_up));
+        v_right = merian::normalize(merian::cross(vpn, v_up));
         s_up = v_up;
         s_right = v_right;
         break;
@@ -542,12 +548,12 @@ void add_geo_sprite(entity_t* ent,
         return;
     }
 
-    s_up = glm::normalize(s_up);
-    s_right = glm::normalize(s_right);
+    s_up = merian::normalize(s_up);
+    s_right = merian::normalize(s_right);
 
     // add two quads
     for (int k = 0; k < 2; k++) {
-        glm::vec3 v0, v1, v2, v3;
+        merian::float3 v0, v1, v2, v3;
 
         // clang-format off
         switch (k) {
@@ -599,9 +605,9 @@ void add_geo_sprite(entity_t* ent,
         idx.emplace_back(vtx_cnt + 3);
 
         // add extra data
-        const glm::vec3 e0(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
-        const glm::vec3 e1(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
-        const uint32_t n_enc = merian::encode_normal(glm::normalize(glm::cross(e0, e1)));
+        const merian::float3 e0(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
+        const merian::float3 e1(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
+        const uint32_t n_enc = merian::encode_normal(merian::normalize(merian::cross(e0, e1)));
 
         const uint16_t texnum = make_texnum_alpha(frame->gltexture);
 

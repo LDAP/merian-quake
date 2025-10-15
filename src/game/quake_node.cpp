@@ -4,7 +4,6 @@
 #include "merian/utils/audio/sdl_audio_device.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/concurrent/utils.hpp"
-#include "merian/utils/glm.hpp"
 #include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
 
 #include <GLFW/glfw3.h>
@@ -26,8 +25,8 @@ struct QuakeData {
     std::unique_ptr<merian::SDLAudioDevice> audio_device;
 
     // updated in parse_worldspawn
-    glm::vec3 current_sun_color{};
-    glm::vec3 current_sun_direction{};
+    merian::float3 current_sun_color{};
+    merian::float3 current_sun_direction{};
 
     float timediff = 0;
 };
@@ -229,8 +228,8 @@ extern "C" void SNDDMA_UnblockSound(void) {
 }
 
 void parse_worldspawn() {
-    glm::vec3& quake_sun_col = quake_data.current_sun_color;
-    glm::vec3& quake_sun_dir = quake_data.current_sun_direction;
+    merian::float3& quake_sun_col = quake_data.current_sun_color;
+    merian::float3& quake_sun_dir = quake_data.current_sun_direction;
 
     std::map<std::string, std::string> worldspawn_props;
     char key[128];
@@ -263,15 +262,15 @@ void parse_worldspawn() {
         worldspawn_props[key] = value;
     }
 
-    quake_sun_col = glm::vec3(0);
+    quake_sun_col = merian::float3(0);
     for (const std::string k : {"sunlight", "sunlight2", "sunlight3"}) {
         if (worldspawn_props.contains(k)) {
-            glm::vec3 col(0);
+            merian::float3 col(0);
 
             if (worldspawn_props.contains(k + "_color")) {
                 sscanf(worldspawn_props[k + "_color"].c_str(), "%f %f %f", &col.r, &col.g, &col.b);
             } else {
-                col = glm::vec3(1);
+                col = merian::float3(1);
             }
 
             float intensity = std::stoi(worldspawn_props[k]);
@@ -294,22 +293,23 @@ void parse_worldspawn() {
         angles[1] -= 180;
         AngleVectors(angles, &quake_sun_dir.x, right, up);
     } else {
-        quake_sun_dir = glm::vec3(1, 1, 1);
+        quake_sun_dir = merian::float3(1, 1, 1);
     }
 
     // Some patches for maps
     if (worldspawn_props.contains("sky") && worldspawn_props["sky"] == "stormydays_") {
         // ad_tears
-        quake_sun_dir = glm::vec3(1, -1, 1);
-        quake_sun_col = glm::vec3(1.1, 1.0, 0.9);
+        quake_sun_dir = merian::float3(1, -1, 1);
+        quake_sun_col = merian::float3(1.1, 1.0, 0.9);
         quake_sun_col *= 6.0;
     }
 
     // prevent float16 overflow
-    const float max_col = std::max(std::max(quake_sun_col.r, quake_sun_col.g), quake_sun_col.b);
+    const float max_col =
+        merian::max(merian::max(quake_sun_col.r, quake_sun_col.g), quake_sun_col.b);
     if (max_col > MAX_SUN_COLOR)
         quake_sun_col = quake_sun_col / max_col * MAX_SUN_COLOR;
-    quake_sun_dir = glm::normalize(quake_sun_dir);
+    quake_sun_dir = merian::normalize(quake_sun_dir);
 }
 
 // If the supplied buffer is not nullptr and is large enough, it is returned and an upload is
@@ -758,13 +758,14 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
             render_info.constant.sun_color = quake_data.current_sun_color;
             render_info.constant.sun_direction = quake_data.current_sun_direction;
         }
-        if (glm::length(render_info.constant.sun_direction) > 0)
-            render_info.constant.sun_direction = glm::normalize(render_info.constant.sun_direction);
+        if (merian::length(render_info.constant.sun_direction) > 0)
+            render_info.constant.sun_direction =
+                merian::normalize(render_info.constant.sun_direction);
 
         // Quake sets fov assuming a 4x3 screen :D
         // Set the stuff in quake and let quake compute the fov.
         render_info.constant.fov = r_refdef.fov_x;
-        render_info.constant.fov_tan_alpha_half = glm::tan(glm::radians(r_refdef.fov_x) / 2);
+        render_info.constant.fov_tan_alpha_half = std::tan(merian::radians(r_refdef.fov_x) / 2);
     }
 
     // Update uniform data
@@ -786,7 +787,7 @@ void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
         float rgt[3];
         AngleVectors(r_refdef.viewangles, &render_info.uniform.cam_w.x, rgt,
                      &render_info.uniform.cam_u.x);
-        render_info.uniform.cam_x_mu_t = glm::vec4(*merian::as_vec3(r_refdef.vieworg), 1);
+        render_info.uniform.cam_x_mu_t = merian::float4(merian::as_float3(r_refdef.vieworg), 1);
         render_info.uniform.sky.fill(notexture->texnum);
         if (!render_info.render) {
             render_info.uniform.sky.fill(notexture->texnum);
@@ -1015,8 +1016,8 @@ void QuakeNode::update_as(const merian::CommandBufferHandle& cmd, const merian_n
 
 QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     const bool old_overwrite_sun = overwrite_sun;
-    const glm::vec3 old_overwrite_sun_dir = overwrite_sun_dir;
-    const glm::vec3 old_overwrite_sun_col = overwrite_sun_col;
+    const merian::float3 old_overwrite_sun_dir = overwrite_sun_dir;
+    const merian::float3 old_overwrite_sun_col = overwrite_sun_col;
 
     config.st_separate("General");
     config.config_bool("gamestate update", update_gamestate);
@@ -1054,8 +1055,8 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.st_separate("Debug / Info");
     config.config_bool("overwrite sun", overwrite_sun);
     if (overwrite_sun) {
-        config.config_float3("sun dir", &overwrite_sun_dir.x);
-        config.config_float3("sun col", &overwrite_sun_col.x);
+        config.config_vec("sun dir", overwrite_sun_dir);
+        config.config_vec("sun col", overwrite_sun_col);
     }
     if (config.config_float("volume max t", render_info.constant.volume_max_t)) {
         render_info.constant_data_update = true;
@@ -1063,7 +1064,7 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.config_bool("overwrite mu_t/s", mu_t_s_overwrite);
     if (mu_t_s_overwrite) {
         config.config_float("mu_t", mu_t, "", 0.000001);
-        config.config_float3("mu_s / mu_t", &mu_s_div_mu_t.x);
+        config.config_vec("mu_s / mu_t", mu_s_div_mu_t);
     } else {
         config.output_text(fmt::format(
             "mu_t: {}\nmu_s: ({}, {}, {})", render_info.uniform.cam_x_mu_t.a,
@@ -1080,8 +1081,8 @@ QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
     config.output_text(fmt::format("server fps: {}", server_fps));
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
 
-    if (old_overwrite_sun != overwrite_sun || old_overwrite_sun_dir != overwrite_sun_dir ||
-        old_overwrite_sun_col != overwrite_sun_col) {
+    if (old_overwrite_sun != overwrite_sun || (old_overwrite_sun_dir != overwrite_sun_dir) ||
+        (old_overwrite_sun_col != overwrite_sun_col)) {
         render_info.constant_data_update = true;
     }
 

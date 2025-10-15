@@ -269,10 +269,10 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
 
     config.st_separate("Temporal Reuse");
     config.config_bool("enable temporal reuse", temporal_reuse_enable);
-    float temporal_reject_angle = glm::acos(temporal_normal_reject_cos);
+    float temporal_reject_angle = std::acos(temporal_normal_reject_cos);
     recreate_pipeline |= config.config_angle("temporal normal threshold", temporal_reject_angle,
                                              "Reject points with normals farther apart", 0, 180);
-    temporal_normal_reject_cos = glm::cos(temporal_reject_angle);
+    temporal_normal_reject_cos = std::cos(temporal_reject_angle);
     recreate_pipeline |=
         config.config_percent("temporal depth threshold", temporal_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
@@ -294,10 +294,10 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     config.st_separate("Spatial Reuse");
     recreate_pipeline |=
         config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
-    float spatial_reject_angle = glm::acos(spatial_normal_reject_cos);
+    float spatial_reject_angle = std::acos(spatial_normal_reject_cos);
     recreate_pipeline |= config.config_angle("spatial normal threshold", spatial_reject_angle,
                                              "Reject points with normals farther apart", 0, 180);
-    spatial_normal_reject_cos = glm::cos(spatial_reject_angle);
+    spatial_normal_reject_cos = std::cos(spatial_reject_angle);
     recreate_pipeline |=
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");

@@ -97,7 +97,8 @@ void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
         spec_builder.add_entry(render_info.constant.sun_direction.y);
         spec_builder.add_entry(render_info.constant.sun_direction.z);
 
-        const glm::vec3 sun_color = hide_sun ? glm::vec3(0) : render_info.constant.sun_color;
+        const merian::float3 sun_color =
+            hide_sun ? merian::float3(0) : render_info.constant.sun_color;
         spec_builder.add_entry(sun_color.r);
         spec_builder.add_entry(sun_color.g);
         spec_builder.add_entry(sun_color.b);

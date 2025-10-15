@@ -12,7 +12,7 @@ class QuakeHud : public merian_nodes::AbstractCompute {
     static constexpr uint32_t local_size_y = 16;
 
     struct PushConstant {
-        glm::vec4 blend = glm::vec4(0);
+        merian::float4 blend = merian::float4(0);
         float armor = 0;
         float health = 0;
         int32_t effect = 0;

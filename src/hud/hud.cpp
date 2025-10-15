@@ -1,6 +1,5 @@
 #include "hud.hpp"
 #include "hud.comp.spv.h"
-#include "merian/utils/glm.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "merian-nodes/connectors/connector_utils.hpp"
@@ -48,7 +47,7 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun&
         // Demos do not have a player set
         pc.health = sv_player->v.health;
         pc.armor = sv_player->v.armorvalue;
-        pc.blend = *merian::as_vec4(v_blend);
+        pc.blend = merian::as_float4(v_blend);
 
         pc.effect = 0;
         if (r_viewleaf) {
@@ -64,7 +63,7 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun&
         pc.health = 0;
         pc.armor = 0;
         pc.effect = 0;
-        pc.blend = glm::vec4(0);
+        pc.blend = merian::float4(0);
     }
 
     return &pc;
@@ -81,8 +80,7 @@ VulkanEntryPointHandle QuakeHud::get_entry_point() {
 }
 
 QuakeHud::NodeStatusFlags QuakeHud::properties(Properties& config) {
-    config.output_text(
-        fmt::format("blend: ({}, {}, {}, {})", pc.blend.r, pc.blend.g, pc.blend.b, pc.blend.a));
+    config.output_text(fmt::format("blend: {}", pc.blend));
 
     return {};
 }

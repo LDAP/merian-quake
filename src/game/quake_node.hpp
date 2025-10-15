@@ -1,7 +1,6 @@
 #pragma once
 
 #include "game/quake_helpers.hpp"
-#include "glm/ext/vector_float4.hpp"
 
 #include "merian-nodes/connectors/buffer/vk_buffer_out_unmanaged.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_unmanaged.hpp"
@@ -40,13 +39,13 @@ class QuakeNode : public merian_nodes::Node {
     };
 
     struct UniformData {
-        glm::vec4 cam_x_mu_t; // pos, and fog mu_t in alpha
-        glm::vec4 cam_w;      // forward, and time_diff in alpha (set to 1. if 0.)
-        glm::vec4 cam_u;      // up
+        merian::float4 cam_x_mu_t; // pos, and fog mu_t in alpha
+        merian::float4 cam_w;      // forward, and time_diff in alpha (set to 1. if 0.)
+        merian::float4 cam_u;      // up
 
-        glm::vec4 prev_cam_x_mu_sx;
-        glm::vec4 prev_cam_w_mu_sy;
-        glm::vec4 prev_cam_u_mu_sz;
+        merian::float4 prev_cam_x_mu_sx;
+        merian::float4 prev_cam_w_mu_sy;
+        merian::float4 prev_cam_u_mu_sz;
 
         // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
         std::array<uint16_t, 6> sky;
@@ -60,8 +59,8 @@ class QuakeNode : public merian_nodes::Node {
     };
 
     struct ConstantData {
-        glm::vec3 sun_color;
-        glm::vec3 sun_direction;
+        merian::float3 sun_color;
+        merian::float3 sun_direction;
 
         float fov;
         float fov_tan_alpha_half;
@@ -244,12 +243,12 @@ class QuakeNode : public merian_nodes::Node {
 
     // Debug overwrites
     bool overwrite_sun = false;
-    glm::vec3 overwrite_sun_dir{0, 0, 1};
-    glm::vec3 overwrite_sun_col{0};
+    merian::float3 overwrite_sun_dir{0, 0, 1};
+    merian::float3 overwrite_sun_col{0};
     // --
     bool mu_t_s_overwrite = false;
     float mu_t = 0.;
-    glm::vec3 mu_s_div_mu_t = glm::vec3(1);
+    merian::float3 mu_s_div_mu_t = merian::float3(1);
     // --
     // 0 None, 1 Gun, 2 Full
     int playermodel = 1;
