@@ -258,9 +258,10 @@ void add_geo_alias(entity_t* ent,
     mat_prev_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
+    mat_prev_model = merian::mul(
+        mat_prev_model, merian::translation(merian::as_float3(hdr->scale_origin) * fovscale));
     mat_prev_model =
-        mat_prev_model * merian::translation(merian::as_float3(hdr->scale_origin) * fovscale);
-    mat_prev_model = mat_prev_model * merian::scale(merian::as_float3(hdr->scale) * fovscale);
+        merian::mul(mat_prev_model, merian::scale(merian::as_float3(hdr->scale) * fovscale));
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -276,8 +277,9 @@ void add_geo_alias(entity_t* ent,
     mat_model[1] *= -1;
 
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_model = mat_model * merian::translation(merian::as_float3(hdr->scale_origin) * fovscale);
-    mat_model = mat_model * merian::scale(merian::as_float3(hdr->scale) * fovscale);
+    mat_model = merian::mul(mat_model,
+                            merian::translation(merian::as_float3(hdr->scale_origin) * fovscale));
+    mat_model = merian::mul(mat_model, merian::scale(merian::as_float3(hdr->scale) * fovscale));
 
     const merian::float3x3 mat_model_inv_t =
         merian::float3x3(merian::transpose(merian::inverse(mat_model)));
