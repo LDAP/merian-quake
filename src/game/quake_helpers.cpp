@@ -251,17 +251,18 @@ void add_geo_alias(entity_t* ent,
     if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value)
         fovscale.y = fovscale.z = tan(scr_fov.value * (0.5f * M_PI / 180.f));
 
+    const merian::float4x4 scale = merian::transpose(
+        merian::mul(merian::translation(merian::as_float3(hdr->scale_origin) * fovscale),
+                    merian::scale(merian::as_float3(hdr->scale) * fovscale)));
+
     merian::float4x4 mat_prev_model = merian::identity();
     AngleVectors(ent->mv_prev_angles, &mat_prev_model[0].x, &mat_prev_model[1].x,
                  &mat_prev_model[2].x);
     mat_prev_model[3] = merian::float4(merian::as_float3(ent->mv_prev_origin), 1);
     mat_prev_model[1] *= -1;
 
+    mat_prev_model = merian::mul(scale, mat_prev_model);
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_prev_model = merian::mul(
-        mat_prev_model, merian::translation(merian::as_float3(hdr->scale_origin) * fovscale));
-    mat_prev_model =
-        merian::mul(mat_prev_model, merian::scale(merian::as_float3(hdr->scale) * fovscale));
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -276,10 +277,8 @@ void add_geo_alias(entity_t* ent,
     mat_model[3] = merian::float4(merian::as_float3(lerpdata.origin), 1);
     mat_model[1] *= -1;
 
+    mat_model = merian::mul(scale, mat_model);
     // * ENTSCALE_DECODE(ent->scale)?
-    mat_model = merian::mul(mat_model,
-                            merian::translation(merian::as_float3(hdr->scale_origin) * fovscale));
-    mat_model = merian::mul(mat_model, merian::scale(merian::as_float3(hdr->scale) * fovscale));
 
     const merian::float3x3 mat_model_inv_t =
         merian::float3x3(merian::transpose(merian::inverse(mat_model)));
@@ -295,15 +294,15 @@ void add_geo_alias(entity_t* ent,
         }
         // convert to world space
         const merian::float3 world_pos =
-            merian::mul(mat_model,
-                        merian::float4(merian::lerp(pos_pose1, pos_pose2, lerpdata.blend), 1.0))
+            merian::mul(merian::float4(merian::lerp(pos_pose1, pos_pose2, lerpdata.blend), 1.0),
+                        mat_model)
                 .xyz();
         for (int k = 0; k < 3; k++)
             vtx.emplace_back(world_pos[k]);
 
         const merian::float3 old_world_pos =
-            merian::mul(mat_prev_model,
-                        merian::float4(merian::lerp(pos_pose1, pos_pose2, ent->mv_prev_blend), 1.0))
+            merian::mul(merian::float4(merian::lerp(pos_pose1, pos_pose2, ent->mv_prev_blend), 1.0),
+                        mat_prev_model)
                 .xyz();
         for (int k = 0; k < 3; k++)
             prev_vtx.emplace_back(old_world_pos[k]);
@@ -327,7 +326,7 @@ void add_geo_alias(entity_t* ent,
             merian::as_float3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
         // convert to worldspace
         const merian::float3 world_n = merian::normalize(
-            merian::mul(mat_model_inv_t, merian::lerp(n_pose1, n_pose2, lerpdata.blend)));
+            merian::mul(merian::lerp(n_pose1, n_pose2, lerpdata.blend), mat_model_inv_t));
         tmpn[v] = merian::encode_normal(world_n);
     }
 
@@ -413,10 +412,10 @@ void add_geo_brush(entity_t* ent,
             uint32_t vtx_cnt = vtx.size() / 3;
             for (int k = 0; k < p->numverts; k++) {
                 const merian::float3 coord =
-                    merian::mul(mat_model, merian::float4(merian::as_float3(p->verts[k]), 1.0))
+                    merian::mul(merian::float4(merian::as_float3(p->verts[k]), 1.0), mat_model)
                         .xyz();
                 const merian::float3 prev_coord =
-                    merian::mul(mat_prev_model, merian::float4(merian::as_float3(p->verts[k]), 1.0))
+                    merian::mul(merian::float4(merian::as_float3(p->verts[k]), 1.0), mat_prev_model)
                         .xyz();
 
                 for (int l = 0; l < 3; l++) {
