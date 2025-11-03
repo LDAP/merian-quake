@@ -13,25 +13,25 @@ GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {}
 
 GBuffer::~GBuffer() {}
 
-std::vector<merian_nodes::InputConnectorHandle> GBuffer::describe_inputs() {
+std::vector<merian::InputConnectorHandle> GBuffer::describe_inputs() {
     return {
         con_render_info, con_textures, con_resolution, con_vtx,
         con_prev_vtx,    con_idx,      con_ext,        con_tlas,
     };
 }
 
-std::vector<merian_nodes::OutputConnectorHandle>
-GBuffer::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
+std::vector<merian::OutputConnectorHandle>
+GBuffer::describe_outputs(const merian::NodeIOLayout& io_layout) {
     extent = io_layout[con_resolution]->value();
 
-    con_albedo = merian_nodes::ManagedVkImageOut::compute_write(
+    con_albedo = merian::ManagedVkImageOut::compute_write(
         "albedo", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
-    con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
+    con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
-    con_mv = merian_nodes::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
+    con_mv = merian::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
                                                             extent.width, extent.height);
-    con_gbuffer = merian_nodes::GBufferOut::compute_write("gbuffer", extent.width, extent.height);
-    con_hits = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+    con_gbuffer = merian::GBufferOut::compute_write("gbuffer", extent.width, extent.height);
+    con_hits = std::make_shared<merian::ManagedVkBufferOut>(
         "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{
@@ -57,7 +57,7 @@ GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties
 }
 
 GBuffer::NodeStatusFlags
-GBuffer::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+GBuffer::on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
                       const merian::DescriptorSetLayoutHandle& descriptor_set_layout) {
     this->descriptor_set_layout = descriptor_set_layout;
     this->pipe.reset();
@@ -65,9 +65,9 @@ GBuffer::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layo
     return {};
 }
 
-void GBuffer::process([[maybe_unused]] merian_nodes::GraphRun& run,
+void GBuffer::process([[maybe_unused]] merian::GraphRun& run,
                       const merian::DescriptorSetHandle& descriptor_set,
-                      const merian_nodes::NodeIO& io) {
+                      const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
 
     QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];

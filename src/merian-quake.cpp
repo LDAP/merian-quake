@@ -181,24 +181,24 @@ int main(const int argc, const char** argv) {
         context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
                                              std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
-    merian_nodes::Graph<> graph(context, alloc);
+    merian::Graph<> graph(context, alloc);
 
-    graph.get_registry().register_node_type<QuakeNode>(merian_nodes::NodeRegistry::NodeTypeInfo{
+    graph.get_registry().register_node_type<QuakeNode>(merian::NodeRegistry::NodeTypeInfo{
         "Quake", "Extract geometry info from Quake",
         [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
     graph.get_registry().register_node_type<merian::QuakeHud>(
-        merian_nodes::NodeRegistry::NodeTypeInfo{
+        merian::NodeRegistry::NodeTypeInfo{
             "Hud", "Show gamestate and apply screen effects.",
             [=]() { return std::make_shared<merian::QuakeHud>(context); }});
     graph.get_registry().register_node_type<RendererMarkovChain>(
-        merian_nodes::NodeRegistry::NodeTypeInfo{
+        merian::NodeRegistry::NodeTypeInfo{
             "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
             [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
     graph.get_registry().register_node_type<RendererRESTIR>(
-        merian_nodes::NodeRegistry::NodeTypeInfo{
+        merian::NodeRegistry::NodeTypeInfo{
             "Renderer (RESTIR)", "Renders a scene using RESTIR.",
             [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
-    graph.get_registry().register_node_type<GBuffer>(merian_nodes::NodeRegistry::NodeTypeInfo{
+    graph.get_registry().register_node_type<GBuffer>(merian::NodeRegistry::NodeTypeInfo{
         "GBuffer", "Generates the GBuffer for Quake.",
         [=]() { return std::make_shared<GBuffer>(context); }});
     graph.get_registry().register_node_type<RendererSSMM>(
@@ -210,8 +210,8 @@ int main(const int argc, const char** argv) {
     ConfigurationManager config_manager(graph, context->file_loader);
     config_manager.load();
 
-    std::shared_ptr<merian_nodes::GLFWWindow> output =
-        graph.find_node_for_identifier_and_type<merian_nodes::GLFWWindow>("output");
+    std::shared_ptr<merian::GLFWWindowNode> output =
+        graph.find_node_for_identifier_and_type<merian::GLFWWindowNode>("output");
     std::shared_ptr<QuakeNode> quake =
         graph.find_node_for_identifier_and_type<QuakeNode>("Quake 0");
 
@@ -273,7 +273,7 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    graph.set_on_run_starting([](merian_nodes::GraphRun&) { glfwPollEvents(); });
+    graph.set_on_run_starting([](merian::GraphRun&) { glfwPollEvents(); });
     while (!stop) {
         graph.run();
     }

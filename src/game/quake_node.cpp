@@ -428,7 +428,7 @@ static QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHand
         geo.blas_info->update_geometry_f32_u32(geo.geo_handle, vertex_count, primitive_count,
                                                geo.vtx, geo.idx);
     } else {
-        geo.blas_info = std::make_shared<merian_nodes::DeviceASBuilder::BlasBuildInfo>(flags);
+        geo.blas_info = std::make_shared<merian::DeviceASBuilder::BlasBuildInfo>(flags);
         geo.geo_handle =
             geo.blas_info->add_geometry_f32_u32(vertex_count, primitive_count, geo.vtx, geo.idx);
     }
@@ -668,9 +668,9 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
     // clang-format on
 }
 
-std::vector<merian_nodes::OutputConnectorHandle>
-QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout) {
-    con_resolution = merian_nodes::SpecialStaticOut<vk::Extent3D>::create(
+std::vector<merian::OutputConnectorHandle>
+QuakeNode::describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) {
+    con_resolution = merian::SpecialStaticOut<vk::Extent3D>::create(
         "resolution",
         vk::Extent3D{static_cast<uint32_t>(vid.width), static_cast<uint32_t>(vid.height), 1});
 
@@ -681,7 +681,7 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& i
 }
 
 void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
-                                const merian_nodes::NodeIO& io) {
+                                const merian::NodeIO& io) {
 
     for (const auto& [texnum, tex] : pending_uploads) {
         SPDLOG_DEBUG("uploading texture {}", texnum);
@@ -706,15 +706,15 @@ void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
 }
 
 QuakeNode::NodeStatusFlags QuakeNode::on_connected(
-    [[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+    [[maybe_unused]] const merian::NodeIOLayout& io_layout,
     [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout) {
     render_info.constant_data_update = true;
     return {};
 }
 
-void QuakeNode::process([[maybe_unused]] merian_nodes::GraphRun& run,
+void QuakeNode::process([[maybe_unused]] merian::GraphRun& run,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
-                        [[maybe_unused]] const merian_nodes::NodeIO& io) {
+                        [[maybe_unused]] const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
 
     if (update_gamestate) {
@@ -896,7 +896,7 @@ void QuakeNode::update_static_geo(const merian::CommandBufferHandle& cmd) {
     }
 }
 
-void QuakeNode::update_dynamic_geo(merian_nodes::GraphRun& run,
+void QuakeNode::update_dynamic_geo(merian::GraphRun& run,
                                    const merian::CommandBufferHandle& cmd,
                                    const merian::ProfilerHandle& profiler) {
     vtx.clear();
@@ -985,15 +985,15 @@ void QuakeNode::update_dynamic_geo(merian_nodes::GraphRun& run,
     }
 }
 
-void QuakeNode::update_as(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io) {
+void QuakeNode::update_as(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io) {
     vk::BuildAccelerationStructureFlagsKHR flags =
         vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
     if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
         flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
     }
 
-    std::shared_ptr<merian_nodes::DeviceASBuilder::TlasBuildInfo> tlas_info =
-        std::make_shared<merian_nodes::DeviceASBuilder::TlasBuildInfo>(flags);
+    std::shared_ptr<merian::DeviceASBuilder::TlasBuildInfo> tlas_info =
+        std::make_shared<merian::DeviceASBuilder::TlasBuildInfo>(flags);
 
     assert(static_geo.size() + dynamic_geo.size() < MAX_GEOMETRIES);
 

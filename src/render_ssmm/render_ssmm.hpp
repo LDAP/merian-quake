@@ -14,7 +14,7 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
-class RendererSSMM : public merian_nodes::Node {
+class RendererSSMM : public merian::Node {
   public:
     RendererSSMM(const merian::ContextHandle& context,
                  const merian::ResourceAllocatorHandle& allocator);
@@ -23,18 +23,18 @@ class RendererSSMM : public merian_nodes::Node {
 
     // -----------------------------------------------------
 
-    std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorHandle> describe_inputs() override;
 
-    std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs(const merian_nodes::NodeIOLayout& io_layout) override;
+    std::vector<merian::OutputConnectorHandle>
+    describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
     NodeStatusFlags
-    on_connected(const merian_nodes::NodeIOLayout& io_layout,
+    on_connected(const merian::NodeIOLayout& io_layout,
                  const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) override;
 
-    void process(merian_nodes::GraphRun& run,
+    void process(merian::GraphRun& run,
                  const merian::DescriptorSetHandle& descriptor_set,
-                 const merian_nodes::NodeIO& io) override;
+                 const merian::NodeIO& io) override;
 
     NodeStatusFlags properties(merian::Properties& config) override;
 
@@ -45,30 +45,30 @@ class RendererSSMM : public merian_nodes::Node {
     merian::EntryPointHandle rt_shader;
     merian::EntryPointHandle clear_shader;
 
-    merian_nodes::VkBufferInHandle con_vtx = merian_nodes::VkBufferIn::compute_read("vtx");
-    merian_nodes::VkBufferInHandle con_prev_vtx =
-        merian_nodes::VkBufferIn::compute_read("prev_vtx");
-    merian_nodes::VkBufferInHandle con_idx = merian_nodes::VkBufferIn::compute_read("idx");
-    merian_nodes::VkBufferInHandle con_ext = merian_nodes::VkBufferIn::compute_read("ext");
-    merian_nodes::GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
-    merian_nodes::VkBufferInHandle con_hits = merian_nodes::VkBufferIn::compute_read("hits");
-    merian_nodes::VkSampledImageInHandle con_textures =
-        merian_nodes::VkSampledImageIn::compute_read("textures");
-    merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
-    merian_nodes::VkSampledImageInHandle con_mv =
-        merian_nodes::VkSampledImageIn::compute_read("mv");
-    merian_nodes::VkBufferInHandle con_prev_ssmc =
-        merian_nodes::VkBufferIn::compute_read("prev_ssmc", 1);
+    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
+    merian::VkBufferInHandle con_prev_vtx =
+        merian::VkBufferIn::compute_read("prev_vtx");
+    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
+    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
+    merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read("gbuffer");
+    merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read("hits");
+    merian::VkSampledImageInHandle con_textures =
+        merian::VkSampledImageIn::compute_read("textures");
+    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
+    merian::VkSampledImageInHandle con_mv =
+        merian::VkSampledImageIn::compute_read("mv");
+    merian::VkBufferInHandle con_prev_ssmc =
+        merian::VkBufferIn::compute_read("prev_ssmc", 1);
 
-    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
-    merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
+    merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
+        merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
+    merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
+        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
 
-    merian_nodes::ManagedVkImageOutHandle con_irradiance;
-    merian_nodes::ManagedVkImageOutHandle con_moments;
+    merian::ManagedVkImageOutHandle con_irradiance;
+    merian::ManagedVkImageOutHandle con_moments;
 
-    merian_nodes::ManagedVkBufferOutHandle con_ssmc;
+    merian::ManagedVkBufferOutHandle con_ssmc;
 
     //-----------------------------------------------------
 

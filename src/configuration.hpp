@@ -12,7 +12,7 @@ static const char* CONFIG_PATH_ENV_VAR = "MERIAN_QUAKE_CONFIG_PATH";
 
 class ConfigurationManager {
   public:
-    ConfigurationManager(merian_nodes::Graph<>& graph, merian::FileLoader& loader)
+    ConfigurationManager(merian::Graph<>& graph, merian::FileLoader& loader)
         : graph(graph), loader(loader) {}
 
     void load() {
@@ -39,6 +39,6 @@ class ConfigurationManager {
     }
 
   private:
-    merian_nodes::Graph<>& graph;
+    merian::Graph<>& graph;
     merian::FileLoader& loader;
 };

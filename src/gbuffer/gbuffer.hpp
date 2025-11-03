@@ -13,7 +13,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
 
-class GBuffer : public merian_nodes::Node {
+class GBuffer : public merian::Node {
 
   private:
     static constexpr uint32_t local_size_x = 8;
@@ -24,46 +24,46 @@ class GBuffer : public merian_nodes::Node {
 
     ~GBuffer();
 
-    std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorHandle> describe_inputs() override;
 
-    std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout) override;
+    std::vector<merian::OutputConnectorHandle>
+    describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) override;
 
     virtual NodeStatusFlags
-    on_connected(const merian_nodes::NodeIOLayout& io_layout,
+    on_connected(const merian::NodeIOLayout& io_layout,
                  const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    virtual void process(merian_nodes::GraphRun& run,
+    virtual void process(merian::GraphRun& run,
                          const merian::DescriptorSetHandle& descriptor_set,
-                         const merian_nodes::NodeIO& io) override;
+                         const merian::NodeIO& io) override;
 
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
     const merian::ContextHandle context;
 
-    merian_nodes::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian_nodes::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian_nodes::VkSampledImageInHandle con_textures =
-        merian_nodes::VkSampledImageIn::compute_read("textures");
-    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution");
-    merian_nodes::VkBufferInHandle con_vtx =
-        merian_nodes::VkBufferIn::compute_read("vtx");
-    merian_nodes::VkBufferInHandle con_prev_vtx =
-        merian_nodes::VkBufferIn::compute_read("prev_vtx");
-    merian_nodes::VkBufferInHandle con_idx =
-        merian_nodes::VkBufferIn::compute_read("idx");
-    merian_nodes::VkBufferInHandle con_ext =
-        merian_nodes::VkBufferIn::compute_read("ext");
-    merian_nodes::VkTLASInHandle con_tlas = merian_nodes::VkTLASIn::compute_read("tlas");
+    merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
+        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
+    merian::VkSampledImageInHandle con_textures =
+        merian::VkSampledImageIn::compute_read("textures");
+    merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
+        merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
+    merian::VkBufferInHandle con_vtx =
+        merian::VkBufferIn::compute_read("vtx");
+    merian::VkBufferInHandle con_prev_vtx =
+        merian::VkBufferIn::compute_read("prev_vtx");
+    merian::VkBufferInHandle con_idx =
+        merian::VkBufferIn::compute_read("idx");
+    merian::VkBufferInHandle con_ext =
+        merian::VkBufferIn::compute_read("ext");
+    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
 
-    merian_nodes::ManagedVkImageOutHandle con_albedo;
-    merian_nodes::ManagedVkImageOutHandle con_irradiance;
-    merian_nodes::ManagedVkImageOutHandle con_mv;
+    merian::ManagedVkImageOutHandle con_albedo;
+    merian::ManagedVkImageOutHandle con_irradiance;
+    merian::ManagedVkImageOutHandle con_mv;
 
-    merian_nodes::GBufferOutHandle con_gbuffer;
-    merian_nodes::ManagedVkBufferOutHandle con_hits;
+    merian::GBufferOutHandle con_gbuffer;
+    merian::ManagedVkBufferOutHandle con_hits;
 
     vk::Extent3D extent;
     merian::EntryPointHandle shader;

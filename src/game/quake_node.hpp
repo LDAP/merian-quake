@@ -21,7 +21,7 @@ extern "C" {
 #include "quakedef.h"
 }
 
-class QuakeNode : public merian_nodes::Node {
+class QuakeNode : public merian::Node {
   public:
     struct PlayerData {
         // see PLAYER_* in config.h
@@ -112,8 +112,8 @@ class QuakeNode : public merian_nodes::Node {
         merian::BufferHandle idx;
         merian::BufferHandle ext;
 
-        std::shared_ptr<merian_nodes::DeviceASBuilder::BlasBuildInfo> blas_info;
-        merian_nodes::DeviceASBuilder::BlasBuildInfo::GeometryHandle geo_handle;
+        std::shared_ptr<merian::DeviceASBuilder::BlasBuildInfo> blas_info;
+        merian::DeviceASBuilder::BlasBuildInfo::GeometryHandle geo_handle;
         vk::GeometryInstanceFlagsKHR instance_flags;
     };
 
@@ -127,16 +127,16 @@ class QuakeNode : public merian_nodes::Node {
 
     void set_controller(const merian::InputControllerHandle& controller);
 
-    std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout);
+    std::vector<merian::OutputConnectorHandle>
+    describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout);
 
     NodeStatusFlags
-    on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+    on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
                  [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout);
 
-    void process(merian_nodes::GraphRun& run,
+    void process(merian::GraphRun& run,
                  const merian::DescriptorSetHandle& descriptor_set,
-                 const merian_nodes::NodeIO& io);
+                 const merian::NodeIO& io);
 
     NodeStatusFlags properties(merian::Properties& config);
 
@@ -165,13 +165,13 @@ class QuakeNode : public merian_nodes::Node {
 
   private:
     // processes the pending uploads and updates the current descriptor set
-    void update_textures(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io);
+    void update_textures(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io);
 
     void update_static_geo(const merian::CommandBufferHandle& cmd);
-    void update_dynamic_geo(merian_nodes::GraphRun& run,
+    void update_dynamic_geo(merian::GraphRun& run,
                             const merian::CommandBufferHandle& cmd,
                             const merian::ProfilerHandle& profiler);
-    void update_as(const merian::CommandBufferHandle& cmd, const merian_nodes::NodeIO& io);
+    void update_as(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io);
 
   private:
     const merian::ContextHandle context;
@@ -179,16 +179,16 @@ class QuakeNode : public merian_nodes::Node {
 
     // Graph outputs
     // clang-format off
-    merian_nodes::SpecialStaticOutHandle<vk::Extent3D> con_resolution;
-    merian_nodes::PtrOutHandle<QuakeRenderInfo> con_render_info = merian_nodes::PtrOut<QuakeRenderInfo>::create("render_info");
-    merian_nodes::UnmanagedVkImageOutHandle con_textures = merian_nodes::UnmanagedVkImageOut::create("textures", MAX_GLTEXTURES, vk::ImageUsageFlagBits::eTransferDst);
+    merian::SpecialStaticOutHandle<vk::Extent3D> con_resolution;
+    merian::PtrOutHandle<QuakeRenderInfo> con_render_info = merian::PtrOut<QuakeRenderInfo>::create("render_info");
+    merian::UnmanagedVkImageOutHandle con_textures = merian::UnmanagedVkImageOut::create("textures", MAX_GLTEXTURES, vk::ImageUsageFlagBits::eTransferDst);
 
-    merian_nodes::UnmanagedVkBufferOutHandle con_vtx = merian_nodes::UnmanagedVkBufferOut::create("vtx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
-    merian_nodes::UnmanagedVkBufferOutHandle con_prev_vtx = merian_nodes::UnmanagedVkBufferOut::create("prev_vtx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
-    merian_nodes::UnmanagedVkBufferOutHandle con_idx = merian_nodes::UnmanagedVkBufferOut::create("idx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
-    merian_nodes::UnmanagedVkBufferOutHandle con_ext = merian_nodes::UnmanagedVkBufferOut::create("ext", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
+    merian::UnmanagedVkBufferOutHandle con_vtx = merian::UnmanagedVkBufferOut::create("vtx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
+    merian::UnmanagedVkBufferOutHandle con_prev_vtx = merian::UnmanagedVkBufferOut::create("prev_vtx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
+    merian::UnmanagedVkBufferOutHandle con_idx = merian::UnmanagedVkBufferOut::create("idx", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
+    merian::UnmanagedVkBufferOutHandle con_ext = merian::UnmanagedVkBufferOut::create("ext", MAX_GEOMETRIES, vk::BufferUsageFlagBits::eTransferDst);
 
-    merian_nodes::PtrOutHandle<merian_nodes::DeviceASBuilder::TlasBuildInfo> con_tlas_info = merian_nodes::PtrOut<merian_nodes::DeviceASBuilder::TlasBuildInfo>::create("tlas_info");
+    merian::PtrOutHandle<merian::DeviceASBuilder::TlasBuildInfo> con_tlas_info = merian::PtrOut<merian::DeviceASBuilder::TlasBuildInfo>::create("tlas_info");
     // clang-format on
 
     // Game thread / synchronization

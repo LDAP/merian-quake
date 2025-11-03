@@ -5,7 +5,7 @@
 
 namespace merian {
 
-class QuakeHud : public merian_nodes::AbstractCompute {
+class QuakeHud : public merian::AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -23,24 +23,24 @@ class QuakeHud : public merian_nodes::AbstractCompute {
 
     ~QuakeHud();
 
-    std::vector<merian_nodes::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorHandle> describe_inputs() override;
 
-    std::vector<merian_nodes::OutputConnectorHandle>
-    describe_outputs(const merian_nodes::NodeIOLayout& io_layout) override;
+    std::vector<merian::OutputConnectorHandle>
+    describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
-    const void* get_push_constant(merian_nodes::GraphRun& run,
-                                  const merian_nodes::NodeIO& io) override;
+    const void* get_push_constant(merian::GraphRun& run,
+                                  const merian::NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
-    get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
+    get_group_count(const merian::NodeIO& io) const noexcept override;
 
     VulkanEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian_nodes::VkSampledImageInHandle con_src =
-        merian_nodes::VkSampledImageIn::compute_read("src");
+    merian::VkSampledImageInHandle con_src =
+        merian::VkSampledImageIn::compute_read("src");
 
     vk::Extent3D extent;
     PushConstant pc;

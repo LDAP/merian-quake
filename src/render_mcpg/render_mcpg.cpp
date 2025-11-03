@@ -24,7 +24,7 @@ RendererMarkovChain::~RendererMarkovChain() {}
 
 // -------------------------------------------------------------------------------------------
 
-std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
+std::vector<merian::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
     return {
         con_vtx,      con_prev_vtx,   con_idx,
         con_ext,      con_gbuffer,    con_hits,
@@ -33,25 +33,25 @@ std::vector<merian_nodes::InputConnectorHandle> RendererMarkovChain::describe_in
     };
 }
 
-std::vector<merian_nodes::OutputConnectorHandle>
-RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
+std::vector<merian::OutputConnectorHandle>
+RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
 
-    con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
+    con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_volume = merian_nodes::ManagedVkImageOut::compute_write(
+    con_volume = merian::ManagedVkImageOut::compute_write(
         "volume", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_volume_depth = merian_nodes::ManagedVkImageOut::compute_write(
+    con_volume_depth = merian::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR16Sfloat, render_width, render_height);
-    con_volume_mv = merian_nodes::ManagedVkImageOut::compute_read_write_transfer_dst(
+    con_volume_mv = merian::ManagedVkImageOut::compute_read_write_transfer_dst(
         "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height, 1,
         vk::ImageLayout::eTransferDstOptimal);
-    con_debug = merian_nodes::ManagedVkImageOut::compute_write(
+    con_debug = merian::ManagedVkImageOut::compute_write(
         "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
 
-    con_markovchain = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+    con_markovchain = std::make_shared<merian::ManagedVkBufferOut>(
         "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -61,7 +61,7 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
-    con_lightcache = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+    con_lightcache = std::make_shared<merian::ManagedVkBufferOut>(
         "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -71,7 +71,7 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
                                  vk::BufferUsageFlagBits::eTransferDst |
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
-    con_volume_distancemc = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+    con_volume_distancemc = std::make_shared<merian::ManagedVkBufferOut>(
         "volume_distancemc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
@@ -91,7 +91,7 @@ RendererMarkovChain::describe_outputs(const merian_nodes::NodeIOLayout& io_layou
 }
 
 RendererMarkovChain::NodeStatusFlags
-RendererMarkovChain::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+RendererMarkovChain::on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
                                   const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
     pipe_layout = merian::PipelineLayoutBuilder(context)
                       .add_descriptor_set_layout(graph_desc_set_layout)
@@ -102,9 +102,9 @@ RendererMarkovChain::on_connected([[maybe_unused]] const merian_nodes::NodeIOLay
     return {};
 }
 
-void RendererMarkovChain::process(merian_nodes::GraphRun& run,
+void RendererMarkovChain::process(merian::GraphRun& run,
                                   const merian::DescriptorSetHandle& graph_descriptor_set,
-                                  const merian_nodes::NodeIO& io) {
+                                  const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
 
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];

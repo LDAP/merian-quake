@@ -53,7 +53,7 @@ RendererRESTIR::~RendererRESTIR() {}
 
 // -------------------------------------------------------------------------------------------
 
-std::vector<merian_nodes::InputConnectorHandle> RendererRESTIR::describe_inputs() {
+std::vector<merian::InputConnectorHandle> RendererRESTIR::describe_inputs() {
     return {
         con_vtx,          con_prev_vtx,      con_idx,      con_ext,  con_gbuffer,
         con_prev_gbuffer, con_hits,          con_textures, con_tlas, con_resolution,
@@ -61,19 +61,19 @@ std::vector<merian_nodes::InputConnectorHandle> RendererRESTIR::describe_inputs(
     };
 }
 
-std::vector<merian_nodes::OutputConnectorHandle>
-RendererRESTIR::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
+std::vector<merian::OutputConnectorHandle>
+RendererRESTIR::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
 
-    con_irradiance = merian_nodes::ManagedVkImageOut::compute_write(
+    con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_moments = merian_nodes::ManagedVkImageOut::compute_write(
+    con_moments = merian::ManagedVkImageOut::compute_write(
         "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
-    con_debug = merian_nodes::ManagedVkImageOut::compute_write(
+    con_debug = merian::ManagedVkImageOut::compute_write(
         "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
-    con_reservoirs_out = std::make_shared<merian_nodes::ManagedVkBufferOut>(
+    con_reservoirs_out = std::make_shared<merian::ManagedVkBufferOut>(
         "reservoirs", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlags(), make_reservoir_buffer_create_info(render_width, render_height));
 
@@ -86,7 +86,7 @@ RendererRESTIR::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
 }
 
 RendererRESTIR::NodeStatusFlags
-RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& io_layout,
+RendererRESTIR::on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
                              const merian::DescriptorSetLayoutHandle& graph_desc_set_layout) {
     pipe_layout = merian::PipelineLayoutBuilder(context)
                       .add_descriptor_set_layout(graph_desc_set_layout)
@@ -104,9 +104,9 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian_nodes::NodeIOLayout& 
     return {};
 }
 
-void RendererRESTIR::process(merian_nodes::GraphRun& run,
+void RendererRESTIR::process(merian::GraphRun& run,
                              const merian::DescriptorSetHandle& graph_descriptor_set,
-                             const merian_nodes::NodeIO& io) {
+                             const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
     const QuakeNode::QuakeRenderInfo& render_info = *io[con_render_info];
 

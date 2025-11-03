@@ -25,24 +25,24 @@ QuakeHud::QuakeHud(const ContextHandle context) : AbstractCompute(context, sizeo
 
 QuakeHud::~QuakeHud() {}
 
-std::vector<merian_nodes::InputConnectorHandle> QuakeHud::describe_inputs() {
+std::vector<merian::InputConnectorHandle> QuakeHud::describe_inputs() {
     return {
         con_src,
-        merian_nodes::GBufferIn::compute_read("gbuffer"),
+        merian::GBufferIn::compute_read("gbuffer"),
     };
 }
 
-std::vector<merian_nodes::OutputConnectorHandle>
-QuakeHud::describe_outputs(const merian_nodes::NodeIOLayout& io_layout) {
+std::vector<merian::OutputConnectorHandle>
+QuakeHud::describe_outputs(const merian::NodeIOLayout& io_layout) {
     extent = io_layout[con_src]->get_create_info_or_throw().extent;
     return {
-        merian_nodes::ManagedVkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
+        merian::ManagedVkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat,
                                                        extent),
     };
 }
 
-const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun& run,
-                                        [[maybe_unused]] const merian_nodes::NodeIO& io) {
+const void* QuakeHud::get_push_constant([[maybe_unused]] merian::GraphRun& run,
+                                        [[maybe_unused]] const merian::NodeIO& io) {
     if (cl.worldmodel && sv_player && cl.intermission == 0) {
         // Demos do not have a player set
         pc.health = sv_player->v.health;
@@ -70,7 +70,7 @@ const void* QuakeHud::get_push_constant([[maybe_unused]] merian_nodes::GraphRun&
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t>
-QuakeHud::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept {
+QuakeHud::get_group_count([[maybe_unused]] const merian::NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
