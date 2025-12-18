@@ -181,7 +181,7 @@ int main(const int argc, const char** argv) {
         context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
                                              std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
-    merian::Graph<> graph(context, alloc);
+    merian::Graph graph(context, alloc);
 
     graph.get_registry().register_node_type<QuakeNode>(merian::NodeRegistry::NodeTypeInfo{
         "Quake", "Extract geometry info from Quake",
