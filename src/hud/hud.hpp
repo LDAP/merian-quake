@@ -28,8 +28,7 @@ class QuakeHud : public merian::AbstractCompute {
     std::vector<merian::OutputConnectorHandle>
     describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
-    const void* get_push_constant(merian::GraphRun& run,
-                                  const merian::NodeIO& io) override;
+    const void* get_push_constant(merian::GraphRun& run, const merian::NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const merian::NodeIO& io) const noexcept override;
@@ -39,8 +38,7 @@ class QuakeHud : public merian::AbstractCompute {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian::VkSampledImageInHandle con_src =
-        merian::VkSampledImageIn::compute_read("src");
+    merian::VkSampledImageInHandle con_src = merian::VkSampledImageIn::compute_read("src");
 
     vk::Extent3D extent;
     PushConstant pc;

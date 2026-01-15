@@ -69,10 +69,10 @@ RendererRESTIR::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_moments = merian::ManagedVkImageOut::compute_write(
-        "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
-    con_debug = merian::ManagedVkImageOut::compute_write(
-        "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
+    con_moments = merian::ManagedVkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
+                                                           render_width, render_height);
+    con_debug = merian::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
+                                                         render_width, render_height);
     con_reservoirs_out = std::make_shared<merian::ManagedVkBufferOut>(
         "reservoirs", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlags(), make_reservoir_buffer_create_info(render_width, render_height));
@@ -99,7 +99,7 @@ RendererRESTIR::on_connected([[maybe_unused]] const merian::NodeIOLayout& io_lay
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
     pong_buffer =
-        allocator->createBuffer(make_reservoir_buffer_create_info(render_width, render_height));
+        allocator->create_buffer(make_reservoir_buffer_create_info(render_width, render_height));
 
     return {};
 }

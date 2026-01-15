@@ -24,12 +24,12 @@ std::vector<merian::OutputConnectorHandle>
 GBuffer::describe_outputs(const merian::NodeIOLayout& io_layout) {
     extent = io_layout[con_resolution]->value();
 
-    con_albedo = merian::ManagedVkImageOut::compute_write(
-        "albedo", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
+    con_albedo = merian::ManagedVkImageOut::compute_write("albedo", vk::Format::eR16G16B16A16Sfloat,
+                                                          extent.width, extent.height);
     con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
-    con_mv = merian::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat,
-                                                            extent.width, extent.height);
+    con_mv = merian::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat, extent.width,
+                                                      extent.height);
     con_gbuffer = merian::GBufferOut::compute_write("gbuffer", extent.width, extent.height);
     con_hits = std::make_shared<merian::ManagedVkBufferOut>(
         "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,

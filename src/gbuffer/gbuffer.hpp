@@ -1,17 +1,17 @@
 #pragma once
 
+#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
-#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/connector_utils.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
-#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
-#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 
 #include "game/quake_node.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 
 class GBuffer : public merian::Node {
 
@@ -48,14 +48,10 @@ class GBuffer : public merian::Node {
         merian::VkSampledImageIn::compute_read("textures");
     merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
         merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
-    merian::VkBufferInHandle con_vtx =
-        merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx =
-        merian::VkBufferIn::compute_read("prev_vtx");
-    merian::VkBufferInHandle con_idx =
-        merian::VkBufferIn::compute_read("idx");
-    merian::VkBufferInHandle con_ext =
-        merian::VkBufferIn::compute_read("ext");
+    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
+    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
+    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
     merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
 
     merian::ManagedVkImageOutHandle con_albedo;

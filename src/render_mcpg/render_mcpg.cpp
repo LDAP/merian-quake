@@ -2,10 +2,10 @@
 
 #include "game/quake_node.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
+#include "merian/shader/shader_module.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/shader/shader_module.hpp"
 #include "nlohmann/json.hpp"
 
 #include "../../res/shader/render_mcpg/grid.h"
@@ -41,15 +41,15 @@ RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_volume = merian::ManagedVkImageOut::compute_write(
-        "volume", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
+    con_volume = merian::ManagedVkImageOut::compute_write("volume", vk::Format::eR32G32B32A32Sfloat,
+                                                          render_width, render_height);
     con_volume_depth = merian::ManagedVkImageOut::compute_write(
         "volume_depth", vk::Format::eR16Sfloat, render_width, render_height);
     con_volume_mv = merian::ManagedVkImageOut::compute_read_write_transfer_dst(
         "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height, 1,
         vk::ImageLayout::eTransferDstOptimal);
-    con_debug = merian::ManagedVkImageOut::compute_write(
-        "debug", vk::Format::eR16G16B16A16Sfloat, render_width, render_height);
+    con_debug = merian::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
+                                                         render_width, render_height);
 
     con_markovchain = std::make_shared<merian::ManagedVkBufferOut>(
         "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
@@ -281,7 +281,7 @@ void RendererMarkovChain::process(merian::GraphRun& run,
     if (!dumping && dump_mc) {
         dumping = true;
         const std::size_t count = mc_adaptive_buffer_size;
-        const merian::MemoryAllocationHandle memory = allocator->getStaging()->cmd_from_device(
+        const merian::MemoryAllocationHandle memory = allocator->get_staging()->cmd_from_device(
             cmd, io[con_markovchain], 0, sizeof(MCState) * count);
         run.sync_to_cpu([count, memory, this]() {
             nlohmann::json j;

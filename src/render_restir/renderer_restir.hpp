@@ -12,9 +12,9 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "game/quake_node.hpp"
+#include "merian/shader/shader_module.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/shader/shader_module.hpp"
 
 class RendererRESTIR : public merian::Node {
   public:
@@ -63,13 +63,11 @@ class RendererRESTIR : public merian::Node {
     merian::EntryPointHandle clear_shader;
 
     merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx =
-        merian::VkBufferIn::compute_read("prev_vtx");
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
     merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
     merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
     merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read("gbuffer");
-    merian::GBufferInHandle con_prev_gbuffer =
-        merian::GBufferIn::compute_read("prev_gbuffer", 1);
+    merian::GBufferInHandle con_prev_gbuffer = merian::GBufferIn::compute_read("prev_gbuffer", 1);
     merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read("hits");
 
     merian::VkSampledImageInHandle con_textures =
@@ -80,10 +78,8 @@ class RendererRESTIR : public merian::Node {
         merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
     merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian::VkBufferInHandle con_reservoirs_in =
-        merian::VkBufferIn::compute_read("reservoirs", 1);
-    merian::VkSampledImageInHandle con_mv =
-        merian::VkSampledImageIn::compute_read("mv");
+    merian::VkBufferInHandle con_reservoirs_in = merian::VkBufferIn::compute_read("reservoirs", 1);
+    merian::VkSampledImageInHandle con_mv = merian::VkSampledImageIn::compute_read("mv");
 
     merian::ManagedVkImageOutHandle con_irradiance;
     merian::ManagedVkImageOutHandle con_moments;

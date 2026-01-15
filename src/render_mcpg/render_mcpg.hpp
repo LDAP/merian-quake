@@ -11,9 +11,9 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "game/quake_node.hpp"
+#include "merian/shader/entry_point.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/shader/entry_point.hpp"
 
 class RendererMarkovChain : public merian::Node {
   public:
@@ -58,8 +58,7 @@ class RendererMarkovChain : public merian::Node {
     merian::EntryPointHandle volume_forward_project_shader;
 
     merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx =
-        merian::VkBufferIn::compute_read("prev_vtx");
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
     merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
     merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
     merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read("gbuffer");

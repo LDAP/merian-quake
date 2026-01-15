@@ -323,8 +323,8 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
                                    const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
                                    const std::string& debug_name = {}) {
     merian::BufferHandle buffer = optional_buffer;
-    if (!allocator->ensureBufferSize(buffer, merian::size_of(data), usage, debug_name,
-                                     merian::MemoryMappingType::NONE, min_alignment, 1.25)) {
+    if (!allocator->ensure_buffer_size(buffer, merian::size_of(data), usage, debug_name,
+                                       merian::MemoryMappingType::NONE, min_alignment, 1.25)) {
         cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR |
                          vk::PipelineStageFlagBits::eComputeShader,
                      vk::PipelineStageFlagBits::eTransfer,
@@ -333,7 +333,7 @@ merian::BufferHandle ensure_buffer(const merian::ResourceAllocatorHandle& alloca
                                                 vk::AccessFlagBits::eTransferRead,
                                             vk::AccessFlagBits::eTransferWrite));
     }
-    allocator->getStaging()->cmd_to_device(cmd, buffer, data);
+    allocator->get_staging()->cmd_to_device(cmd, buffer, data);
     return buffer;
 }
 
@@ -680,8 +680,7 @@ QuakeNode::describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layo
     };
 }
 
-void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
-                                const merian::NodeIO& io) {
+void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io) {
 
     for (const auto& [texnum, tex] : pending_uploads) {
         SPDLOG_DEBUG("uploading texture {}", texnum);
@@ -695,7 +694,7 @@ void QuakeNode::update_textures(const merian::CommandBufferHandle& cmd,
                 ((tex.flags & TEXPREF_NEAREST) != 0u) ? vk::Filter::eNearest : vk::Filter::eLinear;
         }
 
-        merian::TextureHandle gpu_tex = allocator->createTextureFromRGBA8(
+        merian::TextureHandle gpu_tex = allocator->create_texture_from_rgba8(
             cmd, tex.cpu_tex.data(), tex.width, tex.height, mag_filter, vk::Filter::eLinear,
             !tex.linear, tex.name, (tex.flags & TEXPREF_MIPMAP) != 0u,
             vk::ImageUsageFlagBits::eTransferSrc);

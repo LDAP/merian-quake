@@ -2,10 +2,10 @@
 
 #include "game/quake_node.hpp"
 #include "merian-shaders/image_buffer.glsl.h"
+#include "merian/shader/shader_module.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/shader/shader_module.hpp"
 
 #include "../../res/shader/render_ssmm/ssmc_state.h"
 
@@ -35,8 +35,8 @@ RendererSSMM::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     con_irradiance = merian::ManagedVkImageOut::compute_write(
         "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_moments = merian::ManagedVkImageOut::compute_write(
-        "moments", vk::Format::eR32G32Sfloat, render_width, render_height);
+    con_moments = merian::ManagedVkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
+                                                           render_width, render_height);
     con_ssmc = std::make_shared<merian::ManagedVkBufferOut>(
         "ssmc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
