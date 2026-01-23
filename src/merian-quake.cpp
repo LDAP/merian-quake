@@ -171,15 +171,17 @@ int main(const int argc, const char** argv) {
     std::optional<std::filesystem::path> dev_data_dir =
         merian::FileLoader::search_cwd_parents("res");
     if (dev_data_dir) {
-        context->file_loader.add_search_path(*dev_data_dir);
+        context->get_file_loader().add_search_path(*dev_data_dir);
     }
-    context->file_loader.add_search_path(MERIAN_QUAKE_DATA_DIR);
+    context->get_file_loader().add_search_path(MERIAN_QUAKE_DATA_DIR);
     if (const auto prefix = merian::FileLoader::portable_prefix(); prefix)
-        context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
-                                             std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+        context->get_file_loader().add_search_path(
+            *prefix / merian::FileLoader::install_datadir_name() /
+            std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
     if (const auto prefix = merian::FileLoader::install_prefix(); prefix)
-        context->file_loader.add_search_path(*prefix / merian::FileLoader::install_datadir_name() /
-                                             std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+        context->get_file_loader().add_search_path(
+            *prefix / merian::FileLoader::install_datadir_name() /
+            std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
     merian::Graph graph(context, alloc);
 
@@ -204,7 +206,7 @@ int main(const int argc, const char** argv) {
          [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
 
     // this also creates all nodes in the graph.
-    ConfigurationManager config_manager(graph, context->file_loader);
+    ConfigurationManager config_manager(graph, context->get_file_loader());
     config_manager.load();
 
     std::shared_ptr<merian::GLFWWindowNode> output =
@@ -224,9 +226,9 @@ int main(const int argc, const char** argv) {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
     quake_font_sm = io.Fonts->AddFontFromFileTTF(
-        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 26);
+        context->get_file_loader().find_file("dpquake.ttf")->string().c_str(), 26);
     quake_font_lg = io.Fonts->AddFontFromFileTTF(
-        context->file_loader.find_file("dpquake.ttf")->string().c_str(), 46);
+        context->get_file_loader().find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,

@@ -166,7 +166,7 @@ void RendererRESTIR::process(merian::GraphRun& run,
             debug_output_selector, visibility_shade, temporal_normal_reject_cos,
             temporal_depth_reject_percent, spatial_normal_reject_cos, spatial_depth_reject_percent,
             temporal_clamp_m, spatial_radius, temporal_bias_correction, spatial_bias_correction,
-            context->physical_device.physical_device_subgroup_properties.subgroupSize,
+            context->get_physical_device()->physical_device_subgroup_properties.subgroupSize,
             boiling_filter_strength, std::max(spatial_reuse_iterations, 1), apply_mv);
 
         auto spec = spec_builder.build();
