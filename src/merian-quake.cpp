@@ -10,13 +10,9 @@
 #include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
+#include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
-#include "merian/vk/extension/extension_vk_float_atomics.hpp"
-#include "merian/vk/extension/extension_vk_push_descriptor.hpp"
-#include "merian/vk/extension/extension_vk_ray_query.hpp"
-#include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
 #include <csignal>
@@ -141,30 +137,94 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::ImguiSpdlogSink>();
     spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
-    std::shared_ptr<merian::ExtensionGLFW> ext_glfw;
     auto resources = std::make_shared<merian::ExtensionResources>();
-    auto ext_as = std::make_shared<merian::ExtensionVkAccelerationStructure>();
-    auto ext_rq = std::make_shared<merian::ExtensionVkRayQuery>();
-    auto ext_rt_pos = std::make_shared<merian::ExtensionVkRayTracingPositionFetch>();
-    auto ext_push_desc = std::make_shared<merian::ExtensionVkPushDescriptor>();
-    auto ext_core = std::make_shared<merian::ExtensionVkCore>();
-    auto ext_float = std::make_shared<merian::ExtensionVkFloatAtomics>();
-    auto ext_desc_buf = std::make_shared<merian::ExtensionVkDescriptorBuffer>();
-    std::vector<std::shared_ptr<merian::Extension>> extensions = {
-        resources, ext_as, ext_rq, ext_rt_pos, ext_push_desc, ext_core, ext_float, ext_desc_buf};
+    auto mitigations = std::make_shared<merian::ExtensionMitigations>();
+    std::vector<std::shared_ptr<merian::ContextExtension>> context_extensions = {
+        resources,
+        mitigations,
+    };
 
     std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
     debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
-    extensions.push_back(debug_utils);
+    context_extensions.push_back(debug_utils);
 #endif
 
+    std::shared_ptr<merian::ExtensionGLFW> ext_glfw;
     if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
         ext_glfw = std::make_shared<merian::ExtensionGLFW>();
-        extensions.push_back(ext_glfw);
+        context_extensions.push_back(ext_glfw);
     }
 
-    merian::ContextHandle context = merian::Context::create(extensions, "merian-quake");
+    std::vector<std::string> features = {
+        "Vulkan10/robustBufferAccess",
+        "Vulkan10/alphaToOne",
+        "Vulkan10/samplerAnisotropy",
+        "Vulkan10/shaderUniformBufferArrayDynamicIndexing",
+        "Vulkan10/shaderSampledImageArrayDynamicIndexing",
+        "Vulkan10/shaderStorageBufferArrayDynamicIndexing",
+        "Vulkan10/shaderStorageImageArrayDynamicIndexing",
+        "Vulkan10/shaderClipDistance",
+        "Vulkan10/shaderCullDistance",
+        "Vulkan10/shaderFloat64",
+        "Vulkan10/shaderInt64",
+        "Vulkan10/shaderInt16",
+        "Vulkan10/shaderResourceMinLod",
+        "Vulkan10/sparseBinding",
+
+        "Vulkan11/storageBuffer16BitAccess",
+
+        "Vulkan12/scalarBlockLayout",
+        "Vulkan12/shaderFloat16",
+        "Vulkan12/uniformAndStorageBuffer8BitAccess",
+        "Vulkan12/bufferDeviceAddress",
+        "Vulkan12/runtimeDescriptorArray",
+        "Vulkan12/descriptorIndexing",
+        "Vulkan12/shaderSampledImageArrayNonUniformIndexing",
+        "Vulkan12/shaderStorageImageArrayNonUniformIndexing",
+        "Vulkan12/shaderStorageBufferArrayNonUniformIndexing",
+        "Vulkan12/shaderUniformBufferArrayNonUniformIndexing",
+        "Vulkan12/shaderInt8",
+        "Vulkan12/timelineSemaphore",
+        "Vulkan12/hostQueryReset",
+
+        "Vulkan13/robustImageAccess",
+        "Vulkan13/synchronization2",
+        "Vulkan13/maintenance4",
+        "Vulkan13/subgroupSizeControl",
+
+        "AccelerationStructure/accelerationStructure",
+        "AccelerationStructure/accelerationStructureHostCommands",
+        "AccelerationStructure/descriptorBindingAccelerationStructureUpdateAfterBind",
+
+        "ShaderAtomicFloat/shaderBufferFloat32Atomics",
+        "ShaderAtomicFloat/shaderBufferFloat32AtomicAdd",
+        "ShaderAtomicFloat/shaderBufferFloat64Atomics",
+        "ShaderAtomicFloat/shaderBufferFloat64AtomicAdd",
+        "ShaderAtomicFloat/shaderSharedFloat32Atomics",
+        "ShaderAtomicFloat/shaderSharedFloat32AtomicAdd",
+        "ShaderAtomicFloat/shaderSharedFloat64Atomics",
+        "ShaderAtomicFloat/shaderSharedFloat64AtomicAdd",
+        "ShaderAtomicFloat/shaderImageFloat32Atomics",
+        "ShaderAtomicFloat/shaderImageFloat32AtomicAdd",
+        "ShaderAtomicFloat/sparseImageFloat32Atomics",
+        "ShaderAtomicFloat/sparseImageFloat32AtomicAdd",
+
+        "RayQuery/rayQuery",
+        "RayTracingPipeline/rayTracingPipeline",
+
+        "Robustness2/robustImageAccess2",
+        "Robustness2/robustBufferAccess2",
+        "Robustness2/nullDescriptor",
+
+        "ShaderMaximalReconvergence/shaderMaximalReconvergence"};
+
+    std::vector<const char*> extensions = {
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+    };
+
+    merian::ContextHandle context =
+        merian::Context::create(features, extensions, context_extensions, "merian-quake");
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
