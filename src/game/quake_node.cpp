@@ -4,7 +4,6 @@
 #include "merian/utils/audio/sdl_audio_device.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/concurrent/utils.hpp"
-#include "merian/vk/extension/extension_vk_ray_tracing_position_fetch.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -863,7 +862,10 @@ void QuakeNode::update_static_geo(const merian::CommandBufferHandle& cmd) {
         RTGeometry old_geo = old_static_geo.size() > 0 ? old_static_geo[0] : RTGeometry();
         vk::BuildAccelerationStructureFlagsKHR flags =
             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-        if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+        if (context->get_device()
+                ->get_enabled_features()
+                .get_ray_tracing_position_fetch_features_khr()
+                .rayTracingPositionFetch == VK_TRUE) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
         }
         static_geo.emplace_back(
@@ -885,7 +887,10 @@ void QuakeNode::update_static_geo(const merian::CommandBufferHandle& cmd) {
         RTGeometry old_geo = old_static_geo.size() > 1 ? old_static_geo[1] : RTGeometry();
         vk::BuildAccelerationStructureFlagsKHR flags =
             vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-        if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+        if (context->get_device()
+                ->get_enabled_features()
+                .get_ray_tracing_position_fetch_features_khr()
+                .rayTracingPositionFetch == VK_TRUE) {
             flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
         }
         static_geo.emplace_back(
@@ -973,7 +978,10 @@ void QuakeNode::update_dynamic_geo(merian::GraphRun& run,
             RTGeometry old_geo = old_dynamic_geo.size() > 0 ? old_dynamic_geo[0] : RTGeometry();
             vk::BuildAccelerationStructureFlagsKHR flags =
                 vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
-            if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+            if (context->get_device()
+                    ->get_enabled_features()
+                    .get_ray_tracing_position_fetch_features_khr()
+                    .rayTracingPositionFetch == VK_TRUE) {
                 flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
             }
             dynamic_geo.emplace_back(
@@ -987,7 +995,10 @@ void QuakeNode::update_dynamic_geo(merian::GraphRun& run,
 void QuakeNode::update_as(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io) {
     vk::BuildAccelerationStructureFlagsKHR flags =
         vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
-    if (context->get_extension<merian::ExtensionVkRayTracingPositionFetch>()) {
+    if (context->get_device()
+            ->get_enabled_features()
+            .get_ray_tracing_position_fetch_features_khr()
+            .rayTracingPositionFetch == VK_TRUE) {
         flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess;
     }
 
