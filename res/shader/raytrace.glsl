@@ -5,7 +5,7 @@
 #extension GL_EXT_ray_query                         : enable
 #extension GL_EXT_nonuniform_qualifier              : enable
 
-#ifdef MERIAN_CONTEXT_EXT_ENABLED_ExtensionVkRayTracingPositionFetch
+#ifdef MERIAN_SPIRV_EXT_SUPPORTED_SPV_KHR_ray_tracing_position_fetch
 #extension GL_EXT_ray_tracing_position_fetch        : enable
 #endif
 
@@ -210,7 +210,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     {
         const uvec3 prim_indexes = buf_idx[nonuniformEXT(rq_instance_id(ray_query))].i[rq_primitive_index(ray_query)];
         vec3 verts[3];
-#ifdef MERIAN_CONTEXT_EXT_ENABLED_ExtensionVkRayTracingPositionFetch
+#ifdef MERIAN_SPIRV_CAP_SUPPORTED_RayQueryPositionFetchKHR
         rayQueryGetIntersectionTriangleVertexPositionsEXT(ray_query, true, verts);
 #else
         verts[0] = buf_vtx[nonuniformEXT(rq_instance_id(ray_query))].v[prim_indexes.x];
