@@ -212,6 +212,8 @@ int main(const int argc, const char** argv) {
 
          "RayQuery/rayQuery",
          "RayTracingPipeline/rayTracingPipeline",
+         "RayTracingPipeline/rayTracingPipeline",
+         "RayTracingPositionFetch/rayTracingPositionFetch",
 
          "Robustness2/robustImageAccess2",
          "Robustness2/robustBufferAccess2",
