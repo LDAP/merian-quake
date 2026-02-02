@@ -6,6 +6,7 @@ project(
         'warning_level=3',
         'cpp_std=c++23',
         'b_ndebug=if-release',
+        'b_lto=true',
         'buildtype=release',
     ],
     meson_version: '>=1.2.0',
