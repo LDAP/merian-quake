@@ -137,23 +137,17 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::ImguiSpdlogSink>();
     spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
-    auto resources = std::make_shared<merian::ExtensionResources>();
-    auto mitigations = std::make_shared<merian::ExtensionMitigations>();
-    std::vector<std::shared_ptr<merian::ContextExtension>> context_extensions = {
-        resources,
-        mitigations,
+    std::vector<std::string> context_extensions = {
+        "resources",
+        "mitigations",
     };
 
-    std::shared_ptr<merian::ExtensionVkDebugUtils> debug_utils;
 #ifndef NDEBUG
-    debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(true);
-    context_extensions.push_back(debug_utils);
+    context_extensions.push_back("vk_debug_utils");
 #endif
 
-    std::shared_ptr<merian::ExtensionGLFW> ext_glfw;
     if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
-        ext_glfw = std::make_shared<merian::ExtensionGLFW>();
-        context_extensions.push_back(ext_glfw);
+        context_extensions.push_back("glfw");
     }
 
     merian::VulkanFeatures features({"robustBufferAccess",
@@ -224,8 +218,15 @@ int main(const int argc, const char** argv) {
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     };
 
-    merian::ContextHandle context =
-        merian::Context::create(features, extensions, context_extensions, "merian-quake");
+    merian::ContextCreateInfo create_info{
+        .desired_features = features,
+        .additional_extensions = extensions,
+        .context_extensions = context_extensions,
+        .application_name = "merian-quake",
+    };
+
+    merian::ContextHandle context = merian::Context::create(create_info);
+    auto resources = context->get_context_extension<merian::ExtensionResources>();
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
 
