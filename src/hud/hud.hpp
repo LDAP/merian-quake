@@ -19,7 +19,9 @@ class QuakeHud : public merian::AbstractCompute {
     };
 
   public:
-    QuakeHud(const ContextHandle context);
+    QuakeHud();
+
+    void initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) override;
 
     ~QuakeHud();
 

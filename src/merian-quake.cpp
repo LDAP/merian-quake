@@ -252,7 +252,7 @@ int main(const int argc, const char** argv) {
         [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
     graph.get_registry().register_node_type<merian::QuakeHud>(merian::NodeRegistry::NodeTypeInfo{
         "Hud", "Show gamestate and apply screen effects.",
-        [=]() { return std::make_shared<merian::QuakeHud>(context); }});
+        []() { return std::make_shared<merian::QuakeHud>(); }});
     graph.get_registry().register_node_type<RendererMarkovChain>(merian::NodeRegistry::NodeTypeInfo{
         "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
         [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});

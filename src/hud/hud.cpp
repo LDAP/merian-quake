@@ -14,7 +14,10 @@ extern mleaf_t* r_viewleaf;
 
 namespace merian {
 
-QuakeHud::QuakeHud(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
+QuakeHud::QuakeHud() : AbstractCompute(sizeof(PushConstant)) {}
+
+void QuakeHud::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
