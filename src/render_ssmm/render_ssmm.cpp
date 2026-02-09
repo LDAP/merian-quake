@@ -2,7 +2,6 @@
 
 #include "game/quake_node.hpp"
 #include "merian-shaders/image_buffer.glsl.h"
-#include "merian/shader/shader_module.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -14,9 +13,13 @@
 // QuakeNode
 // --------------------------------------------------------------------------------------
 
-RendererSSMM::RendererSSMM(const merian::ContextHandle& context,
-                           const merian::ResourceAllocatorHandle& allocator)
-    : Node(), context(context), allocator(allocator) {}
+RendererSSMM::RendererSSMM() : Node() {}
+
+void RendererSSMM::initialize(const merian::ContextHandle& context,
+                              const merian::ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
+}
 
 RendererSSMM::~RendererSSMM() {}
 

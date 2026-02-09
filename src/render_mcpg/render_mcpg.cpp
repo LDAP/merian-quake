@@ -2,7 +2,6 @@
 
 #include "game/quake_node.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
-#include "merian/shader/shader_module.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -16,9 +15,13 @@
 // QuakeNode
 // --------------------------------------------------------------------------------------
 
-RendererMarkovChain::RendererMarkovChain(const merian::ContextHandle& context,
-                                         const merian::ResourceAllocatorHandle& allocator)
-    : Node(), context(context), allocator(allocator) {}
+RendererMarkovChain::RendererMarkovChain() : Node() {}
+
+void RendererMarkovChain::initialize(const merian::ContextHandle& context,
+                                     const merian::ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
+}
 
 RendererMarkovChain::~RendererMarkovChain() {}
 

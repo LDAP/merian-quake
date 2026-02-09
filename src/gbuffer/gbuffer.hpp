@@ -20,9 +20,12 @@ class GBuffer : public merian::Node {
     static constexpr uint32_t local_size_y = 8;
 
   public:
-    GBuffer(const merian::ContextHandle& context);
+    GBuffer();
 
     ~GBuffer();
+
+    virtual void initialize(const merian::ContextHandle& context,
+                            const merian::ResourceAllocatorHandle& allocator) override;
 
     std::vector<merian::InputConnectorHandle> describe_inputs() override;
 
@@ -40,7 +43,7 @@ class GBuffer : public merian::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
-    const merian::ContextHandle context;
+    merian::ContextHandle context;
 
     merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
         merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");

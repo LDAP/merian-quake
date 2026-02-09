@@ -26,8 +26,10 @@ class RendererMarkovChain : public merian::Node {
     };
 
   public:
-    RendererMarkovChain(const merian::ContextHandle& context,
-                        const merian::ResourceAllocatorHandle& allocator);
+    RendererMarkovChain();
+
+    virtual void initialize(const merian::ContextHandle& context,
+                            const merian::ResourceAllocatorHandle& allocator) override;
 
     ~RendererMarkovChain();
 
@@ -49,8 +51,8 @@ class RendererMarkovChain : public merian::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
-    const merian::ContextHandle context;
-    const merian::ResourceAllocatorHandle allocator;
+    merian::ContextHandle context;
+    merian::ResourceAllocatorHandle allocator;
 
     merian::EntryPointHandle rt_shader;
     merian::EntryPointHandle clear_shader;

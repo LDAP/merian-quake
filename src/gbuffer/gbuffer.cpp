@@ -9,9 +9,14 @@
 #include "../../res/shader/hit.glsl.h"
 #include "merian-shaders/image_buffer.glsl.h"
 
-GBuffer::GBuffer(const merian::ContextHandle& context) : context(context) {}
+GBuffer::GBuffer() {}
 
 GBuffer::~GBuffer() {}
+
+void GBuffer::initialize(const merian::ContextHandle& context,
+                         const merian::ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+}
 
 std::vector<merian::InputConnectorHandle> GBuffer::describe_inputs() {
     return {

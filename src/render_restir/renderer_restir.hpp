@@ -12,7 +12,6 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "game/quake_node.hpp"
-#include "merian/shader/shader_module.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
@@ -30,8 +29,10 @@ class RendererRESTIR : public merian::Node {
     };
 
   public:
-    RendererRESTIR(const merian::ContextHandle& context,
-                   const merian::ResourceAllocatorHandle& allocator);
+    RendererRESTIR();
+
+    virtual void initialize(const merian::ContextHandle& context,
+                            const merian::ResourceAllocatorHandle& allocator) override;
 
     ~RendererRESTIR() override;
 

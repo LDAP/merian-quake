@@ -435,26 +435,21 @@ static QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHand
     return geo;
 }
 
-QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
-                     const merian::ResourceAllocatorHandle& allocator,
-                     const int quakespasm_argc,
-                     const char** quakespasm_argv)
-    : Node(), context(context), allocator(allocator) {
+QuakeNode::QuakeNode() : Node() {}
 
-    // reserve roughly 1GB for all vectors
-    vtx.reserve(256 * 1024 * 1024 / sizeof(float));
-    prev_vtx.reserve(256 * 1024 * 1024 / sizeof(float));
-    idx.reserve(256 * 1024 * 1024 / sizeof(uint32_t));
-    ext.reserve(256 * 1024 * 1024 / sizeof(VertexExtraData));
+void QuakeNode::initialize(const merian::ContextHandle& context,
+                           const merian::ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
 
     // INIT QUAKE
     if (quake_data.quake_node != nullptr) {
-        throw std::runtime_error{"Only one quake node can be created."};
+        throw merian::graph_errors::node_error{"Only one quake node can be created."};
     }
     quake_data.quake_node = this;
     host_parms = &quake_data.params;
 
-    init_quakespasm(quakespasm_argc, quakespasm_argv);
+    init_quakespasm(argc, argv);
 
     game_thread = std::thread([&] {
         merian::Stopwatch sw;
@@ -487,6 +482,12 @@ QuakeNode::QuakeNode([[maybe_unused]] const merian::ContextHandle& context,
         }
     });
     sync_gamestate.pop();
+
+    // reserve roughly 1GB for all vectors
+    vtx.reserve(256 * 1024 * 1024 / sizeof(float));
+    prev_vtx.reserve(256 * 1024 * 1024 / sizeof(float));
+    idx.reserve(256 * 1024 * 1024 / sizeof(uint32_t));
+    ext.reserve(256 * 1024 * 1024 / sizeof(VertexExtraData));
 }
 
 QuakeNode::~QuakeNode() {
@@ -590,6 +591,11 @@ void QuakeNode::QS_texture_load(gltexture_t* glt, uint32_t* data) {
         pending_uploads.erase(glt->texnum);
     }
     pending_uploads.try_emplace(glt->texnum, glt, data);
+}
+
+void QuakeNode::set_cmd_args(const uint32_t argc, const char** argv) {
+    this->argc = argc;
+    this->argv = argv;
 }
 
 void QuakeNode::set_controller(const merian::InputControllerHandle& controller) {

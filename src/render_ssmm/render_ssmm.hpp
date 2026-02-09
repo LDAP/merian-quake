@@ -16,8 +16,10 @@
 
 class RendererSSMM : public merian::Node {
   public:
-    RendererSSMM(const merian::ContextHandle& context,
-                 const merian::ResourceAllocatorHandle& allocator);
+    RendererSSMM();
+
+    virtual void initialize(const merian::ContextHandle& context,
+                            const merian::ResourceAllocatorHandle& allocator) override;
 
     ~RendererSSMM();
 
@@ -39,8 +41,8 @@ class RendererSSMM : public merian::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
-    const merian::ContextHandle context;
-    const merian::ResourceAllocatorHandle allocator;
+    merian::ContextHandle context;
+    merian::ResourceAllocatorHandle allocator;
 
     merian::EntryPointHandle rt_shader;
     merian::EntryPointHandle clear_shader;

@@ -22,10 +22,10 @@ vk::BufferCreateInfo make_reservoir_buffer_create_info(const uint32_t render_wid
                                     vk::BufferUsageFlagBits::eTransferSrc};
 }
 
-RendererRESTIR::RendererRESTIR(const merian::ContextHandle& context,
-                               const merian::ResourceAllocatorHandle& allocator)
-    : Node(), context(context), allocator(allocator) {
+RendererRESTIR::RendererRESTIR() : Node() {}
 
+void RendererRESTIR::initialize(const merian::ContextHandle& context,
+                                const merian::ResourceAllocatorHandle& /*allocator*/) {
     const auto shader_compiler = merian::GLSLShaderCompiler::get();
     merian::ShaderCompileContextHandle compile_context =
         merian::ShaderCompileContext::create(context);

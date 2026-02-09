@@ -1,5 +1,6 @@
 #include "gbuffer/gbuffer.hpp"
 #include "imgui.h"
+#include "merian-nodes/graph/extension_graph_nodes.hpp"
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 
 #include "merian-nodes/graph/graph.hpp"
@@ -9,10 +10,8 @@
 #include "merian/utils/input_controller_glfw.hpp"
 #include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/context.hpp"
-#include "merian/vk/extension/extension_glfw.hpp"
-#include "merian/vk/extension/extension_mitigations.hpp"
+#include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/window/glfw_imgui.hpp"
 
 #include <csignal>
@@ -137,10 +136,10 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::ImguiSpdlogSink>();
     spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
-    std::vector<std::string> context_extensions = {
-        "resources",
-        "mitigations",
-    };
+    merian::ExtensionRegistry::get_instance().register_extension(
+        "graph", merian::create_extension<merian::ExtensionGraph>);
+
+    std::vector<std::string> context_extensions = {"resources", "graph"};
 
 #ifndef NDEBUG
     context_extensions.push_back("vk_debug_utils");
@@ -150,82 +149,11 @@ int main(const int argc, const char** argv) {
         context_extensions.push_back("glfw");
     }
 
-    merian::VulkanFeatures features({"robustBufferAccess",
-                                     "alphaToOne",
-                                     "samplerAnisotropy",
-                                     "shaderUniformBufferArrayDynamicIndexing",
-                                     "shaderSampledImageArrayDynamicIndexing",
-                                     "shaderStorageBufferArrayDynamicIndexing",
-                                     "shaderStorageImageArrayDynamicIndexing",
-                                     "shaderClipDistance",
-                                     "shaderCullDistance",
-                                     "shaderFloat64",
-                                     "shaderInt64",
-                                     "shaderInt16",
-                                     "shaderResourceMinLod",
-                                     "sparseBinding",
-
-                                     "storageBuffer16BitAccess",
-
-                                     "scalarBlockLayout",
-                                     "shaderFloat16",
-                                     "uniformAndStorageBuffer8BitAccess",
-                                     "bufferDeviceAddress",
-                                     "runtimeDescriptorArray",
-                                     "descriptorIndexing",
-                                     "shaderSampledImageArrayNonUniformIndexing",
-                                     "shaderStorageImageArrayNonUniformIndexing",
-                                     "shaderStorageBufferArrayNonUniformIndexing",
-                                     "shaderUniformBufferArrayNonUniformIndexing",
-                                     "shaderInt8",
-                                     "timelineSemaphore",
-                                     "hostQueryReset",
-
-                                     "robustImageAccess",
-                                     "synchronization2",
-                                     "maintenance4",
-                                     "subgroupSizeControl",
-
-                                     "accelerationStructure",
-                                     "accelerationStructureHostCommands",
-                                     "descriptorBindingAccelerationStructureUpdateAfterBind",
-
-                                     "shaderBufferFloat32Atomics",
-                                     "shaderBufferFloat32AtomicAdd",
-                                     "shaderBufferFloat64Atomics",
-                                     "shaderBufferFloat64AtomicAdd",
-                                     "shaderSharedFloat32Atomics",
-                                     "shaderSharedFloat32AtomicAdd",
-                                     "shaderSharedFloat64Atomics",
-                                     "shaderSharedFloat64AtomicAdd",
-                                     "shaderImageFloat32Atomics",
-                                     "shaderImageFloat32AtomicAdd",
-                                     "sparseImageFloat32Atomics",
-                                     "sparseImageFloat32AtomicAdd",
-
-                                     "rayQuery",
-                                     "rayTracingPipeline",
-                                     "rayTracingPipeline",
-                                     "rayTracingPositionFetch",
-
-                                     "robustImageAccess2",
-                                     "robustBufferAccess2",
-                                     "nullDescriptor",
-
-                                     "shaderMaximalReconvergence"});
-
-    std::vector<const char*> extensions = {
-        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-    };
-
     merian::ContextCreateInfo create_info{
-        .desired_features = features,
-        .additional_extensions = extensions,
         .context_extensions = context_extensions,
         .application_name = "merian-quake",
     };
-
-    merian::ContextHandle context = merian::Context::create(create_info);
+    const merian::ContextHandle context = merian::Context::create(create_info);
     auto resources = context->get_context_extension<merian::ExtensionResources>();
     auto alloc = resources->resource_allocator();
     auto queue = context->get_queue_GCT();
@@ -245,27 +173,26 @@ int main(const int argc, const char** argv) {
             *prefix / merian::FileLoader::install_datadir_name() /
             std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
 
-    merian::Graph graph(context, alloc);
-
     merian::NodeRegistry& registry = merian::NodeRegistry::get_instance();
-    registry.register_node_type<QuakeNode>(merian::NodeRegistry::NodeTypeInfo{
-        "Quake", "Extract geometry info from Quake",
-        [=]() { return std::make_shared<QuakeNode>(context, alloc, argc - 1, argv + 1); }});
-    registry.register_node_type<merian::QuakeHud>("Hud", "Show gamestate and apply screen effects.");
-    registry.register_node_type<RendererMarkovChain>(merian::NodeRegistry::NodeTypeInfo{
-        "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.",
-        [=]() { return std::make_shared<RendererMarkovChain>(context, alloc); }});
-    registry.register_node_type<RendererRESTIR>(merian::NodeRegistry::NodeTypeInfo{
-        "Renderer (RESTIR)", "Renders a scene using RESTIR.",
-        [=]() { return std::make_shared<RendererRESTIR>(context, alloc); }});
-    registry.register_node_type<GBuffer>(
-        merian::NodeRegistry::NodeTypeInfo{"GBuffer", "Generates the GBuffer for Quake.",
-                                           [=]() { return std::make_shared<GBuffer>(context); }});
-    registry.register_node_type<RendererSSMM>(
-        {"Renderer (SSMM)",
-         "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)",
-         [=]() { return std::make_shared<RendererSSMM>(context, alloc); }});
 
+    registry.register_node_type<QuakeNode>(
+        merian::NodeRegistry::NodeTypeInfo{"Quake", "Extract geometry info from Quake", [=]() {
+                                               auto quake_node = std::make_shared<QuakeNode>();
+                                               quake_node->set_cmd_args(argc - 1, argv + 1);
+                                               return quake_node;
+                                           }});
+    registry.register_node_type<merian::QuakeHud>("Hud",
+                                                  "Show gamestate and apply screen effects.");
+    registry.register_node_type<GBuffer>("GBuffer", "Generates the GBuffer for Quake.");
+    registry.register_node_type<RendererMarkovChain>(
+        "Renderer (MCPG)", "Renders a scene using Markov Chain Path Guiding.");
+    registry.register_node_type<RendererRESTIR>("Renderer (RESTIR)",
+                                                "Renders a scene using RESTIR.");
+    registry.register_node_type<RendererSSMM>(
+        "Renderer (SSMM)",
+        "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)");
+
+    merian::Graph graph({context, alloc});
     // this also creates all nodes in the graph.
     ConfigurationManager config_manager(graph, context->get_file_loader());
     config_manager.load();

@@ -118,27 +118,29 @@ class QuakeNode : public merian::Node {
     };
 
   public:
-    QuakeNode(const merian::ContextHandle& context,
-              const merian::ResourceAllocatorHandle& allocator,
-              const int quakespasm_argc,
-              const char** quakespasm_argv);
+    QuakeNode();
+
+    void initialize(const merian::ContextHandle& context,
+                    const merian::ResourceAllocatorHandle& allocator) override;
 
     ~QuakeNode();
+
+    void set_cmd_args(const uint32_t argc, const char** argv);
 
     void set_controller(const merian::InputControllerHandle& controller);
 
     std::vector<merian::OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout);
+    describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags
-    on_connected([[maybe_unused]] const merian::NodeIOLayout& io_layout,
-                 [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout);
+    NodeStatusFlags on_connected(
+        [[maybe_unused]] const merian::NodeIOLayout& io_layout,
+        [[maybe_unused]] const merian::DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(merian::GraphRun& run,
                  const merian::DescriptorSetHandle& descriptor_set,
-                 const merian::NodeIO& io);
+                 const merian::NodeIO& io) override;
 
-    NodeStatusFlags properties(merian::Properties& config);
+    NodeStatusFlags properties(merian::Properties& config) override;
 
     // -----------------------------------------------------
 
@@ -174,8 +176,8 @@ class QuakeNode : public merian::Node {
     void update_as(const merian::CommandBufferHandle& cmd, const merian::NodeIO& io);
 
   private:
-    const merian::ContextHandle context;
-    const merian::ResourceAllocatorHandle allocator;
+    merian::ContextHandle context;
+    merian::ResourceAllocatorHandle allocator;
 
     // Graph outputs
     // clang-format off
@@ -204,6 +206,9 @@ class QuakeNode : public merian::Node {
     double server_fps = 0;
     uint64_t frame = 0;
     uint64_t last_worldspawn_frame = 0;
+
+    uint32_t argc = 0;
+    const char** argv = nullptr;
 
     // Input processing
     std::shared_ptr<merian::InputController> controller =
