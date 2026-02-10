@@ -196,7 +196,7 @@ int main(const int argc, const char** argv) {
     merian::GraphHandle graph =
         context->get_context_extension<merian::MerianNodesExtension>()->create({context, alloc});
     // this also creates all nodes in the graph.
-    ConfigurationManager config_manager(*graph, context->get_file_loader());
+    ConfigurationManager config_manager(*graph, *context->get_file_loader());
     config_manager.load();
 
     std::shared_ptr<merian::GLFWWindowNode> output =
@@ -216,9 +216,9 @@ int main(const int argc, const char** argv) {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
     quake_font_sm = io.Fonts->AddFontFromFileTTF(
-        context->get_file_loader().find_file("dpquake.ttf")->string().c_str(), 26);
+        context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 26);
     quake_font_lg = io.Fonts->AddFontFromFileTTF(
-        context->get_file_loader().find_file("dpquake.ttf")->string().c_str(), 46);
+        context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
