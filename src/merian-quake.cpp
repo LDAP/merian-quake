@@ -1,6 +1,6 @@
 #include "gbuffer/gbuffer.hpp"
 #include "imgui.h"
-#include "merian-nodes/graph/extension_graph_nodes.hpp"
+#include "merian-nodes/merian_nodes_extension.hpp"
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 
 #include "merian-nodes/graph/graph.hpp"
@@ -136,42 +136,33 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::ImguiSpdlogSink>();
     spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
-    merian::ExtensionRegistry::get_instance().register_extension(
-        "graph", merian::create_extension<merian::ExtensionGraph>);
-
-    std::vector<std::string> context_extensions = {"resources", "graph"};
+    std::vector<std::string> context_extensions = {"merian-resources", "merian-nodes"};
 
 #ifndef NDEBUG
     context_extensions.push_back("vk_debug_utils");
 #endif
 
     if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
-        context_extensions.push_back("glfw");
+        context_extensions.push_back("merian-glfw");
     }
 
-    merian::ContextCreateInfo create_info{
-        .context_extensions = context_extensions,
-        .application_name = "merian-quake",
-    };
-    const merian::ContextHandle context = merian::Context::create(create_info);
-    auto resources = context->get_context_extension<merian::ExtensionResources>();
-    auto alloc = resources->resource_allocator();
-    auto queue = context->get_queue_GCT();
+    // Prepare additional search paths for shader includes and data files
+    std::vector<std::filesystem::path> additional_search_paths;
 
     std::optional<std::filesystem::path> dev_data_dir =
         merian::FileLoader::search_cwd_parents("res");
     if (dev_data_dir) {
-        context->get_file_loader().add_search_path(*dev_data_dir);
+        additional_search_paths.push_back(*dev_data_dir);
     }
-    context->get_file_loader().add_search_path(MERIAN_QUAKE_DATA_DIR);
-    if (const auto prefix = merian::FileLoader::portable_prefix(); prefix)
-        context->get_file_loader().add_search_path(
-            *prefix / merian::FileLoader::install_datadir_name() /
-            std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
-    if (const auto prefix = merian::FileLoader::install_prefix(); prefix)
-        context->get_file_loader().add_search_path(
-            *prefix / merian::FileLoader::install_datadir_name() /
-            std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+    additional_search_paths.push_back(MERIAN_QUAKE_DATA_DIR);
+    if (const auto prefix = merian::FileLoader::portable_prefix(); prefix) {
+        additional_search_paths.push_back(*prefix / merian::FileLoader::install_datadir_name() /
+                                          std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+    }
+    if (const auto prefix = merian::FileLoader::install_prefix(); prefix) {
+        additional_search_paths.push_back(*prefix / merian::FileLoader::install_datadir_name() /
+                                          std::filesystem::path(MERIAN_QUAKE_PROJECT_NAME));
+    }
 
     merian::NodeRegistry& registry = merian::NodeRegistry::get_instance();
 
@@ -192,15 +183,26 @@ int main(const int argc, const char** argv) {
         "Renderer (SSMM)",
         "Renders s scene using screen-space mixture models by Dittebrandt et al. (2023)");
 
-    merian::Graph graph({context, alloc});
+    merian::ContextCreateInfo create_info{
+        .context_extensions = context_extensions,
+        .additional_search_paths = additional_search_paths,
+        .application_name = "merian-quake",
+    };
+    const merian::ContextHandle context = merian::Context::create(create_info);
+    auto resources = context->get_context_extension<merian::ExtensionResources>();
+    auto alloc = resources->resource_allocator();
+    auto queue = context->get_queue_GCT();
+
+    merian::GraphHandle graph =
+        context->get_context_extension<merian::MerianNodesExtension>()->create({context, alloc});
     // this also creates all nodes in the graph.
-    ConfigurationManager config_manager(graph, context->get_file_loader());
+    ConfigurationManager config_manager(*graph, context->get_file_loader());
     config_manager.load();
 
     std::shared_ptr<merian::GLFWWindowNode> output =
-        graph.find_node_for_identifier_and_type<merian::GLFWWindowNode>("output");
+        graph->find_node_for_identifier_and_type<merian::GLFWWindowNode>("output");
     std::shared_ptr<QuakeNode> quake =
-        graph.find_node_for_identifier_and_type<QuakeNode>("Quake 0");
+        graph->find_node_for_identifier_and_type<QuakeNode>("Quake 0");
 
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
     if (output && quake && output->get_window()) {
@@ -260,9 +262,9 @@ int main(const int argc, const char** argv) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    graph.set_on_run_starting([](merian::GraphRun&) { glfwPollEvents(); });
+    graph->set_on_run_starting([](merian::GraphRun&) { glfwPollEvents(); });
     while (!stop) {
-        graph.run();
+        graph->run();
     }
 
     config_manager.store();

@@ -439,6 +439,8 @@ QuakeNode::QuakeNode() : Node() {}
 
 void QuakeNode::initialize(const merian::ContextHandle& context,
                            const merian::ResourceAllocatorHandle& allocator) {
+    assert(this->context == nullptr && "QuakeNode was initialized multiple times.");
+
     this->context = context;
     this->allocator = allocator;
 
@@ -491,13 +493,17 @@ void QuakeNode::initialize(const merian::ContextHandle& context,
 }
 
 QuakeNode::~QuakeNode() {
-    game_running.store(false);
-    // make sure to unlock
-    sync_render.push(0);
-    sync_render.push(0);
-    game_thread.join();
+    if (context) {
+        // node initialized
 
-    shutdown_quakespasm();
+        game_running.store(false);
+        // make sure to unlock
+        sync_render.push(0);
+        sync_render.push(0);
+        game_thread.join();
+
+        shutdown_quakespasm();
+    }
 }
 
 void QuakeNode::QS_worldspawn() {
