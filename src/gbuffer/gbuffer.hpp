@@ -24,6 +24,9 @@ class GBuffer : public merian::Node {
 
     ~GBuffer();
 
+    merian::DeviceSupportInfo
+    query_device_support(const merian::DeviceSupportQueryInfo& query_info) override;
+
     virtual void initialize(const merian::ContextHandle& context,
                             const merian::ResourceAllocatorHandle& allocator) override;
 

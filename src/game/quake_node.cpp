@@ -437,6 +437,11 @@ static QuakeNode::RTGeometry get_rt_geometry(const merian::ResourceAllocatorHand
 
 QuakeNode::QuakeNode() : Node() {}
 
+merian::DeviceSupportInfo
+QuakeNode::query_device_support(const merian::DeviceSupportQueryInfo& query_info) {
+    return merian::DeviceSupportInfo::check(query_info, {"rayQuery", "accelerationStructure"});
+}
+
 void QuakeNode::initialize(const merian::ContextHandle& context,
                            const merian::ResourceAllocatorHandle& allocator) {
     assert(this->context == nullptr && "QuakeNode was initialized multiple times.");

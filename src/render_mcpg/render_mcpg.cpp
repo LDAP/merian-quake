@@ -2,6 +2,8 @@
 
 #include "game/quake_node.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
+#include "merian/shader/spriv_reflect.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -16,6 +18,38 @@
 // --------------------------------------------------------------------------------------
 
 RendererMarkovChain::RendererMarkovChain() : Node() {}
+
+merian::DeviceSupportInfo
+RendererMarkovChain::query_device_support(const merian::DeviceSupportQueryInfo& query_info) {
+    merian::ShaderCompileContextHandle compile_context = merian::ShaderCompileContext::create(
+        query_info.file_loader->get_search_paths(), query_info.physical_device);
+    compile_context->set_preprocessor_macros(
+        get_additional_macro_definitions(QuakeNode::QuakeRenderInfo(), true));
+
+    const auto& glsl_compiler =
+        query_info.extension_container.get_context_extension<merian::ExtensionGLSLCompiler>()
+            ->get_compiler();
+
+    merian::BlobHandle rt_shader = glsl_compiler->find_compile_glsl(
+        query_info.file_loader, "shader/render_mcpg/mcpg.comp", compile_context);
+    merian::BlobHandle clear_shader = glsl_compiler->find_compile_glsl(
+        query_info.file_loader, "shader/render_mcpg/clear.comp", compile_context);
+    merian::BlobHandle volume_shader = glsl_compiler->find_compile_glsl(
+        query_info.file_loader, "shader/render_mcpg/volume.comp", compile_context);
+    merian::BlobHandle volume_forward_project_shader = glsl_compiler->find_compile_glsl(
+        query_info.file_loader, "shader/render_mcpg/volume_forward_project.comp", compile_context);
+
+    merian::SpirvReflect rt_shader_reflect(rt_shader);
+    merian::SpirvReflect clear_shader_reflect(clear_shader);
+    merian::SpirvReflect volume_shader_reflect(volume_shader);
+    merian::SpirvReflect volume_forward_project_shader_reflect(volume_forward_project_shader);
+
+    return rt_shader_reflect.query_device_support(query_info) &
+           clear_shader_reflect.query_device_support(query_info) &
+           volume_shader_reflect.query_device_support(query_info) &
+           volume_forward_project_shader_reflect.query_device_support(query_info) &
+           merian::DeviceSupportInfo::check(query_info, {"scalarBlockLayout"});
+}
 
 void RendererMarkovChain::initialize(const merian::ContextHandle& context,
                                      const merian::ResourceAllocatorHandle& allocator) {
@@ -105,6 +139,62 @@ RendererMarkovChain::on_connected([[maybe_unused]] const merian::NodeIOLayout& i
     return {};
 }
 
+std::map<std::string, std::string>
+RendererMarkovChain::get_additional_macro_definitions(const QuakeNode::QuakeRenderInfo& render_info,
+                                                      const bool debug_out) {
+
+    const float draine_g = std::exp(-2.20679 / (volume_particle_size_um + 3.91029) - 0.428934);
+    const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
+
+    return {
+        {"MERIAN_QUAKE_REFERENCE_MODE",
+         std::to_string(static_cast<int>(reference_mode || surf_bsdf_p == 1.0))},
+        {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(mc_adaptive_grid_type)},
+        {"SURFACE_SPP", std::to_string(spp)},
+        {"MAX_PATH_LENGTH", std::to_string(max_path_length)},
+        {"USE_LIGHT_CACHE_TAIL", std::to_string(use_light_cache_tail)},
+        {"FOV_TAN_ALPHA_HALF", std::to_string(render_info.constant.fov_tan_alpha_half)},
+        {"SUN_W_X", std::to_string(render_info.constant.sun_direction.x)},
+        {"SUN_W_Y", std::to_string(render_info.constant.sun_direction.y)},
+        {"SUN_W_Z", std::to_string(render_info.constant.sun_direction.z)},
+        {"SUN_COLOR_R", std::to_string(render_info.constant.sun_color.r)},
+        {"SUN_COLOR_G", std::to_string(render_info.constant.sun_color.g)},
+        {"SUN_COLOR_B", std::to_string(render_info.constant.sun_color.b)},
+        {"VOLUME_SPP", std::to_string(volume_spp)},
+        {"VOLUME_USE_LIGHT_CACHE", std::to_string(volume_use_light_cache)},
+        {"DRAINE_G", std::to_string(draine_g)},
+        {"DRAINE_A", std::to_string(draine_a)},
+        {"MC_SAMPLES", std::to_string(mc_samples)},
+        {"MC_SAMPLES_ADAPTIVE_PROB", std::to_string(mc_samples_adaptive_prob)},
+        {"DISTANCE_MC_SAMPLES", std::to_string(distance_mc_samples)},
+        {"MC_FAST_RECOVERY", std::to_string(mc_fast_recovery)},
+        {"MERIAN_QUAKE_LC_GRID_TYPE", std::to_string(lc_grid_type)},
+        {"LIGHT_CACHE_BUFFER_SIZE", std::to_string(lc_buffer_size)},
+        {"LC_GRID_STEPS_PER_UNIT_SIZE", std::to_string(lc_grid_steps_per_unit_size)},
+        {"LC_GRID_TAN_ALPHA_HALF", std::to_string(lc_grid_tan_alpha_half)},
+        {"LC_GRID_MIN_WIDTH", std::to_string(lc_grid_min_width)},
+        {"LC_GRID_POWER", std::to_string(lc_grid_power)},
+        {"MC_ADAPTIVE_BUFFER_SIZE", std::to_string(mc_adaptive_buffer_size)},
+        {"MC_ADAPTIVE_GRID_TAN_ALPHA_HALF", std::to_string(mc_adaptive_grid_tan_alpha_half)},
+        {"MC_ADAPTIVE_GRID_MIN_WIDTH", std::to_string(mc_adaptive_grid_min_width)},
+        {"MC_ADAPTIVE_GRID_POWER", std::to_string(mc_adaptive_grid_power)},
+        {"MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE",
+         std::to_string(mc_adaptive_grid_steps_per_unit_size)},
+        {"MC_STATIC_BUFFER_SIZE", std::to_string(mc_static_buffer_size)},
+        {"MC_STATIC_GRID_WIDTH", std::to_string(mc_static_grid_width)},
+        {"DISTANCE_MC_GRID_WIDTH", std::to_string(distance_mc_grid_width)},
+        {"VOLUME_MAX_T", std::to_string(render_info.constant.volume_max_t)},
+        {"SURF_BSDF_P", std::to_string(surf_bsdf_p)},
+        {"VOLUME_PHASE_P", std::to_string(volume_phase_p)},
+        {"DIR_GUIDE_PRIOR", std::to_string(dir_guide_prior)},
+        {"DIST_GUIDE_P", std::to_string(dist_guide_p)},
+        {"DISTANCE_MC_VERTEX_STATE_COUNT", std::to_string(distance_mc_vertex_state_count)},
+        {"SEED", std::to_string(seed)},
+        {"DEBUG_OUTPUT_CONNECTED", std::to_string(static_cast<int>(debug_out))},
+        {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
+    };
+}
+
 void RendererMarkovChain::process(merian::GraphRun& run,
                                   const merian::DescriptorSetHandle& graph_descriptor_set,
                                   const merian::NodeIO& io) {
@@ -122,61 +212,10 @@ void RendererMarkovChain::process(merian::GraphRun& run,
             seed = dist(rng);
         }
 
-        const float draine_g = std::exp(-2.20679 / (volume_particle_size_um + 3.91029) - 0.428934);
-        const float draine_a = std::exp(3.62489 - 8.29288 / (volume_particle_size_um + 5.52825));
-
-        const std::map<std::string, std::string> additional_macro_definitions = {
-            {"MERIAN_QUAKE_REFERENCE_MODE",
-             std::to_string(static_cast<int>(reference_mode || surf_bsdf_p == 1.0))},
-            {"MERIAN_QUAKE_ADAPTIVE_GRID_TYPE", std::to_string(mc_adaptive_grid_type)},
-            {"SURFACE_SPP", std::to_string(spp)},
-            {"MAX_PATH_LENGTH", std::to_string(max_path_length)},
-            {"USE_LIGHT_CACHE_TAIL", std::to_string(use_light_cache_tail)},
-            {"FOV_TAN_ALPHA_HALF", std::to_string(render_info.constant.fov_tan_alpha_half)},
-            {"SUN_W_X", std::to_string(render_info.constant.sun_direction.x)},
-            {"SUN_W_Y", std::to_string(render_info.constant.sun_direction.y)},
-            {"SUN_W_Z", std::to_string(render_info.constant.sun_direction.z)},
-            {"SUN_COLOR_R", std::to_string(render_info.constant.sun_color.r)},
-            {"SUN_COLOR_G", std::to_string(render_info.constant.sun_color.g)},
-            {"SUN_COLOR_B", std::to_string(render_info.constant.sun_color.b)},
-            {"VOLUME_SPP", std::to_string(volume_spp)},
-            {"VOLUME_USE_LIGHT_CACHE", std::to_string(volume_use_light_cache)},
-            {"DRAINE_G", std::to_string(draine_g)},
-            {"DRAINE_A", std::to_string(draine_a)},
-            {"MC_SAMPLES", std::to_string(mc_samples)},
-            {"MC_SAMPLES_ADAPTIVE_PROB", std::to_string(mc_samples_adaptive_prob)},
-            {"DISTANCE_MC_SAMPLES", std::to_string(distance_mc_samples)},
-            {"MC_FAST_RECOVERY", std::to_string(mc_fast_recovery)},
-            {"MERIAN_QUAKE_LC_GRID_TYPE", std::to_string(lc_grid_type)},
-            {"LIGHT_CACHE_BUFFER_SIZE", std::to_string(lc_buffer_size)},
-            {"LC_GRID_STEPS_PER_UNIT_SIZE", std::to_string(lc_grid_steps_per_unit_size)},
-            {"LC_GRID_TAN_ALPHA_HALF", std::to_string(lc_grid_tan_alpha_half)},
-            {"LC_GRID_MIN_WIDTH", std::to_string(lc_grid_min_width)},
-            {"LC_GRID_POWER", std::to_string(lc_grid_power)},
-            {"MC_ADAPTIVE_BUFFER_SIZE", std::to_string(mc_adaptive_buffer_size)},
-            {"MC_ADAPTIVE_GRID_TAN_ALPHA_HALF", std::to_string(mc_adaptive_grid_tan_alpha_half)},
-            {"MC_ADAPTIVE_GRID_MIN_WIDTH", std::to_string(mc_adaptive_grid_min_width)},
-            {"MC_ADAPTIVE_GRID_POWER", std::to_string(mc_adaptive_grid_power)},
-            {"MC_ADAPTIVE_GRID_STEPS_PER_UNIT_SIZE",
-             std::to_string(mc_adaptive_grid_steps_per_unit_size)},
-            {"MC_STATIC_BUFFER_SIZE", std::to_string(mc_static_buffer_size)},
-            {"MC_STATIC_GRID_WIDTH", std::to_string(mc_static_grid_width)},
-            {"DISTANCE_MC_GRID_WIDTH", std::to_string(distance_mc_grid_width)},
-            {"VOLUME_MAX_T", std::to_string(render_info.constant.volume_max_t)},
-            {"SURF_BSDF_P", std::to_string(surf_bsdf_p)},
-            {"VOLUME_PHASE_P", std::to_string(volume_phase_p)},
-            {"DIR_GUIDE_PRIOR", std::to_string(dir_guide_prior)},
-            {"DIST_GUIDE_P", std::to_string(dist_guide_p)},
-            {"DISTANCE_MC_VERTEX_STATE_COUNT", std::to_string(distance_mc_vertex_state_count)},
-            {"SEED", std::to_string(seed)},
-            {"DEBUG_OUTPUT_CONNECTED",
-             std::to_string(static_cast<int>(io.is_connected(con_debug)))},
-            {"DEBUG_OUTPUT_SELECTOR", std::to_string(debug_output_selector)},
-        };
-
         merian::ShaderCompileContextHandle compile_context =
             merian::ShaderCompileContext::create(context);
-        compile_context->set_preprocessor_macros(additional_macro_definitions);
+        compile_context->set_preprocessor_macros(
+            get_additional_macro_definitions(render_info, io.is_connected(con_debug)));
 
         rt_shader = run.get_shader_compiler()->find_compile_glsl_to_entry_point(
             context, "shader/render_mcpg/mcpg.comp", compile_context);

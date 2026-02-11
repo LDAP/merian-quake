@@ -120,6 +120,9 @@ class QuakeNode : public merian::Node {
   public:
     QuakeNode();
 
+    merian::DeviceSupportInfo
+    query_device_support(const merian::DeviceSupportQueryInfo& /*query_info*/) override;
+
     void initialize(const merian::ContextHandle& context,
                     const merian::ResourceAllocatorHandle& allocator) override;
 

@@ -28,6 +28,9 @@ class RendererMarkovChain : public merian::Node {
   public:
     RendererMarkovChain();
 
+    merian::DeviceSupportInfo
+    query_device_support(const merian::DeviceSupportQueryInfo& query_info) override;
+
     virtual void initialize(const merian::ContextHandle& context,
                             const merian::ResourceAllocatorHandle& allocator) override;
 
@@ -51,6 +54,9 @@ class RendererMarkovChain : public merian::Node {
     NodeStatusFlags properties(merian::Properties& config) override;
 
   private:
+    std::map<std::string, std::string>
+    get_additional_macro_definitions(const QuakeNode::QuakeRenderInfo& render_info, const bool debug_out);
+
     merian::ContextHandle context;
     merian::ResourceAllocatorHandle allocator;
 
