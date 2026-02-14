@@ -21,13 +21,14 @@ class QuakeHud : public merian::AbstractCompute {
   public:
     QuakeHud();
 
-    void initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) override;
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     ~QuakeHud();
 
-    std::vector<merian::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<merian::OutputConnectorHandle>
+    std::vector<merian::OutputConnectorDescriptor>
     describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
     const void* get_push_constant(merian::GraphRun& run, const merian::NodeIO& io) override;
@@ -40,7 +41,7 @@ class QuakeHud : public merian::AbstractCompute {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    merian::VkSampledImageInHandle con_src = merian::VkSampledImageIn::compute_read("src");
+    merian::VkSampledImageInHandle con_src = merian::VkSampledImageIn::compute_read();
 
     vk::Extent3D extent;
     PushConstant pc;

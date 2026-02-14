@@ -61,35 +61,43 @@ RendererMarkovChain::~RendererMarkovChain() {}
 
 // -------------------------------------------------------------------------------------------
 
-std::vector<merian::InputConnectorHandle> RendererMarkovChain::describe_inputs() {
+std::vector<merian::InputConnectorDescriptor> RendererMarkovChain::describe_inputs() {
     return {
-        con_vtx,      con_prev_vtx,   con_idx,
-        con_ext,      con_gbuffer,    con_hits,
-        con_textures, con_tlas,       con_prev_volume_depth,
-        con_mv,       con_resolution, con_render_info,
+        {"vtx", con_vtx},
+        {"prev_vtx", con_prev_vtx},
+        {"idx", con_idx},
+        {"ext", con_ext},
+        {"gbuffer", con_gbuffer},
+        {"hits", con_hits},
+        {"textures", con_textures},
+        {"tlas", con_tlas},
+        {"prev_volume_depth", con_prev_volume_depth},
+        {"mv", con_mv},
+        {"resolution", con_resolution},
+        {"render_info", con_render_info},
     };
 }
 
-std::vector<merian::OutputConnectorHandle>
+std::vector<merian::OutputConnectorDescriptor>
 RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
 
-    con_irradiance = merian::ManagedVkImageOut::compute_write(
-        "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_volume = merian::ManagedVkImageOut::compute_write("volume", vk::Format::eR32G32B32A32Sfloat,
+    con_irradiance = merian::ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat,
+                                                              render_width, render_height);
+    con_volume = merian::ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat,
                                                           render_width, render_height);
-    con_volume_depth = merian::ManagedVkImageOut::compute_write(
-        "volume_depth", vk::Format::eR16Sfloat, render_width, render_height);
+    con_volume_depth = merian::ManagedVkImageOut::compute_write(vk::Format::eR16Sfloat,
+                                                                render_width, render_height);
     con_volume_mv = merian::ManagedVkImageOut::compute_read_write_transfer_dst(
-        "volume_mv", vk::Format::eR16G16Sfloat, render_width, render_height, 1,
+        vk::Format::eR16G16Sfloat, render_width, render_height, 1,
         vk::ImageLayout::eTransferDstOptimal);
-    con_debug = merian::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
+    con_debug = merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat,
                                                          render_width, render_height);
 
     con_markovchain = std::make_shared<merian::ManagedVkBufferOut>(
-        "markovchain", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
@@ -99,7 +107,7 @@ RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
     con_lightcache = std::make_shared<merian::ManagedVkBufferOut>(
-        "lightcache", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
@@ -109,7 +117,7 @@ RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
                                  vk::BufferUsageFlagBits::eTransferSrc},
         true);
     con_volume_distancemc = std::make_shared<merian::ManagedVkBufferOut>(
-        "volume_distancemc", vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{{},
@@ -122,8 +130,14 @@ RendererMarkovChain::describe_outputs(const merian::NodeIOLayout& io_layout) {
         true);
 
     return {
-        con_irradiance, con_volume,      con_volume_depth, con_volume_mv,
-        con_debug,      con_markovchain, con_lightcache,   con_volume_distancemc,
+        {"irradiance", con_irradiance},
+        {"volume", con_volume},
+        {"volume_depth", con_volume_depth},
+        {"volume_mv", con_volume_mv},
+        {"debug", con_debug},
+        {"markovchain", con_markovchain},
+        {"lightcache", con_lightcache},
+        {"volume_distancemc", con_volume_distancemc},
     };
 }
 

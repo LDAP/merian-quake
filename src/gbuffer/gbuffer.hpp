@@ -30,9 +30,9 @@ class GBuffer : public merian::Node {
     virtual void initialize(const merian::ContextHandle& context,
                             const merian::ResourceAllocatorHandle& allocator) override;
 
-    std::vector<merian::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<merian::OutputConnectorHandle>
+    std::vector<merian::OutputConnectorDescriptor>
     describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) override;
 
     virtual NodeStatusFlags
@@ -49,16 +49,15 @@ class GBuffer : public merian::Node {
     merian::ContextHandle context;
 
     merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
-    merian::VkSampledImageInHandle con_textures =
-        merian::VkSampledImageIn::compute_read("textures");
+        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create();
+    merian::VkSampledImageInHandle con_textures = merian::VkSampledImageIn::compute_read();
     merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
-    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
-    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
-    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
-    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
+        merian::SpecialStaticIn<vk::Extent3D>::create();
+    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read();
+    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read();
 
     merian::ManagedVkImageOutHandle con_albedo;
     merian::ManagedVkImageOutHandle con_irradiance;

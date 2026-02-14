@@ -684,15 +684,20 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
     // clang-format on
 }
 
-std::vector<merian::OutputConnectorHandle>
+std::vector<merian::OutputConnectorDescriptor>
 QuakeNode::describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) {
     con_resolution = merian::SpecialStaticOut<vk::Extent3D>::create(
-        "resolution",
         vk::Extent3D{static_cast<uint32_t>(vid.width), static_cast<uint32_t>(vid.height), 1});
 
     return {
-        con_resolution, con_render_info, con_tlas_info, con_textures,
-        con_vtx,        con_prev_vtx,    con_idx,       con_ext,
+        {"resolution", con_resolution},
+        {"render_info", con_render_info},
+        {"tlas_info", con_tlas_info},
+        {"textures", con_textures},
+        {"vtx", con_vtx},
+        {"prev_vtx", con_prev_vtx},
+        {"idx", con_idx},
+        {"ext", con_ext},
     };
 }
 

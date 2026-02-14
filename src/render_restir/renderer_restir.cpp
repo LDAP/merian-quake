@@ -54,35 +54,44 @@ RendererRESTIR::~RendererRESTIR() {}
 
 // -------------------------------------------------------------------------------------------
 
-std::vector<merian::InputConnectorHandle> RendererRESTIR::describe_inputs() {
+std::vector<merian::InputConnectorDescriptor> RendererRESTIR::describe_inputs() {
     return {
-        con_vtx,          con_prev_vtx,      con_idx,      con_ext,  con_gbuffer,
-        con_prev_gbuffer, con_hits,          con_textures, con_tlas, con_resolution,
-        con_render_info,  con_reservoirs_in, con_mv,
+        {"vtx", con_vtx},
+        {"prev_vtx", con_prev_vtx},
+        {"idx", con_idx},
+        {"ext", con_ext},
+        {"gbuffer", con_gbuffer},
+        {"prev_gbuffer", con_prev_gbuffer},
+        {"hits", con_hits},
+        {"textures", con_textures},
+        {"tlas", con_tlas},
+        {"resolution", con_resolution},
+        {"render_info", con_render_info},
+        {"reservoirs", con_reservoirs_in},
+        {"mv", con_mv},
     };
 }
 
-std::vector<merian::OutputConnectorHandle>
+std::vector<merian::OutputConnectorDescriptor>
 RendererRESTIR::describe_outputs(const merian::NodeIOLayout& io_layout) {
 
     const uint32_t render_width = io_layout[con_resolution]->value().width;
     const uint32_t render_height = io_layout[con_resolution]->value().height;
 
-    con_irradiance = merian::ManagedVkImageOut::compute_write(
-        "irradiance", vk::Format::eR32G32B32A32Sfloat, render_width, render_height);
-    con_moments = merian::ManagedVkImageOut::compute_write("moments", vk::Format::eR32G32Sfloat,
-                                                           render_width, render_height);
-    con_debug = merian::ManagedVkImageOut::compute_write("debug", vk::Format::eR16G16B16A16Sfloat,
+    con_irradiance = merian::ManagedVkImageOut::compute_write(vk::Format::eR32G32B32A32Sfloat,
+                                                              render_width, render_height);
+    con_moments = merian::ManagedVkImageOut::compute_write(vk::Format::eR32G32Sfloat, render_width,
+                                                           render_height);
+    con_debug = merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat,
                                                          render_width, render_height);
     con_reservoirs_out = std::make_shared<merian::ManagedVkBufferOut>(
-        "reservoirs", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlags(), make_reservoir_buffer_create_info(render_width, render_height));
-
     return {
-        con_irradiance,
-        con_moments,
-        con_debug,
-        con_reservoirs_out,
+        {"irradiance", con_irradiance},
+        {"moments", con_moments},
+        {"debug", con_debug},
+        {"reservoirs", con_reservoirs_out},
     };
 }
 

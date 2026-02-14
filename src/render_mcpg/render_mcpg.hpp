@@ -38,9 +38,9 @@ class RendererMarkovChain : public merian::Node {
 
     // -----------------------------------------------------
 
-    std::vector<merian::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<merian::OutputConnectorHandle>
+    std::vector<merian::OutputConnectorDescriptor>
     describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
     NodeStatusFlags
@@ -55,7 +55,8 @@ class RendererMarkovChain : public merian::Node {
 
   private:
     std::map<std::string, std::string>
-    get_additional_macro_definitions(const QuakeNode::QuakeRenderInfo& render_info, const bool debug_out);
+    get_additional_macro_definitions(const QuakeNode::QuakeRenderInfo& render_info,
+                                     const bool debug_out);
 
     merian::ContextHandle context;
     merian::ResourceAllocatorHandle allocator;
@@ -65,24 +66,23 @@ class RendererMarkovChain : public merian::Node {
     merian::EntryPointHandle volume_shader;
     merian::EntryPointHandle volume_forward_project_shader;
 
-    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
-    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
-    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
-    merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read("gbuffer");
-    merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read("hits");
+    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read();
+    merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read();
+    merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read();
 
-    merian::VkSampledImageInHandle con_textures =
-        merian::VkSampledImageIn::compute_read("textures");
-    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
+    merian::VkSampledImageInHandle con_textures = merian::VkSampledImageIn::compute_read();
+    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read();
     merian::VkSampledImageInHandle con_prev_volume_depth =
-        merian::VkSampledImageIn::compute_read("prev_volume_depth", 1);
-    merian::VkImageInHandle con_mv = merian::VkImageIn::transfer_src("mv");
+        merian::VkSampledImageIn::compute_read(1);
+    merian::VkImageInHandle con_mv = merian::VkImageIn::transfer_src();
 
     merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
+        merian::SpecialStaticIn<vk::Extent3D>::create();
     merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
+        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create();
 
     merian::ManagedVkImageOutHandle con_irradiance;
     merian::ManagedVkImageOutHandle con_debug;

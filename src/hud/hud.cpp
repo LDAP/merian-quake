@@ -28,18 +28,19 @@ void QuakeHud::initialize(const ContextHandle& context, const ResourceAllocatorH
 
 QuakeHud::~QuakeHud() {}
 
-std::vector<merian::InputConnectorHandle> QuakeHud::describe_inputs() {
+std::vector<merian::InputConnectorDescriptor> QuakeHud::describe_inputs() {
     return {
-        con_src,
-        merian::GBufferIn::compute_read("gbuffer"),
+        {"src", con_src},
+        {"gbuffer", merian::GBufferIn::compute_read()},
     };
 }
 
-std::vector<merian::OutputConnectorHandle>
+std::vector<merian::OutputConnectorDescriptor>
 QuakeHud::describe_outputs(const merian::NodeIOLayout& io_layout) {
     extent = io_layout[con_src]->get_create_info_or_throw().extent;
     return {
-        merian::ManagedVkImageOut::compute_write("output", vk::Format::eR16G16B16A16Sfloat, extent),
+        {"output",
+         merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat, extent)},
     };
 }
 

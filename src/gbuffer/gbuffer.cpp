@@ -33,26 +33,32 @@ void GBuffer::initialize(const merian::ContextHandle& context,
     this->context = context;
 }
 
-std::vector<merian::InputConnectorHandle> GBuffer::describe_inputs() {
+std::vector<merian::InputConnectorDescriptor> GBuffer::describe_inputs() {
     return {
-        con_render_info, con_textures, con_resolution, con_vtx,
-        con_prev_vtx,    con_idx,      con_ext,        con_tlas,
+        {"render_info", con_render_info},
+        {"textures", con_textures},
+        {"resolution", con_resolution},
+        {"vtx", con_vtx},
+        {"prev_vtx", con_prev_vtx},
+        {"idx", con_idx},
+        {"ext", con_ext},
+        {"tlas", con_tlas},
     };
 }
 
-std::vector<merian::OutputConnectorHandle>
+std::vector<merian::OutputConnectorDescriptor>
 GBuffer::describe_outputs(const merian::NodeIOLayout& io_layout) {
     extent = io_layout[con_resolution]->value();
 
-    con_albedo = merian::ManagedVkImageOut::compute_write("albedo", vk::Format::eR16G16B16A16Sfloat,
+    con_albedo = merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat,
                                                           extent.width, extent.height);
-    con_irradiance = merian::ManagedVkImageOut::compute_write(
-        "irradiance", vk::Format::eR16G16B16A16Sfloat, extent.width, extent.height);
-    con_mv = merian::ManagedVkImageOut::compute_write("mv", vk::Format::eR16G16Sfloat, extent.width,
+    con_irradiance = merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16B16A16Sfloat,
+                                                              extent.width, extent.height);
+    con_mv = merian::ManagedVkImageOut::compute_write(vk::Format::eR16G16Sfloat, extent.width,
                                                       extent.height);
-    con_gbuffer = merian::GBufferOut::compute_write("gbuffer", extent.width, extent.height);
+    con_gbuffer = merian::GBufferOut::compute_write(extent.width, extent.height);
     con_hits = std::make_shared<merian::ManagedVkBufferOut>(
-        "hits", vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eMemoryWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo{
             {},
@@ -60,7 +66,11 @@ GBuffer::describe_outputs(const merian::NodeIOLayout& io_layout) {
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
                 vk::BufferUsageFlagBits::eTransferSrc});
 
-    return {con_albedo, con_irradiance, con_mv, con_gbuffer, con_hits};
+    return {{"albedo", con_albedo},
+            {"irradiance", con_irradiance},
+            {"mv", con_mv},
+            {"gbuffer", con_gbuffer},
+            {"hits", con_hits}};
 }
 
 GBuffer::NodeStatusFlags GBuffer::properties([[maybe_unused]] merian::Properties& props) {

@@ -25,9 +25,9 @@ class RendererSSMM : public merian::Node {
 
     // -----------------------------------------------------
 
-    std::vector<merian::InputConnectorHandle> describe_inputs() override;
+    std::vector<merian::InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<merian::OutputConnectorHandle>
+    std::vector<merian::OutputConnectorDescriptor>
     describe_outputs(const merian::NodeIOLayout& io_layout) override;
 
     NodeStatusFlags
@@ -47,22 +47,21 @@ class RendererSSMM : public merian::Node {
     merian::EntryPointHandle rt_shader;
     merian::EntryPointHandle clear_shader;
 
-    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read("vtx");
-    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read("prev_vtx");
-    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read("idx");
-    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read("ext");
-    merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read("gbuffer");
-    merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read("hits");
-    merian::VkSampledImageInHandle con_textures =
-        merian::VkSampledImageIn::compute_read("textures");
-    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read("tlas");
-    merian::VkSampledImageInHandle con_mv = merian::VkSampledImageIn::compute_read("mv");
-    merian::VkBufferInHandle con_prev_ssmc = merian::VkBufferIn::compute_read("prev_ssmc", 1);
+    merian::VkBufferInHandle con_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_prev_vtx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_idx = merian::VkBufferIn::compute_read();
+    merian::VkBufferInHandle con_ext = merian::VkBufferIn::compute_read();
+    merian::GBufferInHandle con_gbuffer = merian::GBufferIn::compute_read();
+    merian::VkBufferInHandle con_hits = merian::VkBufferIn::compute_read();
+    merian::VkSampledImageInHandle con_textures = merian::VkSampledImageIn::compute_read();
+    merian::VkTLASInHandle con_tlas = merian::VkTLASIn::compute_read();
+    merian::VkSampledImageInHandle con_mv = merian::VkSampledImageIn::compute_read();
+    merian::VkBufferInHandle con_prev_ssmc = merian::VkBufferIn::compute_read(1);
 
     merian::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian::SpecialStaticIn<vk::Extent3D>::create("resolution");
+        merian::SpecialStaticIn<vk::Extent3D>::create();
     merian::PtrInHandle<QuakeNode::QuakeRenderInfo> con_render_info =
-        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create("render_info");
+        merian::PtrIn<QuakeNode::QuakeRenderInfo>::create();
 
     merian::ManagedVkImageOutHandle con_irradiance;
     merian::ManagedVkImageOutHandle con_moments;
