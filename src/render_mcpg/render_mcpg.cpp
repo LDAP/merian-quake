@@ -470,8 +470,20 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
 
     config.st_separate("Debug");
     config.config_options("debug output", debug_output_selector,
-                          {"light cache", "mc weight", "mc mean direction", "mc grid", "irradiance",
-                           "moments", "mc cos", "mc N", "mc motion vectors"});
+                          {
+                              "irradiance",
+                              "moments",
+                              "light cache",
+                              "mc grid",
+                              "mc weight",
+                              "mc mean direction",
+                              "mc cos",
+                              "mc N",
+                              "mc motion vectors",
+                              "mc_f",
+                              "mean score",
+                              "wo_p",
+                          });
     needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
     if (!dumping) {
         dump_mc = config.config_bool("Download Adaptive Grid",
