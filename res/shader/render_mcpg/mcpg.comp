@@ -189,7 +189,7 @@ void main() {
                     } else if (DEBUG_OUTPUT_SELECTOR == 10 /* mean score */) {
                         imageStore(img_debug, pixel, vec4(debug_color(score_sum / MC_SAMPLES), 1));
                     } else if (DEBUG_OUTPUT_SELECTOR == 11 /* wo_p */) {
-                        imageStore(img_debug, pixel, vec4(debug_color(float(isnan(wo_p))), 1));
+                        imageStore(img_debug, pixel, vec4(debug_color(wo_p), 1));
                     }
                 }
 #endif
