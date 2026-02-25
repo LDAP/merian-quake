@@ -483,6 +483,9 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                               "mc_f",
                               "mean score",
                               "wo_p",
+                              "acceptance",
+                              "recovery",
+                              "used guiding",
                           });
     needs_pipeline_rebuild |= config.config_bool("recreate pipeline");
     if (!dumping) {

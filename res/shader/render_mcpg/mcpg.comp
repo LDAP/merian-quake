@@ -42,7 +42,7 @@ void main() {
     irr = vec3(0);
 
 #if DEBUG_OUTPUT_CONNECTED == 1
-    MCState debug_mc_state;
+    MCState debug_mc_state = mc_state_new();
 #endif
 
     if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
@@ -123,10 +123,6 @@ void main() {
                 }
                 wodotn = dot(wo, current_hit.normal);
 
-                // ray is below geometric surface
-                if (wodotn <= 1e-3 || dot(wo, geo_decode_normal(current_hit.enc_geonormal)) <= 1e-3)
-                    break;
-
                 // Multiple importance sampling
                 if (score_sum > 0) {
                     [[unroll]]
@@ -142,18 +138,33 @@ void main() {
 
             // TRACE RAY TO NEXT SURFACE
             Hit next_hit;
-            next_hit.wi = wo;
-            // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
-            next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
             f16vec3 incident = f16vec3(0); // contains throughput already
             f16vec3 throughput = f16vec3(1);
-            trace_ray(throughput, incident, next_hit);
-            // Full GI (infinite diffuse bounces)
-            const f16vec3 lc_incident = any(greaterThan(incident, f16vec3(0))) || (USE_LIGHT_CACHE_TAIL == 0 && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+            f16vec3 lc_incident = f16vec3(0);
+            float microfacet_bsdf = 0;
 
-            // EVALUATE BSDF
-            // without albedo (added below to skip first albedo)
-            const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
+            if (wodotn > 1e-3 && dot(wo, geo_decode_normal(current_hit.enc_geonormal)) > 1e-3) {
+                incident = f16vec3(0);
+                throughput = f16vec3(1);
+
+                next_hit.wi = wo;
+                // Pull back the ray such that it cannot excape through corners (and to prevent self collision)
+                next_hit.pos = current_hit.pos - current_hit.wi * 1e-3;
+                trace_ray(throughput, incident, next_hit);
+
+                            // Full GI (infinite diffuse bounces)
+                lc_incident = any(greaterThan(incident, f16vec3(0))) || (USE_LIGHT_CACHE_TAIL == 0 && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
+
+                // EVALUATE BSDF
+                // without albedo (added below to skip first albedo)
+                microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
+            } else {
+                // ray is below geometric surface
+
+                throughput = f16vec3(0);
+                lc_incident = f16vec3(0);
+                microfacet_bsdf = 0;
+            }
             
             current_throughput *= microfacet_bsdf;
 #if USE_LIGHT_CACHE_TAIL == 1 
@@ -166,6 +177,10 @@ void main() {
 
             // UPDATE MARKOV CHAIN and LIGHT_CACHE
 #if MERIAN_QUAKE_REFERENCE_MODE != 1
+
+#if DEBUG_OUTPUT_CONNECTED == 1
+            bool did_discard = false;
+#endif
             {
                 // multiply albedo?
                 const float mc_f = yuv_luminance(lc_incident * microfacet_bsdf / wo_p);
@@ -177,9 +192,12 @@ void main() {
                         mc_state_add_sample(mc_state, current_hit.pos, mc_f, next_hit.pos, f16vec3((next_hit.pos - next_hit.prev_pos) / TIME_DIFF));
                         mc_static_save(mc_state, current_hit.pos, current_hit.normal);
                         mc_adaptive_save(mc_state, current_hit.pos, current_hit.normal);
-                    } else if (MC_FAST_RECOVERY == 1 && mc_buffer_index != -1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos)) {
+                    } else if (MC_FAST_RECOVERY == 1 && mc_buffer_index != -1 && mc_light_missing(mc_state, mc_f, wo, current_hit.pos, next_hit.pos)) {
                         // fix slow recovery after light source disappears
                         mc_states[mc_buffer_index].sum_w = 0.;
+#if DEBUG_OUTPUT_CONNECTED == 1
+                        did_discard = true;
+#endif
                     }
                 }
 #if DEBUG_OUTPUT_CONNECTED == 1
@@ -190,6 +208,12 @@ void main() {
                         imageStore(img_debug, pixel, vec4(debug_color(score_sum / MC_SAMPLES), 1));
                     } else if (DEBUG_OUTPUT_SELECTOR == 11 /* wo_p */) {
                         imageStore(img_debug, pixel, vec4(debug_color(wo_p), 1));
+                    } else if (DEBUG_OUTPUT_SELECTOR == 12 /* acceptance */) {
+                        imageStore(img_debug, pixel, vec4(vec3(float(XorShift32(rng_state) * score_sum < mc_f * MC_SAMPLES)), 1));
+                    } else if (DEBUG_OUTPUT_SELECTOR == 13 /* recovery */) {
+                        imageStore(img_debug, pixel, vec4(vec3(did_discard), 1));
+                    } else if (DEBUG_OUTPUT_SELECTOR == 14 /*  guiding? */) {
+                        imageStore(img_debug, pixel, vec4(vec3(mc_buffer_index != -1), 1));
                     }
                 }
 #endif
@@ -271,12 +295,12 @@ void main() {
             }
             case 6: {
                 // -- MC learned cos --
-                imageStore(img_debug, pixel, vec4(debug_color(debug_mc_state.sum_w > 0 ? 1 - clamp(acos(debug_mc_state.w_cos / debug_mc_state.sum_w) * INV_PI, 0, 1) : 0), 1));
+                imageStore(img_debug, pixel, vec4(debug_mc_state.sum_w > 0 ? debug_color(debug_mc_state.w_cos / debug_mc_state.sum_w) : vec3(0), 1));
                 break;
             }
             case 7: {
                 // -- MC N --
-                imageStore(img_debug, pixel, vec4(vec3(debug_mc_state.N) / ML_MAX_N, 1));
+                imageStore(img_debug, pixel, vec4(vec3(debug_mc_state.N) / float(ML_MAX_N), 1));
                 break;
             }
             case 8: {

@@ -23,7 +23,7 @@
 
 #define mc_state_mean_cos(mc_state, pos) clamp((mc_state.N * mc_state.N * mc_state.w_cos / mc_state.sum_w) / (mc_state.N * mc_state.N + mc_state_prior(mc_state, pos)), 0, 0.9999999)
 
-bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos) {
+bool mc_light_missing(const MCState mc_state, const float mc_f, const vec3 wo, const vec3 pos, const vec3 next_pos) {
 
     if (mc_f > 1e-3 * mc_state.sum_w) {
         return false;
