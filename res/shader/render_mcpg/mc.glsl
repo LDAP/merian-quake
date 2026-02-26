@@ -14,10 +14,10 @@
 
 #define mc_state_new() MCState(vec3(0.0), 0.0, 0.0, f16vec3(0), 0.0, 0s, 0s);
 
-// return normalized direction (from pos)
-#define mc_state_dir(mc_state, pos) normalize((mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt) - pos)
+#define mc_state_pos(mc_state) (mc_state.w_tgt / mc_state.sum_w)
 
-#define mc_state_pos(mc_state) (mc_state.sum_w > 0.0 ? mc_state.w_tgt / mc_state.sum_w : mc_state.w_tgt)
+// return normalized direction (from pos)
+#define mc_state_dir(mc_state, pos) normalize(mc_state_pos(mc_state) - pos)
 
 #define mc_state_prior(mc_state, pos) (max(0.0001, DIR_GUIDE_PRIOR / merian_square(distance((pos), mc_state_pos(mc_state)))))
 
@@ -44,7 +44,14 @@ float mc_state_kappa(const MCState mc_state, const vec3 pos) {
 }
 
 // returns the vmf lobe vec4(direction, kappa) for a position
-#define mc_state_get_vmf(mc_state, pos) vec4(mc_state_dir(mc_state, pos), mc_state_kappa(mc_state, pos))
+vec4 mc_state_get_vmf(inout MCState mc_state, const vec3 pos) {
+    vec4 vmf = vec4(mc_state_dir(mc_state, pos), mc_state_kappa(mc_state, pos));
+
+    if (any(isnan(vmf)))
+        return vec4(0);
+
+    return vmf;
+} 
 
 void mc_state_reweight(inout MCState mc_state, const float factor) {
     mc_state.sum_w *= factor;
@@ -142,7 +149,7 @@ void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash) {
 }
 
 void mc_static_finalize_load(inout MCState mc_state, const uint16_t hash, const vec3 pos, const vec3 normal) {
-    if (mc_state.sum_w < 0 || hash != mc_state.hash || dot(normal, mc_state_dir(mc_state, pos)) <= 0.) {
+    if (mc_state.sum_w <= 0 || hash != mc_state.hash || dot(normal, mc_state_dir(mc_state, pos)) <= 0.) {
         mc_state.sum_w = 0.;
     }
     mc_state.w_tgt += mc_state.sum_w * (params.cl_time - mc_state.T) * mc_state.mv;
