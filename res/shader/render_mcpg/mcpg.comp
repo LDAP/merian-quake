@@ -141,7 +141,6 @@ void main() {
             f16vec3 incident = f16vec3(0); // contains throughput already
             f16vec3 throughput = f16vec3(1);
             f16vec3 lc_incident = f16vec3(0);
-            float microfacet_bsdf = 0;
 
             if (wodotn > 1e-3 && dot(wo, geo_decode_normal(current_hit.enc_geonormal)) > 1e-3) {
                 incident = f16vec3(0);
@@ -154,19 +153,17 @@ void main() {
 
                             // Full GI (infinite diffuse bounces)
                 lc_incident = any(greaterThan(incident, f16vec3(0))) || (USE_LIGHT_CACHE_TAIL == 0 && MAX_PATH_LENGTH == 2) ? incident : throughput * light_cache_get(next_hit.pos, next_hit.normal).rgb;
-
-                // EVALUATE BSDF
-                // without albedo (added below to skip first albedo)
-                microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
             } else {
                 // ray is below geometric surface
-
                 throughput = f16vec3(0);
                 lc_incident = f16vec3(0);
-                microfacet_bsdf = 0;
             }
-            
+
+            // EVALUATE BSDF
+            // without albedo (added below to skip first albedo)
+            const float microfacet_bsdf = bsdf_ggx_diffuse_mix_times_wodotn(current_hit.wi, wo, current_hit.normal, bsdf_ggx_roughness_to_alpha(current_hit.roughness), 0.02);
             current_throughput *= microfacet_bsdf;
+
 #if USE_LIGHT_CACHE_TAIL == 1 
                 f = current_throughput * (segment < MAX_PATH_LENGTH - 1 ? incident : lc_incident);
 #else
