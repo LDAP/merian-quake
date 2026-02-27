@@ -139,7 +139,7 @@ int main(const int argc, const char** argv) {
     std::vector<std::string> context_extensions = {"merian-resources", "merian-nodes"};
 
 #ifndef NDEBUG
-    context_extensions.push_back("vk_debug_utils");
+    context_extensions.push_back("merian-validation-layers");
 #endif
 
     if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
