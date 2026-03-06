@@ -140,7 +140,7 @@ void main() {
     mc_state_t tent = mc_state_new(); // tentative new state
     mc_state_t ptent = mc_state_new(); // tentative new state
 
-    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7)))) {
+    if (any(greaterThan(first_hit.albedo, f16vec3(0)))) {
         for (int s = 0; s < SURFACE_SPP; s++) {
             mc_state_shuffle(tent, (gl_SubgroupInvocationID+1)%gl_SubgroupSize);
             sample_dirs[s] = vec3(0);

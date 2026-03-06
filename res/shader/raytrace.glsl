@@ -253,7 +253,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         if (texnum_normal > 0 && texnum_normal < MAX_GLTEXTURES) {
             const vec3 tangent_normal = (textureLod(img_tex[nonuniformEXT(texnum_normal)], st, 0).rgb - 0.5) * 2;
             const float16_t st_det = st_dudv[0].x * st_dudv[1].y - st_dudv[1].x * st_dudv[0].y;
-            if (abs(st_det) > 1e-8) {
+            if (abs(st_det) > 0.0hf) {
                 const vec3 du2 =  normalize(( st_dudv[1].y * dudv[0] - st_dudv[0].y * dudv[1]) / st_det);
                 dudv[1] = -normalize((-st_dudv[1].x * dudv[0] + st_dudv[0].x * dudv[1]) / st_det);
                 dudv[0] = du2;

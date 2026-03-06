@@ -28,7 +28,7 @@ void main() {
 
     ReSTIRDIReservoir reservoir = restir_di_reservoir_init();
 
-    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
+    if (any(greaterThan(first_hit.albedo, f16vec3(0))))
     for (int s = 0; s < SURFACE_SPP; s++) {
         Hit current_hit = first_hit;
 

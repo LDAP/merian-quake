@@ -104,7 +104,7 @@ void main() {
         imageStore(img_irradiance, pixel, vec4(incident, 1));
 
         // Store albedo
-        first_hit.albedo *= f16vec3(!any(greaterThanEqual(incident, f16vec3(1e-5)))) * camera_throughput;
+        first_hit.albedo *= f16vec3(!any(greaterThan(incident, f16vec3(0)))) * camera_throughput;
         imageStore(img_albedo, pixel, vec4(first_hit.albedo, 1));
 
         // Store motion vector

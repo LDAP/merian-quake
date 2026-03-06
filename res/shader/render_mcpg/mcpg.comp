@@ -45,7 +45,7 @@ void main() {
     MCState debug_mc_state = mc_state_new();
 #endif
 
-    if (any(greaterThanEqual(first_hit.albedo, f16vec3(1e-7))))
+    if (any(greaterThan(first_hit.albedo, f16vec3(0))))
     for (int s = 0; s < SURFACE_SPP; s++) {
         Hit current_hit;
         decompress_hit(first_hit, current_hit);
