@@ -1,21 +1,22 @@
 #include "gbuffer/gbuffer.hpp"
 #include "imgui.h"
 #include "merian-nodes/merian_nodes_extension.hpp"
-#include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
+#include "merian-nodes/nodes/window/window_node.hpp"
 
 #include "merian-nodes/graph/graph.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/imgui_spdlog_sink.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
-#include "merian/utils/input_controller_glfw.hpp"
 #include "merian/utils/properties_imgui.hpp"
 #include "merian/vk/context.hpp"
-#include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/window/glfw_imgui.hpp"
+#include "merian/vk/extension/extension_vk_validation_layers.hpp"
+#include "merian/vk/imgui/imgui_context.hpp"
+#include "merian/vk/imgui/imgui_merian_backend.hpp"
+#include "merian/vk/imgui/imgui_merian_window_backend.hpp"
+#include "merian/vk/imgui/imgui_renderer.hpp"
 
 #include <csignal>
-#include <merian/vk/window/imgui_context.hpp>
 
 #include "configuration.hpp"
 
@@ -136,15 +137,11 @@ int main(const int argc, const char** argv) {
         std::make_shared<merian::ImguiSpdlogSink>();
     spdlog::default_logger()->sinks().push_back(imgui_spdlog);
 
-    std::vector<std::string> context_extensions = {"merian-resources", "merian-nodes"};
+    std::vector<std::string> context_extensions = {merian::MerianNodesExtension::name};
 
 #ifndef NDEBUG
-    context_extensions.push_back("merian-validation-layers");
+    context_extensions.push_back(merian::ExtensionVkValidationLayers::name);
 #endif
-
-    if (argc == 1 || strcmp(argv[1], "--headless") != 0) {
-        context_extensions.push_back("merian-glfw");
-    }
 
     // Prepare additional search paths for shader includes and data files
     std::vector<std::filesystem::path> additional_search_paths;
@@ -199,41 +196,54 @@ int main(const int argc, const char** argv) {
     ConfigurationManager config_manager(*graph, *context->get_file_loader());
     config_manager.load();
 
-    std::shared_ptr<merian::GLFWWindowNode> output =
-        graph->find_node_for_identifier_and_type<merian::GLFWWindowNode>("output");
+    std::shared_ptr<merian::WindowNode> output =
+        graph->find_node_for_identifier_and_type<merian::WindowNode>("output");
     std::shared_ptr<QuakeNode> quake =
         graph->find_node_for_identifier_and_type<QuakeNode>("Quake 0");
 
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
-    if (output && quake && output->get_window()) {
-        controller = std::make_shared<merian::GLFWInputController>(output->get_window());
+    if (quake) {
         quake->set_controller(controller);
     }
 
+    auto debug_ctx = std::make_shared<merian::ImGuiContext>();
+    std::shared_ptr<merian::ImGuiMerianBackend> imgui_backend =
+        std::make_shared<merian::ImGuiMerianBackend>(debug_ctx);
+    auto imgui_renderer = std::make_shared<merian::ImGuiRenderer>(context, alloc, debug_ctx);
+    debug_ctx->with_context([&] {
+        ImFontConfig quake_cfg;
+        quake_cfg.OversampleH = 1;
+        quake_cfg.OversampleV = 1;
+        quake_cfg.PixelSnapH = true;
+        ImGuiIO& io = ImGui::GetIO();
+        quake_font_sm = io.Fonts->AddFontFromFileTTF(
+            context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 26, &quake_cfg);
+        quake_font_lg = io.Fonts->AddFontFromFileTTF(
+            context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 46, &quake_cfg);
+    });
+
+    if (output) {
+        output->set_on_window_created([&](const merian::WindowHandle& win) {
+            if (quake) {
+                controller = win->get_input_controller();
+                quake->set_controller(controller);
+            }
+            imgui_backend.reset();
+            imgui_backend = std::make_shared<merian::ImGuiMerianWindowBackend>(debug_ctx, win);
+        });
+    }
+
     merian::ImGuiProperties config;
-    merian::ImGuiContextWrapperHandle debug_ctx = std::make_shared<merian::ImGuiContextWrapper>();
-    merian::GLFWImGui imgui(context, debug_ctx, true);
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->AddFontDefault();
-    quake_font_sm = io.Fonts->AddFontFromFileTTF(
-        context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 26);
-    quake_font_lg = io.Fonts->AddFontFromFileTTF(
-        context->get_file_loader()->find_file("dpquake.ttf")->string().c_str(), 46);
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
-                                          const merian::SwapchainAcquireResult& aquire_result) {
-            imgui.new_frame(queue, cmd, *output->get_window(), aquire_result);
-
-            float alpha = 1.0;
-            if (controller->get_raw_mouse_input()) {
-                ImGui::GetIO().ClearInputMouse();
-                ImGui::GetIO().ClearInputKeys();
-                alpha = 0.2;
-            }
-
+                                          const merian::SwapchainAcquireResult& aquire_result,
+                                          const merian::ProfilerHandle& profiler) {
             const double frametime_ms = frametime.millis();
             frametime.reset();
+            imgui_backend->new_frame(static_cast<float>(frametime_ms / 1000.0));
+
+            const float alpha = controller->is_mouse_grabbed() ? 0.2f : 1.0f;
 
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
             ImGui::Begin(fmt::format("Quake Debug ({:.02f}ms, {:.02f} fps)###DebugWindow",
@@ -252,17 +262,13 @@ int main(const int argc, const char** argv) {
 
             QuakeMessageOverlay();
 
-            imgui.render(cmd);
-            controller->set_active(
-                controller->get_raw_mouse_input() ||
-                !(ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse));
+            imgui_renderer->render(cmd, aquire_result.image_view, profiler);
         });
     }
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    graph->set_on_run_starting([](merian::GraphRun&) { glfwPollEvents(); });
     while (!stop) {
         graph->run();
     }

@@ -1,11 +1,9 @@
 #include "quake_node.hpp"
 
 #include "game/quake_helpers.hpp"
-#include "merian/utils/audio/sdl_audio_device.hpp"
+#include "merian/utils/audio/audio_device_provider.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/concurrent/utils.hpp"
-
-#include <GLFW/glfw3.h>
 
 extern "C" {
 #include "bgmusic.h"
@@ -21,7 +19,7 @@ extern qboolean scr_drawloading;
 struct QuakeData {
     QuakeNode* quake_node{nullptr};
     quakeparms_t params;
-    std::unique_ptr<merian::SDLAudioDevice> audio_device;
+    merian::AudioDeviceHandle audio_device;
 
     // updated in parse_worldspawn
     merian::float3 current_sun_color{};
@@ -100,7 +98,8 @@ extern "C" void R_RenderScene() {
 }
 
 extern "C" qboolean SNDDMA_Init(dma_t* dma) {
-    quake_data.audio_device = std::make_unique<merian::SDLAudioDevice>();
+    if (!quake_data.audio_device)
+        return false;
 
     const auto callback = [](uint8_t* stream, int len) {
         // from
@@ -454,6 +453,12 @@ void QuakeNode::initialize(const merian::ContextHandle& context,
         throw merian::graph_errors::node_error{"Only one quake node can be created."};
     }
     quake_data.quake_node = this;
+
+    if (const auto audio_provider = context->find_provider<merian::AudioDeviceProvider>(true)) {
+        quake_data.audio_device = audio_provider->create_audio_device();
+    } else {
+        quake_data.audio_device = nullptr;
+    }
     host_parms = &quake_data.params;
 
     init_quakespasm(argc, argv);
@@ -613,75 +618,99 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
     this->controller = controller;
 
     // clang-format off
-    controller->set_key_event_callback([&](merian::InputController&, int key, int, merian::InputController::KeyStatus action, int){
-        static const std::map<int, int> keymap = {
-            {GLFW_KEY_TAB, K_TAB},
-            {GLFW_KEY_ENTER, K_ENTER},
-            {GLFW_KEY_ESCAPE, K_ESCAPE},
-            {GLFW_KEY_SPACE, K_SPACE},
+    struct QuakeInputListener : merian::InputListener {
+        QuakeNode* node;
+        explicit QuakeInputListener(QuakeNode* n) : node(n) {}
 
-            {GLFW_KEY_BACKSPACE, K_BACKSPACE},
-            {GLFW_KEY_UP, K_UPARROW},
-            {GLFW_KEY_DOWN, K_DOWNARROW},
-            {GLFW_KEY_LEFT, K_LEFTARROW},
-            {GLFW_KEY_RIGHT, K_RIGHTARROW},
+        bool on_key(merian::InputController&, merian::InputController::Key key,
+                    merian::InputController::KeyStatus action, int /*mods*/) override {
+            using K = merian::InputController::Key;
+            // Letters map to lowercase ASCII; digits to ASCII digit characters.
+            const int ki = static_cast<int>(key);
+            const int A  = static_cast<int>(K::A);
+            const int N0 = static_cast<int>(K::NUM_0);
+            int qkey = 0;
+            if (ki >= A && ki <= static_cast<int>(K::Z))
+                qkey = 'a' + (ki - A);
+            else if (ki >= N0 && ki <= static_cast<int>(K::NUM_9))
+                qkey = '0' + (ki - N0);
+            else {
+                // clang-format off
+                static const std::unordered_map<merian::InputController::Key, int> keymap = {
+                    {K::TAB,        K_TAB},
+                    {K::ENTER,      K_ENTER},
+                    {K::ESCAPE,     K_ESCAPE},
+                    {K::SPACE,      K_SPACE},
+                    {K::BACKSPACE,  K_BACKSPACE},
+                    {K::UP,         K_UPARROW},
+                    {K::DOWN,       K_DOWNARROW},
+                    {K::LEFT,       K_LEFTARROW},
+                    {K::RIGHT,      K_RIGHTARROW},
+                    {K::LEFT_ALT,   K_ALT},
+                    {K::LEFT_CTRL,  K_CTRL},
+                    {K::LEFT_SHIFT, K_SHIFT},
+                    {K::F1,  K_F1},  {K::F2,  K_F2},  {K::F3,  K_F3},
+                    {K::F4,  K_F4},  {K::F5,  K_F5},  {K::F6,  K_F6},
+                    {K::F7,  K_F7},  {K::F8,  K_F8},  {K::F9,  K_F9},
+                    {K::F10, K_F10}, {K::F11, K_F11}, {K::F12, K_F12},
+                };
+                // clang-format on
+                if (const auto it = keymap.find(key); it != keymap.end())
+                    qkey = it->second;
+            }
 
-            {GLFW_KEY_LEFT_ALT, K_ALT},
-            {GLFW_KEY_LEFT_CONTROL, K_CTRL},
-            {GLFW_KEY_LEFT_SHIFT, K_SHIFT},
-            {GLFW_KEY_F1, K_F1},
-            {GLFW_KEY_F2, K_F2},
-            {GLFW_KEY_F3, K_F3},
-            {GLFW_KEY_F4, K_F4},
-            {GLFW_KEY_F5, K_F5},
-            {GLFW_KEY_F6, K_F6},
-            {GLFW_KEY_F7, K_F7},
-            {GLFW_KEY_F8, K_F8},
-            {GLFW_KEY_F9, K_F9},
-            {GLFW_KEY_F10, K_F10},
-            {GLFW_KEY_F11, K_F11},
-            {GLFW_KEY_F12, K_F12},
-        };
-
-        // normal keys sould be passed as lowercased ascii
-        if (key >= 65 && key <= 90) key |= 32;
-        else if (keymap.contains(key)) key = keymap.at(key);
-
-        if (action == merian::InputController::PRESS) {
-            Key_Event(key, true);
-        } else if (action == merian::InputController::RELEASE) {
-            Key_Event(key, false);
+            if (qkey == 0)
+                return true; // unknown key — still consume to avoid leaking to other listeners
+            using KS = merian::InputController::KeyStatus;
+            if (action == KS::PRESS)
+                Key_Event(qkey, true);
+            else if (action == KS::RELEASE)
+                Key_Event(qkey, false);
+            return true; // Quake always consumes key events
         }
-    });
-    controller->set_mouse_cursor_callback([&](merian::InputController& controller, double xpos, double ypos){
-        const bool raw = controller.get_raw_mouse_input();
 
-        if (raw) {
-            this->mouse_x = xpos;
-            this->mouse_y = ypos;
+        bool on_cursor(merian::InputController& c, double xpos, double ypos) override {
+            const bool raw = c.is_mouse_grabbed();
+            if (raw) {
+                node->mouse_x = xpos;
+                node->mouse_y = ypos;
+            }
+            if (raw != node->raw_mouse_was_enabled || !raw) {
+                node->mouse_x = node->mouse_oldx = xpos;
+                node->mouse_y = node->mouse_oldy = ypos;
+            }
+            node->raw_mouse_was_enabled = raw;
+            return false; // don't consume cursor events so ImGui can also track position
         }
 
-        if (raw != raw_mouse_was_enabled || !raw) {
-            this->mouse_x = this->mouse_oldx = xpos;
-            this->mouse_y = this->mouse_oldy = ypos;
+        bool on_mouse_button(merian::InputController&,
+                             merian::InputController::MouseButton button,
+                             merian::InputController::KeyStatus status,
+                             int /*mods*/) override {
+            using MB = merian::InputController::MouseButton;
+            using KS = merian::InputController::KeyStatus;
+            if (button == MB::UNKNOWN)
+                return true;
+            const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
+            Key_Event(remap[static_cast<int>(button)], status == KS::PRESS);
+            return true; // Quake always consumes mouse button events
         }
-   
-        raw_mouse_was_enabled = raw;
-    });
-    controller->set_mouse_button_callback([&](merian::InputController&, merian::InputController::MouseButton button, merian::InputController::KeyStatus status, int){
-        const int remap[] = {K_MOUSE1, K_MOUSE2, K_MOUSE3, K_MOUSE4, K_MOUSE5};
-        Key_Event(remap[button], status == merian::InputController::PRESS);
-    });
-    controller->set_scroll_event_callback([&](merian::InputController&, double xoffset, double yoffset){
-        if (yoffset > 0) {
-            Key_Event(K_MWHEELUP, true);
-            Key_Event(K_MWHEELUP, false);
-        } else if (xoffset < 0) {
-            Key_Event(K_MWHEELDOWN, true);
-            Key_Event(K_MWHEELDOWN, false);
+
+        bool on_scroll(merian::InputController&, double xoffset, double yoffset) override {
+            if (yoffset > 0) {
+                Key_Event(K_MWHEELUP, true);
+                Key_Event(K_MWHEELUP, false);
+            } else if (xoffset < 0) {
+                Key_Event(K_MWHEELDOWN, true);
+                Key_Event(K_MWHEELDOWN, false);
+            }
+            return true; // Quake always consumes scroll events
         }
-    });
+    };
     // clang-format on
+
+    input_listener = std::make_shared<QuakeInputListener>(this);
+    controller->add_listener(input_listener, 0);
 }
 
 std::vector<merian::OutputConnectorDescriptor>
@@ -846,11 +875,9 @@ void QuakeNode::process([[maybe_unused]] merian::GraphRun& run,
         render_info.uniform.cl_time = cl.time;
     }
 
-    if (update_gamestate && key_dest == key_game) {
-        controller->request_raw_mouse_input(true);
-    } else {
-        controller->request_raw_mouse_input(false);
-    }
+    const bool in_game = update_gamestate && key_dest == key_game;
+    controller->set_mouse_grabbed(in_game);
+    controller->add_listener(input_listener, in_game ? 100 : 0);
 
     if (stop_after_worldspawn >= 0 &&
         render_info.uniform.frame == (uint64_t)stop_after_worldspawn) {

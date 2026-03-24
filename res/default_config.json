@@ -594,7 +594,7 @@
                 "rebuild on recreate": false,
                 "surface format": "R8G8B8A8Srgb, SrgbNonlinear"
             },
-            "type": "Window (GLFW)"
+            "type": "Window"
         },
         "render_markovchain": {
             "disable": false,

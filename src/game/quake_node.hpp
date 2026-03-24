@@ -12,6 +12,7 @@
 #include "../../res/shader/config.h"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
+#include "merian/utils/input_listener.hpp"
 #include "merian/utils/string.hpp"
 
 #include <queue>
@@ -216,6 +217,7 @@ class QuakeNode : public merian::Node {
     // Input processing
     std::shared_ptr<merian::InputController> controller =
         std::make_shared<merian::DummyInputController>();
+    std::shared_ptr<merian::InputListener> input_listener;
     double mouse_oldx = 0;
     double mouse_oldy = 0;
     double mouse_x = 0;
