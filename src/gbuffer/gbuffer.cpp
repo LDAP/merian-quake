@@ -2,8 +2,8 @@
 
 #include "game/quake_node.hpp"
 
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/shader/spriv_reflect.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -17,9 +17,9 @@ GBuffer::~GBuffer() {}
 
 merian::DeviceSupportInfo
 GBuffer::query_device_support(const merian::DeviceSupportQueryInfo& query_info) {
-    const auto& glsl_compiler =
-        query_info.extension_container.get_context_extension<merian::ExtensionGLSLCompiler>()
-            ->get_compiler();
+    const auto glsl_compiler =
+        query_info.extension_container.find_provider<merian::GLSLCompilerProvider>()
+            ->get_glsl_compiler();
 
     merian::BlobHandle shader = glsl_compiler->find_compile_glsl(
         query_info.file_loader, "shader/gbuffer/gbuffer.comp", query_info.compile_context);

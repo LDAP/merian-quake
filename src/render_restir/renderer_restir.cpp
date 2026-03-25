@@ -1,8 +1,8 @@
 #include "renderer_restir.hpp"
 
 #include "../../res/shader/render_restir/restir_di_reservoir.glsl.h"
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -26,8 +26,8 @@ RendererRESTIR::RendererRESTIR() : Node() {}
 
 void RendererRESTIR::initialize(const merian::ContextHandle& context,
                                 const merian::ResourceAllocatorHandle& /*allocator*/) {
-    auto glsl_compiler_ext = context->get_context_extension<merian::ExtensionGLSLCompiler>();
-    const auto shader_compiler = glsl_compiler_ext->get_compiler();
+    const auto shader_compiler =
+        context->find_provider<merian::GLSLCompilerProvider>()->get_glsl_compiler();
     merian::ShaderCompileContextHandle compile_context =
         merian::ShaderCompileContext::create(context);
 
