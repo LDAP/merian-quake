@@ -685,8 +685,7 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
 
         bool on_mouse_button(merian::InputController&,
                              merian::InputController::MouseButton button,
-                             merian::InputController::KeyStatus status,
-                             int /*mods*/) override {
+                             merian::InputController::KeyStatus status) override {
             using MB = merian::InputController::MouseButton;
             using KS = merian::InputController::KeyStatus;
             if (button == MB::UNKNOWN)
