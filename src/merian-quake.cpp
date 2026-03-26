@@ -212,8 +212,6 @@ int main(const int argc, const char** argv) {
     auto imgui_renderer = std::make_shared<merian::ImGuiRenderer>(context, alloc, debug_ctx);
     debug_ctx->with_context([&] {
         ImFontConfig quake_cfg;
-        quake_cfg.OversampleH = 1;
-        quake_cfg.OversampleV = 1;
         quake_cfg.PixelSnapH = true;
         ImGuiIO& io = ImGui::GetIO();
         quake_font_sm = io.Fonts->AddFontFromFileTTF(
@@ -257,6 +255,7 @@ int main(const int argc, const char** argv) {
                 imgui_spdlog->imgui_draw_log();
                 ImGui::TreePop();
             }
+
             ImGui::End();
             ImGui::PopStyleVar();
 
