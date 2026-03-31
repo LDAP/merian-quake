@@ -680,7 +680,7 @@ void QuakeNode::set_controller(const merian::InputControllerHandle& controller) 
                 node->mouse_y = node->mouse_oldy = ypos;
             }
             node->raw_mouse_was_enabled = raw;
-            return false; // don't consume cursor events so ImGui can also track position
+            return true; // Quake always consumes cursor events
         }
 
         bool on_mouse_button(merian::InputController&,

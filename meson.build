@@ -22,7 +22,7 @@ if get_option('buildtype').startswith('debug')
 endif
 
 # Dependencies
-merian_subp = subproject('merian')
+merian_subp = subproject('merian', default_options: ['glslang=enabled', 'sdl=enabled'])
 merian = merian_subp.get_variable('merian_dep')
 
 quake = dependency('quakespasm', fallback: ['quakespasm', 'quake_dep'], default_options: {'snd_extern': true})
