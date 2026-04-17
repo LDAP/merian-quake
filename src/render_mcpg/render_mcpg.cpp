@@ -404,7 +404,7 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
 
     config.st_separate("Guiding Markov chain");
     config.config_percent("ML Prior", dir_guide_prior);
-    config.config_int("mc samples", mc_samples, 0, 30);
+    config.config_int("mc samples", mc_samples, "", 0, 30);
 
     config.config_percent("adaptive grid prob", mc_samples_adaptive_prob);
     needs_reconnect |= config.config_options("adaptive grid type", mc_adaptive_grid_type,
@@ -431,19 +431,19 @@ RendererMarkovChain::NodeStatusFlags RendererMarkovChain::properties(merian::Pro
                        "light is detected.");
 
     config.st_separate("RT Surface");
-    config.config_int("spp", spp, 0, 15, "samples per pixel");
+    config.config_int("spp", spp, "samples per pixel", 0, 15);
     // config.config_bool("adaptive sampling", adaptive_sampling, "Lowers spp adaptively");
-    config.config_int("max path length", max_path_length, 0, 15, "maximum path length");
+    config.config_int("max path length", max_path_length, "maximum path length", 0, 15);
     config.config_percent("BSDF Prob", surf_bsdf_p, "the probability to use BSDF sampling");
 
     config.st_separate("RT Volume");
-    config.config_int("volume spp", volume_spp, 0, 15, "samples per pixel for volume events");
-    config.config_int("dist mc samples", distance_mc_samples, 0, 30);
+    config.config_int("volume spp", volume_spp, "samples per pixel for volume events", 0, 15);
+    config.config_int("dist mc samples", distance_mc_samples, "", 0, 30);
     config.config_int("dist mc grid width", distance_mc_grid_width,
                       "the markov chain hash grid width in pixels");
-    config.config_uint("dist mc states per vertex", distance_mc_vertex_state_count, 1,
-                       MAX_DISTANCE_MC_VERTEX_STATE_COUNT,
-                       "number of markov chain states per vertex");
+    config.config_uint("dist mc states per vertex", distance_mc_vertex_state_count,
+                       "number of markov chain states per vertex", 1u,
+                       static_cast<uint32_t>(MAX_DISTANCE_MC_VERTEX_STATE_COUNT));
     config.config_float("particle size", volume_particle_size_um, "in mircometer (5-50)", 0.1);
     config.config_percent("dist guide p", dist_guide_p, "higher means more distance guiding");
     config.config_percent("Phase Prob", volume_phase_p,

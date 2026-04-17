@@ -277,7 +277,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     }
 
     config.st_separate("Generate samples");
-    recreate_pipeline |= config.config_int("spp", spp, 0, 15, "samples per pixel");
+    recreate_pipeline |= config.config_int("spp", spp, "samples per pixel", 0, 15);
 
     config.st_separate("Temporal Reuse");
     config.config_bool("enable temporal reuse", temporal_reuse_enable);
@@ -305,7 +305,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
 
     config.st_separate("Spatial Reuse");
     recreate_pipeline |=
-        config.config_int("spatial reuse iterations", spatial_reuse_iterations, 0, 7);
+        config.config_int("spatial reuse iterations", spatial_reuse_iterations, "", 0, 7);
     float spatial_reject_angle = std::acos(spatial_normal_reject_cos);
     recreate_pipeline |= config.config_angle("spatial normal threshold", spatial_reject_angle,
                                              "Reject points with normals farther apart", 0, 180);
@@ -313,7 +313,7 @@ RendererRESTIR::NodeStatusFlags RendererRESTIR::properties(merian::Properties& c
     recreate_pipeline |=
         config.config_percent("spatial depth threshold", spatial_depth_reject_percent,
                               "Reject points with depths farther apart (relative to the max)");
-    recreate_pipeline |= config.config_int("spatital radius", spatial_radius, 0, 100);
+    recreate_pipeline |= config.config_int("spatital radius", spatial_radius, "", 0, 100);
     recreate_pipeline |= config.config_options("spatial bias correction", spatial_bias_correction,
                                                {"none", "basic", "raytraced"});
 

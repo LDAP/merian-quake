@@ -176,7 +176,7 @@ RendererSSMM::NodeStatusFlags RendererSSMM::properties(merian::Properties& confi
     }
 
     config.st_separate();
-    needs_pipeline_rebuild |= config.config_int("spp", spp, 0, 15, "samples per pixel");
+    needs_pipeline_rebuild |= config.config_int("spp", spp, "samples per pixel", 0, 15);
     needs_pipeline_rebuild |=
         config.config_percent("BSDF Prob", surf_bsdf_p, "the probability to use BSDF sampling");
 
