@@ -198,8 +198,7 @@ int main(const int argc, const char** argv) {
 
     std::shared_ptr<merian::WindowNode> output =
         graph->find_node_for_identifier_and_type<merian::WindowNode>("output");
-    std::shared_ptr<QuakeNode> quake =
-        graph->find_node_for_identifier_and_type<QuakeNode>("Quake 0");
+    std::shared_ptr<QuakeNode> quake = graph->find_node_for_identifier_and_type<QuakeNode>("quake");
 
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
     if (quake) {
