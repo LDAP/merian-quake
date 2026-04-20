@@ -325,7 +325,7 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
         QUAKE_MATERIAL_SLANG_TYPE_NAME, QUAKE_MATERIAL_SLANG_MODULE_PATH);
 
     auto cam = std::make_shared<merian::Camera>(merian::float3(1, 0, 0), merian::float3(0, 0, 0),
-                                                get_up(), 60.F, 16.F / 9.F, 0.01F, 1000.F);
+                                                get_up(), 90.F, 16.F / 9.F, 0.01F, 1000.F);
     quake_camera = add_camera(std::move(cam));
 
     if (const auto audio_provider = context->find_provider<merian::AudioDeviceProvider>(true)) {
@@ -381,10 +381,7 @@ QuakeScene::~QuakeScene() {
     shutdown_quakespasm();
 }
 
-float QuakeScene::get_time(const float time) {
-    // Quake's `cl.time` advances on the game thread; using it for the shader
-    // clock keeps animated shaders (water, lava, sky) synced to gameplay
-    // (and frozen during pauses) instead of wall time.
+float QuakeScene::get_time(const float /*time*/) {
     return static_cast<float>(cl.time);
 }
 
@@ -706,11 +703,11 @@ void QuakeScene::refresh_render_info(const bool render_this_frame_) {
 
     const merian::float3 pos = merian::as_float3(r_refdef.vieworg);
     const merian::float3 fwd_v(fwd[0], fwd[1], fwd[2]);
-    cam->look_at(pos, pos + fwd_v, get_up(), r_refdef.fov_x);
     const float aspect =
         (resolution.height > 0)
             ? (static_cast<float>(resolution.width) / static_cast<float>(resolution.height))
             : (16.F / 9.F);
+    cam->look_at(pos, pos + fwd_v, get_up(), r_refdef.fov_x);
     cam->set_aspect_ratio(aspect);
 }
 
@@ -980,13 +977,22 @@ void QuakeScene::refresh_dynamic_meshes() {
     particle_mesh.vertices.clear();
     particle_mesh.indices.clear();
 
+    // Prev-frame world positions, parallel to each mesh's vertices vector.
+    // Storage lives here until the Mesh subclass / Scene plumbing is wired
+    // up to consume them as a motion-vector stream.
+    std::vector<merian::float3> entity_prev_positions;
+    std::vector<merian::float3> sprite_prev_positions;
+    std::vector<merian::float3> particle_prev_positions;
+
     auto append_entity = [&](entity_t* ent) {
         if (ent == nullptr || ent->model == nullptr)
             return;
         if (ent->model->type == mod_sprite) {
-            extract_sprite_geo(ent, sprite_mesh.vertices, sprite_mesh.indices);
+            extract_sprite_geo(ent, sprite_mesh.vertices, sprite_prev_positions,
+                               sprite_mesh.indices);
         } else {
-            extract_entity_geo(ent, entity_mesh.vertices, entity_mesh.indices);
+            extract_entity_geo(ent, entity_mesh.vertices, entity_prev_positions,
+                               entity_mesh.indices);
         }
     };
 
@@ -1009,8 +1015,8 @@ void QuakeScene::refresh_dynamic_meshes() {
         append_entity(&cl_static_entities[i]);
     }
 
-    extract_particle_geo(particle_mesh.vertices, particle_mesh.indices, reproducible_renders,
-                         prev_cl_time);
+    extract_particle_geo(particle_mesh.vertices, particle_prev_positions, particle_mesh.indices,
+                         reproducible_renders, prev_cl_time);
     prev_cl_time = cl.time;
 
     ensure_non_empty(entity_mesh);

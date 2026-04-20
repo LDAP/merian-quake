@@ -22,23 +22,27 @@ namespace {
 
 // Triangulate a Quake glpoly_t (n>=3 vertices) as a fan into `indices`,
 // emitting positions/normals/uvs into `vertices`. `enc_n` is the (already
-// encoded) plane normal in world space.
+// encoded) plane normal in world space. `mat_prev_model` transforms the
+// same model-space verts into their previous-frame world position.
 void emit_brush_poly(const glpoly_t* p,
                      const merian::float4x4& mat_model,
+                     const merian::float4x4& mat_prev_model,
                      const uint32_t enc_n,
                      std::vector<merian::PackedVertexData>& vertices,
+                     std::vector<merian::float3>& prev_positions,
                      std::vector<merian::uint3>& indices) {
     if (p->numverts < 3)
         return;
     const uint32_t base = static_cast<uint32_t>(vertices.size());
     for (int v = 0; v < p->numverts; v++) {
+        const merian::float4 mv(merian::as_float3(p->verts[v]), 1.f);
         merian::PackedVertexData pv{};
-        pv.position =
-            merian::mul(merian::float4(merian::as_float3(p->verts[v]), 1.f), mat_model).xyz();
+        pv.position = merian::mul(mv, mat_model).xyz();
         pv.encoded_normal = enc_n;
         pv.uv = merian::half2(p->verts[v][3], p->verts[v][4]);
         pv.encoded_tangent = 0;
         vertices.push_back(pv);
+        prev_positions.push_back(merian::mul(mv, mat_prev_model).xyz());
     }
     for (int v = 2; v < p->numverts; v++) {
         indices.push_back(merian::uint3(base, base + uint32_t(v) - 1u, base + uint32_t(v)));
@@ -58,6 +62,7 @@ merian::float4x4 entity_world_transform(const float* origin, const float* angles
 
 void extract_alias_geo(entity_t* ent,
                        std::vector<merian::PackedVertexData>& vertices,
+                       std::vector<merian::float3>& prev_positions,
                        std::vector<merian::uint3>& indices) {
     qmodel_t* m = ent->model;
     if (m == nullptr || m->type != mod_alias)
@@ -87,6 +92,18 @@ void extract_alias_geo(entity_t* ent,
     const merian::float4x4 scale = merian::transpose(
         merian::mul(merian::translation(merian::as_float3(hdr->scale_origin) * fovscale),
                     merian::scale(merian::as_float3(hdr->scale) * fovscale)));
+
+    // Previous-frame model matrix from cached mv_prev_origin/angles. The
+    // axis flip mirrors the current-frame logic below.
+    std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1],
+                                        ent->mv_prev_angles[2]};
+    merian::float4x4 mat_prev_model = merian::identity();
+    AngleVectors(prev_angles.data(), &mat_prev_model[0].x, &mat_prev_model[1].x,
+                 &mat_prev_model[2].x);
+    mat_prev_model[3] = merian::float4(merian::as_float3(ent->mv_prev_origin), 1.f);
+    mat_prev_model[1] *= -1;
+    mat_prev_model = merian::mul(scale, mat_prev_model);
+    const float prev_blend = ent->mv_prev_blend;
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -121,6 +138,13 @@ void extract_alias_geo(entity_t* ent,
 
         const merian::float3 world_pos =
             merian::mul(merian::float4(merian::lerp(p1, p2, lerpdata.blend), 1.f), mat_model).xyz();
+        // Previous-frame world position: same model-space pose1/pose2, but
+        // blended with last frame's blend factor and transformed by the
+        // previous model matrix. This matches the legacy motion-vector
+        // computation in quake_helpers.cpp.
+        const merian::float3 prev_world_pos =
+            merian::mul(merian::float4(merian::lerp(p1, p2, prev_blend), 1.f), mat_prev_model)
+                .xyz();
 
         const merian::float3 n1 =
             merian::as_float3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
@@ -135,6 +159,7 @@ void extract_alias_geo(entity_t* ent,
         pv.uv = merian::half2((desc[v].st[0] + 0.5f) / skin_w, (desc[v].st[1] + 0.5f) / skin_h);
         pv.encoded_tangent = 0;
         vertices.push_back(pv);
+        prev_positions.push_back(prev_world_pos);
     }
 
     // Bookkeeping: keep prev-frame state up to date for future motion vectors.
@@ -151,12 +176,15 @@ void extract_alias_geo(entity_t* ent,
 
 void extract_brush_entity_geo(entity_t* ent,
                               std::vector<merian::PackedVertexData>& vertices,
+                              std::vector<merian::float3>& prev_positions,
                               std::vector<merian::uint3>& indices) {
     qmodel_t* m = ent->model;
     if (m == nullptr || m->type != mod_brush)
         return;
 
     const merian::float4x4 mat_model = entity_world_transform(ent->origin, ent->angles);
+    const merian::float4x4 mat_prev_model =
+        entity_world_transform(ent->mv_prev_origin, ent->mv_prev_angles);
 
     for (int i = 0; i < m->nummodelsurfaces; i++) {
         msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
@@ -174,7 +202,8 @@ void extract_brush_entity_geo(entity_t* ent,
         const uint32_t enc_n = merian::encode_normal(merian::normalize(plane_n));
 
         for (glpoly_t* p = surf->polys; p != nullptr; p = nullptr) {
-            emit_brush_poly(p, mat_model, enc_n, vertices, indices);
+            emit_brush_poly(p, mat_model, mat_prev_model, enc_n, vertices, prev_positions,
+                            indices);
         }
     }
 
@@ -184,6 +213,7 @@ void extract_brush_entity_geo(entity_t* ent,
 
 void extract_sprite_geo(entity_t* ent,
                         std::vector<merian::PackedVertexData>& vertices,
+                        std::vector<merian::float3>& prev_positions,
                         std::vector<merian::uint3>& indices) {
     qmodel_t* m = ent->model;
     if (m == nullptr || m->type != mod_sprite)
@@ -263,6 +293,7 @@ void extract_sprite_geo(entity_t* ent,
         }
 
         const merian::float3 origin = merian::as_float3(ent->origin);
+        const merian::float3 prev_origin = merian::as_float3(ent->mv_prev_origin);
         const merian::float3 e0 = v2 - v0;
         const merian::float3 e1 = v1 - v0;
         const uint32_t enc_n = merian::encode_normal(merian::normalize(merian::cross(e0, e1)));
@@ -278,6 +309,9 @@ void extract_sprite_geo(entity_t* ent,
             pv.uv = merian::half2(s, t);
             pv.encoded_tangent = 0;
             vertices.push_back(pv);
+            // Sprites only translate; reuse the local-space corner at the
+            // previous origin so motion vectors track entity movement.
+            prev_positions.push_back(p + prev_origin);
         };
         push(v0, 0.f, tmax);
         push(v1, 0.f, 0.f);
@@ -293,18 +327,19 @@ void extract_sprite_geo(entity_t* ent,
 
 void extract_entity_geo(entity_t* ent,
                         std::vector<merian::PackedVertexData>& vertices,
+                        std::vector<merian::float3>& prev_positions,
                         std::vector<merian::uint3>& indices) {
     if (ent == nullptr || ent->model == nullptr)
         return;
     switch (ent->model->type) {
     case mod_alias:
-        extract_alias_geo(ent, vertices, indices);
+        extract_alias_geo(ent, vertices, prev_positions, indices);
         break;
     case mod_brush:
-        extract_brush_entity_geo(ent, vertices, indices);
+        extract_brush_entity_geo(ent, vertices, prev_positions, indices);
         break;
     case mod_sprite:
-        extract_sprite_geo(ent, vertices, indices);
+        extract_sprite_geo(ent, vertices, prev_positions, indices);
         break;
     default:
         break;
@@ -312,6 +347,7 @@ void extract_entity_geo(entity_t* ent,
 }
 
 void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
+                          std::vector<merian::float3>& prev_positions,
                           std::vector<merian::uint3>& indices,
                           const bool no_random,
                           const double prev_cl_time) {
@@ -341,8 +377,10 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
 
         const float velocity = merian::length(merian::as_float3(p->vel));
         const merian::float3 origin = merian::as_float3(p->org);
+        const merian::float3 prev_origin = merian::as_float3(p->mv_prev_origin);
 
         merian::float3 vert[4];
+        merian::float3 prev_vert[4];
         for (int l = 0; l < 3; l++) {
             const float particle_offset = static_cast<float>(2.0 * (xrand.next_double() - 0.5) +
                                                              2.0 * (xrand.next_double() - 0.5));
@@ -354,19 +392,20 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
             const merian::float4x4 rot =
                 merian::rotation(rand_v, (rand_angle + cl.time * 0.001f * velocity) * 2.f *
                                              static_cast<float>(M_PI));
+            const merian::float4x4 prev_rot = merian::rotation(
+                rand_v, (rand_angle + static_cast<float>(prev_cl_time) * 0.001f * velocity) * 2.f *
+                            static_cast<float>(M_PI));
             for (int k = 0; k < 4; k++) {
                 const float vert_off = static_cast<float>(
                     0.5 * ((xrand.next_double() - 0.5) + (xrand.next_double() - 0.5)));
                 const float rand_scale = static_cast<float>(xrand.next_double());
-                vert[k] =
-                    origin + particle_offset +
-                    merian::mul(
-                        rot, merian::float4(scale * voff[k] * (1.f + rand_scale) + vert_off, 1.f))
-                        .xyz();
+                const merian::float4 corner(scale * voff[k] * (1.f + rand_scale) + vert_off, 1.f);
+                vert[k] = origin + particle_offset + merian::mul(rot, corner).xyz();
+                prev_vert[k] =
+                    prev_origin + particle_offset + merian::mul(prev_rot, corner).xyz();
             }
         }
         VectorCopy(p->org, p->mv_prev_origin);
-        (void)prev_cl_time; // prev positions are not yet uploaded.
 
         // Build a tetrahedron (4 triangles) per particle and emit one
         // shared face-normal per vertex (encoded from the tet centroid).
@@ -383,6 +422,7 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
             const merian::float3 centroid = 0.25f * (vert[0] + vert[1] + vert[2] + vert[3]);
             pv.encoded_normal = merian::encode_normal(merian::normalize(vert[k] - centroid));
             vertices.push_back(pv);
+            prev_positions.push_back(prev_vert[k]);
         }
 
         indices.push_back(merian::uint3(base + 0, base + 1, base + 2));
