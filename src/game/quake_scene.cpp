@@ -325,7 +325,7 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
         QUAKE_MATERIAL_SLANG_TYPE_NAME, QUAKE_MATERIAL_SLANG_MODULE_PATH);
 
     auto cam = std::make_shared<merian::Camera>(merian::float3(1, 0, 0), merian::float3(0, 0, 0),
-                                                get_up(), 90.F, 16.F / 9.F, 0.01F, 1000.F);
+                                                get_up(), 90.F, 16.F / 9.F, 0.01F, 1e5f);
     quake_camera = add_camera(std::move(cam));
 
     if (const auto audio_provider = context->find_provider<merian::AudioDeviceProvider>(true)) {
@@ -1023,9 +1023,9 @@ void QuakeScene::refresh_dynamic_meshes() {
     ensure_non_empty(sprite_mesh);
     ensure_non_empty(particle_mesh);
 
-    mark_mesh_data_dirty(entity_mesh_id);
-    mark_mesh_data_dirty(sprite_mesh_id);
-    mark_mesh_data_dirty(particle_mesh_id);
+    mark_mesh_dirty(entity_mesh_id);
+    mark_mesh_dirty(sprite_mesh_id);
+    mark_mesh_dirty(particle_mesh_id);
 }
 
 void QuakeScene::cycle_animated_materials() {
