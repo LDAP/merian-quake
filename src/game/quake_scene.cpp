@@ -864,8 +864,7 @@ void QuakeScene::rebuild_static_world() {
         mesh->material_id = material_id;
         // Static, opaque, CCW-front (Quake convention; alpha-test on world
         // brushes lands in a follow-up gbuffer pass).
-        mesh->flags =
-            merian::GeometryFlags::IsOpaque | merian::GeometryFlags::FrontCounterClockwise;
+        mesh->flags = merian::MeshFlags::IsOpaque | merian::MeshFlags::FrontCounterClockwise;
         mesh->vertices = std::move(bucket.vertices);
         mesh->indices = std::move(bucket.indices);
 
@@ -944,7 +943,7 @@ void QuakeScene::init_dynamic_meshes() {
         material_system->add_material(quake_material_type_id, make_default_particle_material());
 
     auto add_dynamic = [&](const char* name, merian::MaterialID mid,
-                           merian::GeometryFlags flags) -> merian::MeshID {
+                           merian::MeshFlags flags) -> merian::MeshID {
         auto mesh = std::make_unique<QuakeBrushMesh>();
         mesh->name = name;
         mesh->material_id = mid;
@@ -955,8 +954,7 @@ void QuakeScene::init_dynamic_meshes() {
         return id;
     };
 
-    const auto dyn_flags =
-        merian::GeometryFlags::IsDynamic | merian::GeometryFlags::FrontCounterClockwise;
+    const auto dyn_flags = merian::MeshFlags::IsDynamic | merian::MeshFlags::FrontCounterClockwise;
     entity_mesh_id = add_dynamic("dynamic:entities", entity_material_id, dyn_flags);
     sprite_mesh_id = add_dynamic("dynamic:sprites", sprite_material_id, dyn_flags);
     particle_mesh_id = add_dynamic("dynamic:particles", particle_material_id, dyn_flags);
