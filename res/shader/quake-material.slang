@@ -4,21 +4,10 @@
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 
+#include "shader/quake-material.slangh"
+
 namespace merian {
 
-// Sentinel matching TextureID(-1) used in QuakeMaterialPayload for "no texture".
-static const TextureID kQuakeNoTexture = TextureID(0xFFFF);
-
-// Surface flag values, must match MAT_FLAGS_* in res/shader/config.h.
-static const uint kQuakeSurfaceNone = 0;
-static const uint kQuakeSurfaceLava = 1;
-static const uint kQuakeSurfaceSlime = 2;
-static const uint kQuakeSurfaceTele = 3;
-static const uint kQuakeSurfaceWater = 4;
-static const uint kQuakeSurfaceSky = 5;
-static const uint kQuakeSurfaceWaterfall = 6;
-static const uint kQuakeSurfaceSprite = 7;
-static const uint kQuakeSurfaceSolid = 8;
 
 struct QuakeMaterial : MaterialModel {
     typealias MaterialSampleImpl = QuakeMaterialSample;
@@ -37,8 +26,8 @@ struct QuakeMaterial : MaterialModel {
     QuakeMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler lod) {
         float3 albedo = float3(1, 1, 1);
-        if (base_tex != kQuakeNoTexture) {
-            float4 tex_color = lod.sample(tm.get_sampler2D(base_tex), sd.uv);
+        if (let albedo_tex_id = header.get_alpha_texture_id()) {
+            float4 tex_color = lod.sample(tm.get_sampler2D(albedo_tex_id), sd.uv);
             albedo = tex_color.rgb;
         }
         QuakeMaterialSample s;

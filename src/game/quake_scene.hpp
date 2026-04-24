@@ -83,15 +83,15 @@ class QuakeScene : public merian::Scene {
     void properties(merian::Properties& config);
 
   protected:
-    void
-    on_update(const merian::CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame)
-        override;
+    void on_update(const merian::CommandBufferHandle& cmd,
+                   float time,
+                   float time_diff,
+                   uint32_t frame) override;
 
   private:
     void register_input_listener(const merian::InputControllerHandle& controller);
-    void drain_pending_uploads(const merian::CommandBufferHandle& cmd);
-    void refresh_render_info(bool render_this_frame);
-    void run_startup_commands_if_needed();
+    void update_textures(const merian::CommandBufferHandle& cmd);
+
     void rebuild_static_world();
     void init_dynamic_meshes();
     void refresh_dynamic_meshes();
@@ -100,9 +100,6 @@ class QuakeScene : public merian::Scene {
   private:
     merian::MaterialModelID quake_material_type_id{};
 
-    // Resolution: written from the Quake thread (cb_VID_Changed); read on the
-    // graph thread. Quake calls this before any update; just keep it atomic-
-    // ish (single uint32 reads on x86 are torn-free; we accept it).
     vk::Extent3D resolution{};
 
     // Game thread / synchronization.
@@ -111,21 +108,12 @@ class QuakeScene : public merian::Scene {
     merian::ConcurrentQueue<bool> sync_gamestate;
     merian::ConcurrentQueue<float> sync_render;
 
-    // Set true by the game thread when QuakeSpasm hits R_RenderScene; reset
-    // to false at the top of every on_update. Also gated against
-    // scr_drawloading.
-    bool render_this_frame = false;
-    // Set on worldspawn / when sun overrides change. Renderers will read
-    // this off Scene's get_constant_data_dirty() once that lands.
-    bool constant_data_dirty = true;
+    bool render_next = false;
     bool update_gamestate = true;
     uint64_t frame_counter = 0;
     uint64_t last_worldspawn_frame = 0;
     double server_fps = 0;
 
-    // Sun + volume scattering state, surfaced from worldspawn parsing /
-    // overrides. The renderer reads these via the camera + scene stash;
-    // QuakeNode also exposes them through properties.
     merian::float3 sun_color{};
     merian::float3 sun_direction{0, 0, 1};
     float volume_max_t = 1000.F;
@@ -171,8 +159,7 @@ class QuakeScene : public merian::Scene {
     double prev_cl_time = 0.0;
 
     // Input.
-    merian::InputControllerHandle controller =
-        std::make_shared<merian::DummyInputController>();
+    merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
     std::shared_ptr<merian::InputListener> input_listener;
     double mouse_oldx = 0;
     double mouse_oldy = 0;
@@ -180,25 +167,37 @@ class QuakeScene : public merian::Scene {
     double mouse_y = 0;
     bool raw_mouse_was_enabled = false;
 
-    // Texture upload queue, drained per-frame inside on_update.
     struct PendingTexture {
-        uint32_t texnum;
-        uint32_t width;
-        uint32_t height;
-        uint32_t flags;
+        explicit PendingTexture(gltexture_t* glt, const uint32_t* data)
+            : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name) {
+            cpu_tex.resize(width * height);
+
+            memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
+
+            linear = false;
+            linear |= merian::ends_with(glt->name, "_norm");
+            linear |= merian::ends_with(glt->name, "_gloss");
+        }
+
+        const uint32_t width;
+        const uint32_t height;
+        // bitmask of TEXPREF_* flags in gl_texmgr
+        const uint32_t flags;
+        // if true interpret linearly (Unorm) else as Srgb.
         bool linear;
-        std::string name;
-        std::vector<uint32_t> rgba;
+
+        std::vector<uint32_t> cpu_tex{};
+
+        const std::string name;
     };
-    std::vector<PendingTexture> pending_uploads;
-    std::mutex pending_uploads_mutex;
+    std::unordered_map<uint32_t, PendingTexture> pending_uploads;
 
     // Console commands queued from the graph/UI thread; executed on game
     // thread.
     std::queue<std::string> pending_commands;
     std::mutex pending_commands_mutex;
 
-    // Properties / debug knobs (unchanged from old QuakeNode).
+    // Properties.
     int default_filtering = 0;
     std::string startup_commands{};
     bool startup_commands_dispatched = false;
@@ -213,7 +212,7 @@ class QuakeScene : public merian::Scene {
     int playermodel = 1;
     bool reproducible_renders = false;
 
-    // HACK texture ids stored once at load (used by future particle mesh).
+    // HACK texture ids stored once at load.
     uint32_t texnum_blood = 0;
     uint32_t texnum_explosion = 0;
 

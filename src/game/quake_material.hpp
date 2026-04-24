@@ -26,7 +26,6 @@ enum class QuakeSurfaceFlags : uint16_t {
 // res/shader/quake-material.slang. The Slang side reads this via the
 // MaterialPayload blob, so the order, sizes and packing must stay in sync.
 struct QuakeMaterialPayload {
-    merian::TextureID base_tex{};
     merian::TextureID fullbright_tex{};
     merian::TextureID normal_tex{};
     merian::TextureID gloss_tex{};
@@ -34,7 +33,7 @@ struct QuakeMaterialPayload {
     uint8_t alpha_mode{};
     uint8_t _pad{};
 };
-static_assert(sizeof(QuakeMaterialPayload) == 12,
+static_assert(sizeof(QuakeMaterialPayload) == 10,
               "QuakeMaterialPayload layout must match Slang QuakeMaterial");
 
 // Sentinel value used by the Slang side (kQuakeNoTexture) for "no texture".
@@ -47,7 +46,6 @@ struct QuakeMaterial : merian::Material {
         // alpha_texture_id is consumed by MaterialSystem::alpha_test for
         // alpha-mask discard. Default to "no alpha mask".
         header.alpha_texture_id = merian::TextureID(-1);
-        payload.base_tex = QUAKE_NO_TEXTURE;
         payload.fullbright_tex = QUAKE_NO_TEXTURE;
         payload.normal_tex = QUAKE_NO_TEXTURE;
         payload.gloss_tex = QUAKE_NO_TEXTURE;
