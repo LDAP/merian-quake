@@ -90,7 +90,6 @@ class QuakeScene : public merian::Scene {
 
   private:
     void register_input_listener(const merian::InputControllerHandle& controller);
-    void update_textures(const merian::CommandBufferHandle& cmd);
 
     void rebuild_static_world();
     void init_dynamic_meshes();
@@ -166,31 +165,6 @@ class QuakeScene : public merian::Scene {
     double mouse_x = 0;
     double mouse_y = 0;
     bool raw_mouse_was_enabled = false;
-
-    struct PendingTexture {
-        explicit PendingTexture(gltexture_t* glt, const uint32_t* data)
-            : width(glt->width), height(glt->height), flags(glt->flags), name(glt->name) {
-            cpu_tex.resize(width * height);
-
-            memcpy(cpu_tex.data(), data, sizeof(uint32_t) * cpu_tex.size());
-
-            linear = false;
-            linear |= merian::ends_with(glt->name, "_norm");
-            linear |= merian::ends_with(glt->name, "_gloss");
-        }
-
-        const uint32_t width;
-        const uint32_t height;
-        // bitmask of TEXPREF_* flags in gl_texmgr
-        const uint32_t flags;
-        // if true interpret linearly (Unorm) else as Srgb.
-        bool linear;
-
-        std::vector<uint32_t> cpu_tex{};
-
-        const std::string name;
-    };
-    std::unordered_map<uint32_t, PendingTexture> pending_uploads;
 
     // Console commands queued from the graph/UI thread; executed on game
     // thread.

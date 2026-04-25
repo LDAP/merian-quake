@@ -547,11 +547,6 @@ void QuakeScene::cb_R_RenderScene() {
 }
 
 void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
-    // TODO: Add methods to texture manager that uploads the textures directly to the GPU using a
-    // staging space (use these methods here) and then inserts the GPU copies at a call to update()
-    // (which is called by the scene).
-
-    // LOG -----------------------------------------------
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
     const std::string source = strcmp(glt->source_file, "") == 0 ? "memory" : glt->source_file;
     SPDLOG_DEBUG("texture_load {} {} {}x{} from {}, frame: {}", glt->texnum, glt->name, glt->width,
@@ -563,8 +558,6 @@ void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
         return;
     }
 
-    // STORE SOME TEXTURE IDs ----------------------------
-
     // HACK: for blood patch
     if (strcmp(glt->name, "progs/gib_1.mdl:frame0") == 0)
         texnum_blood = glt->texnum;
@@ -572,19 +565,28 @@ void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
     if (strcmp(glt->name, "progs/s_exp_big.spr:frame10") == 0)
         texnum_explosion = glt->texnum;
 
-    // ALLOCATE ----------------------------
+    const bool linear =
+        merian::ends_with(glt->name, "_norm") || merian::ends_with(glt->name, "_gloss");
 
-    // We store the texture on system memory for now
-    // and upload in cmd_process later
-    if (pending_uploads.contains(glt->texnum)) {
-        pending_uploads.erase(glt->texnum);
+    vk::Filter mag_filter;
+    if (default_filtering == 0) {
+        mag_filter =
+            ((glt->flags & TEXPREF_LINEAR) != 0u) ? vk::Filter::eLinear : vk::Filter::eNearest;
+    } else {
+        mag_filter =
+            ((glt->flags & TEXPREF_NEAREST) != 0u) ? vk::Filter::eNearest : vk::Filter::eLinear;
     }
-    pending_uploads.try_emplace(glt->texnum, glt, data);
+    const bool generate_mipmaps = (glt->flags & TEXPREF_MIPMAP) != 0U;
+
+    get_texture_manager()->set_texture_from_rgba8(static_cast<merian::TextureID>(glt->texnum), data,
+                                                  glt->width, glt->height,
+                                                  vk::SamplerAddressMode::eRepeat, mag_filter,
+                                                  vk::Filter::eLinear, !linear, generate_mipmaps);
 }
 
 // per-frame --------------------------------------------------------------------
 
-void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
+void QuakeScene::on_update(const merian::CommandBufferHandle& /*cmd*/,
                            const float /*time*/,
                            const float time_diff,
                            const uint32_t /*frame*/) {
@@ -592,9 +594,6 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
         sync_render.push(time_diff, 1);
         sync_gamestate.pop();
     }
-
-    // TODO: See add texture callback (get rid of this!)
-    update_textures(cmd);
 
     render_next = render_next && (scr_drawloading == 0);
 
@@ -696,32 +695,6 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
     }
 
     frame_counter++;
-}
-
-void QuakeScene::update_textures(const merian::CommandBufferHandle& cmd) {
-    const auto& texture_manager = get_texture_manager();
-
-    for (const auto& [texnum, tex] : pending_uploads) {
-        SPDLOG_DEBUG("uploading texture {}", texnum);
-
-        vk::Filter mag_filter;
-        if (default_filtering == 0) {
-            mag_filter =
-                ((tex.flags & TEXPREF_LINEAR) != 0u) ? vk::Filter::eLinear : vk::Filter::eNearest;
-        } else {
-            mag_filter =
-                ((tex.flags & TEXPREF_NEAREST) != 0u) ? vk::Filter::eNearest : vk::Filter::eLinear;
-        }
-
-        const bool srgb = !tex.linear;
-        const bool generate_mipmaps = (tex.flags & TEXPREF_MIPMAP) != 0U;
-
-        texture_manager->set_texture_from_rgba8(static_cast<merian::TextureID>(texnum), cmd,
-                                                tex.cpu_tex.data(), tex.width, tex.height,
-                                                vk::SamplerAddressMode::eRepeat, mag_filter,
-                                                vk::Filter::eLinear, srgb, generate_mipmaps);
-    }
-    pending_uploads.clear();
 }
 
 namespace {
