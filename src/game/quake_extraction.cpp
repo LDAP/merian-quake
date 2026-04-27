@@ -409,11 +409,14 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
 
         // Build a tetrahedron (4 triangles) per particle and emit one
         // shared face-normal per vertex (encoded from the tet centroid).
+        // uv.x carries the palette index ([0,255] / 255) so the particle
+        // material samples the diffuse / emission palette texture by uv.
         const uint32_t base = static_cast<uint32_t>(vertices.size());
+        const float palette_uv = (static_cast<float>(static_cast<int>(p->color) & 0xff) + 0.5f) / 256.f;
         for (int k = 0; k < 4; k++) {
             merian::PackedVertexData pv{};
             pv.position = vert[k];
-            pv.uv = merian::half2(0.f, 0.f);
+            pv.uv = merian::half2(palette_uv, 0.f);
             pv.encoded_tangent = 0;
             // Per-vertex normal: take the average of the three faces meeting
             // here — for a regular-ish tet that's roughly the radial outward
@@ -430,6 +433,89 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
         indices.push_back(merian::uint3(base + 0, base + 3, base + 1));
         indices.push_back(merian::uint3(base + 1, base + 3, base + 2));
     }
+}
+
+AliasIndices compute_alias_lerped(entity_t* ent,
+                                  merian::PackedVertexData* vertices_dst,
+                                  merian::PackedPrevVertexData* prev_dst) {
+    qmodel_t* m = ent->model;
+    assert(m && m->type == mod_alias);
+
+    static std::mutex quake_mutex;
+    std::lock_guard<std::mutex> lock(quake_mutex);
+
+    aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(m);
+    aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
+    int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
+    trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
+
+    int f = ent->frame;
+    if (f < 0 || f >= hdr->numposes)
+        return {indexes, 0, 0};
+
+    // FOV scaling for the player gun.
+    merian::float3 fovscale(1.f);
+    if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value != 0.f) {
+        const float t = std::tan(scr_fov.value * static_cast<float>(0.5 * M_PI / 180.0));
+        fovscale.y = t;
+        fovscale.z = t;
+    }
+
+    const merian::float4x4 scale = merian::transpose(
+        merian::mul(merian::translation(merian::as_float3(hdr->scale_origin) * fovscale),
+                    merian::scale(merian::as_float3(hdr->scale) * fovscale)));
+
+    const merian::float3x3 scale_inv_t =
+        merian::float3x3(merian::transpose(merian::inverse(scale)));
+
+    const float prev_blend = ent->mv_prev_blend;
+
+    lerpdata_t lerpdata;
+    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
+    R_SetupEntityTransform(ent, &lerpdata);
+
+    const float skin_w = static_cast<float>(hdr->skinwidth);
+    const float skin_h = static_cast<float>(hdr->skinheight);
+
+    for (int v = 0; v < hdr->numverts_vbo; v++) {
+        const int i_pose1 = (hdr->numverts * lerpdata.pose1) + desc[v].vertindex;
+        const int i_pose2 = (hdr->numverts * lerpdata.pose2) + desc[v].vertindex;
+
+        merian::float3 p1{static_cast<float>(trivertexes[i_pose1].v[0]),
+                          static_cast<float>(trivertexes[i_pose1].v[1]),
+                          static_cast<float>(trivertexes[i_pose1].v[2])};
+        merian::float3 p2{static_cast<float>(trivertexes[i_pose2].v[0]),
+                          static_cast<float>(trivertexes[i_pose2].v[1]),
+                          static_cast<float>(trivertexes[i_pose2].v[2])};
+
+        const merian::float3 model_pos =
+            merian::mul(merian::float4(merian::lerp(p1, p2, lerpdata.blend), 1.f), scale).xyz();
+        const merian::float3 prev_model_pos =
+            merian::mul(merian::float4(merian::lerp(p1, p2, prev_blend), 1.f), scale).xyz();
+
+        const merian::float3 n1 =
+            merian::as_float3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
+        const merian::float3 n2 =
+            merian::as_float3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
+        const merian::float3 model_n =
+            merian::normalize(merian::mul(merian::lerp(n1, n2, lerpdata.blend), scale_inv_t));
+
+        vertices_dst[v].position = model_pos;
+        vertices_dst[v].encoded_normal = merian::encode_normal(model_n);
+        vertices_dst[v].uv =
+            merian::half2((desc[v].st[0] + 0.5f) / skin_w, (desc[v].st[1] + 0.5f) / skin_h);
+        vertices_dst[v].encoded_tangent = 0;
+
+        prev_dst[v].position = prev_model_pos;
+    }
+
+    ent->mv_prev_blend = lerpdata.blend;
+    VectorCopy(lerpdata.angles, ent->mv_prev_angles);
+    VectorCopy(lerpdata.origin, ent->mv_prev_origin);
+
+    return {indexes,
+            static_cast<uint32_t>(hdr->numindexes / 3),
+            static_cast<uint32_t>(hdr->numverts_vbo)};
 }
 
 } // namespace merian_quake

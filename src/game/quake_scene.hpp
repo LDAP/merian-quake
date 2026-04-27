@@ -92,9 +92,12 @@ class QuakeScene : public merian::Scene {
     void register_input_listener(const merian::InputControllerHandle& controller);
 
     void rebuild_static_world();
-    void init_dynamic_meshes();
-    void refresh_dynamic_meshes();
+    void build_model_registries(const merian::CommandBufferHandle& cmd);
+    void init_particle_batch();
+    void refresh_entities(const merian::CommandBufferHandle& cmd);
+    void retire_stale_entity_slots();
     void cycle_animated_materials();
+    void teardown_world();
 
   private:
     merian::MaterialModelID quake_material_type_id{};
@@ -117,11 +120,41 @@ class QuakeScene : public merian::Scene {
     merian::float3 sun_direction{0, 0, 1};
     float volume_max_t = 1000.F;
 
-    // Static brush world: built once on the first worldspawn after
-    // scene construction. Subsequent worldspawns are ignored for now
-    // (Scene has no remove_mesh; map-change support is a follow-up).
+    // Static brush world: rebuilt on every worldspawn. The previous map's
+    // meshes / nodes are torn down first.
     bool world_meshes_built = false;
     merian::NodeID world_node_id = merian::NODE_ID_INVALID;
+    std::vector<merian::MeshID> world_mesh_ids;
+
+    // Partition key for static brush surfaces. Two surfaces sharing the same
+    // (texture_t*, surf->flags) tuple share a material and a mesh.
+    struct TexFlagsKey {
+        texture_t* tex;
+        int surf_flags;
+        bool operator==(const TexFlagsKey& o) const noexcept {
+            return tex == o.tex && surf_flags == o.surf_flags;
+        }
+        bool operator<(const TexFlagsKey& o) const noexcept {
+            if (tex != o.tex)
+                return tex < o.tex;
+            return surf_flags < o.surf_flags;
+        }
+    };
+    struct TexFlagsKeyHash {
+        size_t operator()(const TexFlagsKey& k) const noexcept {
+            return std::hash<texture_t*>()(k.tex) ^
+                   (std::hash<int>()(k.surf_flags) << 1u);
+        }
+    };
+    // Bits we care about for material partitioning. SURF_PLANEBACK is
+    // per-vertex (geometry-level), SURF_DRAWTILED governs r_notexture
+    // surfaces; both irrelevant. The rest distinguish material variants.
+    static constexpr int SURF_INTERESTING_BITS =
+        SURF_DRAWSKY | SURF_DRAWLAVA | SURF_DRAWSLIME | SURF_DRAWTELE | SURF_DRAWWATER;
+
+    // Worldmodel + brush submodels share textures (loadmodel->textures[]),
+    // so this single map covers both.
+    std::unordered_map<TexFlagsKey, merian::MaterialID, TexFlagsKeyHash> material_id_for_tex;
 
     // Animated brush materials: (material_id, base_texture, fb/normal/gloss
     // texnums, surface_flags, alpha_mode). Per-frame, R_TextureAnimation
@@ -140,20 +173,71 @@ class QuakeScene : public merian::Scene {
     };
     std::vector<AnimatedBrushMaterial> animated_brush_materials;
 
-    // Dynamic geometry: per-frame extraction of alias / brush-entity / sprite
-    // and particle quake objects. The meshes are pre-allocated once (in
-    // init_dynamic_meshes) so per-frame refills only mark mesh data dirty
-    // — no add_mesh churn that would force the static world to rebuild.
-    // For now everything (per type) shares a single material with no
-    // texture bound; per-entity textures are a follow-up once material
-    // updates are wired in.
-    bool dynamic_meshes_built = false;
-    merian::NodeID dynamic_node_id = merian::NODE_ID_INVALID;
-    merian::MeshID entity_mesh_id = 0;
-    merian::MeshID sprite_mesh_id = 0;
+    // Per-model info built at worldspawn; stable across frames.
+    struct AliasModelInfo {
+        aliashdr_t* hdr;
+        merian::BufferHandle index_buffer; // device-local, uploaded once
+        uint32_t vertex_count;
+        uint32_t primitive_count;
+    };
+    std::unordered_map<qmodel_t*, AliasModelInfo> alias_model_info;
+
+    // One per (texture_t*, surf_flags) partition in a brush submodel.
+    struct BrushSubmodelGeoPart {
+        merian::BufferHandle vb; // device-local, model space
+        merian::BufferHandle ib; // device-local
+        uint32_t vertex_count;
+        uint32_t primitive_count;
+        merian::MaterialID material_id;
+    };
+    std::unordered_map<qmodel_t*, std::vector<BrushSubmodelGeoPart>> brush_submodel_geo;
+
+    // Material registries built at worldspawn.
+    struct AliasSkinKey {
+        qmodel_t* model;
+        int skin;
+        bool operator==(const AliasSkinKey& o) const = default;
+    };
+    struct AliasSkinKeyHash {
+        size_t operator()(const AliasSkinKey& k) const noexcept {
+            return std::hash<qmodel_t*>()(k.model) ^ (std::hash<int>()(k.skin) << 1u);
+        }
+    };
+    std::unordered_map<AliasSkinKey, merian::MaterialID, AliasSkinKeyHash>
+        material_id_for_alias_skin;
+
+    struct SpriteFrameKey {
+        qmodel_t* model;
+        int frame;
+        bool operator==(const SpriteFrameKey& o) const = default;
+    };
+    struct SpriteFrameKeyHash {
+        size_t operator()(const SpriteFrameKey& k) const noexcept {
+            return std::hash<qmodel_t*>()(k.model) ^ (std::hash<int>()(k.frame) << 1u);
+        }
+    };
+    std::unordered_map<SpriteFrameKey, merian::MaterialID, SpriteFrameKeyHash>
+        material_id_for_sprite_frame;
+
+    // Per-entity slot: one SceneNode + one or more MeshIDs.
+    struct EntityMeshSlot {
+        merian::NodeID node_id = merian::NODE_ID_INVALID;
+        std::vector<merian::MeshID> mesh_ids;
+        qmodel_t* model = nullptr;
+        int kind = 0; // 0=alias, 1=brush, 2=sprite
+        uint64_t last_seen_frame = 0;
+    };
+    std::unordered_map<entity_t*, EntityMeshSlot> entity_slots;
+
+    EntityMeshSlot& ensure_alias_slot(entity_t* ent);
+    EntityMeshSlot& ensure_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
+    EntityMeshSlot& ensure_sprite_slot(entity_t* ent);
+    void fill_alias_pose(EntityMeshSlot& slot, entity_t* ent);
+
+    // Particle batch: single mesh, palette-encoded color.
+    bool particle_mesh_built = false;
     merian::MeshID particle_mesh_id = 0;
-    merian::MaterialID entity_material_id = 0;
-    merian::MaterialID sprite_material_id = 0;
+    merian::NodeID particle_node_id = merian::NODE_ID_INVALID;
     merian::MaterialID particle_material_id = 0;
     double prev_cl_time = 0.0;
 
