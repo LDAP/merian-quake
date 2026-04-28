@@ -142,8 +142,7 @@ class QuakeScene : public merian::Scene {
     };
     struct TexFlagsKeyHash {
         size_t operator()(const TexFlagsKey& k) const noexcept {
-            return std::hash<texture_t*>()(k.tex) ^
-                   (std::hash<int>()(k.surf_flags) << 1u);
+            return std::hash<texture_t*>()(k.tex) ^ (std::hash<int>()(k.surf_flags) << 1u);
         }
     };
     // Bits we care about for material partitioning. SURF_PLANEBACK is

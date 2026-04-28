@@ -886,9 +886,11 @@ void QuakeScene::rebuild_static_world() {
         mesh->name =
             fmt::format("worldspawn:{}", bucket.tex->name[0] != 0 ? bucket.tex->name : "unnamed");
         mesh->material_id = material_id;
-        // Static, opaque, CCW-front (Quake convention; alpha-test on world
-        // brushes lands in a follow-up gbuffer pass).
-        mesh->flags = merian::MeshFlags::IsOpaque | merian::MeshFlags::FrontCounterClockwise;
+        mesh->flags = merian::MeshFlags::FrontCounterClockwise;
+        if ((key.tex->gltexture != nullptr) &&
+            ((key.tex->gltexture->flags & TEXPREF_ALPHA) == 0u)) {
+            mesh->flags = mesh->flags | merian::MeshFlags::IsOpaque;
+        }
         mesh->vertices = std::move(bucket.vertices);
         mesh->indices = std::move(bucket.indices);
 
@@ -1211,7 +1213,10 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
         auto mesh = std::make_unique<BrushEntityMesh>();
         mesh->name = fmt::format("brush:{}:{}", ent->model->name, part.material_id);
         mesh->material_id = part.material_id;
-        mesh->flags = merian::MeshFlags::IsOpaque | merian::MeshFlags::FrontCounterClockwise;
+        mesh->flags = merian::MeshFlags::FrontCounterClockwise;
+        if ((geo_it->first->texinfo->texture->gltexture->flags & TEXPREF_ALPHA) == 0) {
+            mesh->flags = mesh->flags | merian::MeshFlags::IsOpaque;
+        }
         mesh->vb = part.vb;
         mesh->ib = part.ib;
         mesh->vertex_count = part.vertex_count;

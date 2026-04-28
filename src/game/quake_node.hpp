@@ -14,9 +14,7 @@ class QuakeScene;
 
 class QuakeNode : public merian::Node {
   public:
-    // Renderer-facing aliases. Kept on QuakeNode so existing renderer code
-    // (`QuakeNode::QuakeRenderInfo`, `QuakeNode::UniformData`) still compiles
-    // until the renderer migration lands. The actual data lives on the scene.
+    // TODO: Remove when the old renderers are gone.
     using QuakeRenderInfo = merian_quake::QuakeRenderInfo;
     using UniformData = merian_quake::UniformData;
     using ConstantData = merian_quake::ConstantData;
