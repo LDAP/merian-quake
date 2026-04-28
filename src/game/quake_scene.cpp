@@ -913,6 +913,8 @@ merian::float4x4 entity_transform(entity_t* ent) {
 }
 
 QuakeMaterial make_alias_material(aliashdr_t* hdr, int skin) {
+    if (hdr->numskins <= 0)
+        return {};
     skin = std::clamp(skin, 0, hdr->numskins - 1);
     QuakeMaterial m;
     if (hdr->gltextures[skin][0] != nullptr)
@@ -1036,7 +1038,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     }
 
     auto info_it = alias_model_info.find(ent->model);
-    if (info_it == alias_model_info.end())
+    if (info_it == alias_model_info.end() || info_it->second.hdr->numskins <= 0)
         return entity_slots[ent]; // empty slot; caller will skip
 
     const AliasModelInfo& info = info_it->second;
@@ -1054,7 +1056,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
                                         merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
                                         fmt::format("alias_prev_vb:{}", ent->model->name));
 
-    int skin = std::clamp(ent->skinnum, 0, info.hdr->numskins - 1);
+    const int skin = std::clamp(ent->skinnum, 0, info.hdr->numskins - 1);
     auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
     merian::MaterialID mid =
         (mat_it != material_id_for_alias_skin.end()) ? mat_it->second : merian::MaterialID{};

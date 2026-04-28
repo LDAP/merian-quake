@@ -242,6 +242,9 @@ void add_geo_alias(entity_t* ent,
 
     // for(int f = 0; f < hdr->numposes; f++)
     // TODO: upload all vertices so we can just alter the indices on gpu
+    if (hdr->numskins <= 0)
+        return;
+
     int f = ent->frame;
     if (f < 0 || f >= hdr->numposes)
         return;
