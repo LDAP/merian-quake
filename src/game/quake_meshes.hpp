@@ -20,8 +20,14 @@ class QuakeBrushMesh : public merian::Mesh {
         return static_cast<uint32_t>(indices.size());
     }
 
-    Mesh::MeshData get_data() const override {
-        return Mesh::HostPacked{vertices.data(), nullptr, indices.data()};
+    MeshVertexData get_vertices() const override {
+        return HostPacked<merian::PackedVertexData>{vertices.data()};
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        return std::monostate{};
+    }
+    MeshIndexData get_indices() const override {
+        return HostPacked<void>{indices.data()};
     }
 };
 
@@ -39,12 +45,16 @@ class QuakeHostDynamicMesh : public merian::Mesh {
         return static_cast<uint32_t>(indices.size());
     }
 
-    Mesh::MeshData get_data() const override {
-        return Mesh::HostPacked{
-            vertices.data(),
-            prev_vertices.empty() ? nullptr : prev_vertices.data(),
-            indices.data(),
-        };
+    MeshVertexData get_vertices() const override {
+        return HostPacked<merian::PackedVertexData>{vertices.data()};
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        if (prev_vertices.empty())
+            return std::monostate{};
+        return HostPacked<merian::PackedPrevVertexData>{prev_vertices.data()};
+    }
+    MeshIndexData get_indices() const override {
+        return HostPacked<void>{indices.data()};
     }
 };
 
@@ -65,8 +75,16 @@ class AliasInstanceMesh : public merian::Mesh {
         return primitive_count;
     }
 
-    Mesh::MeshData get_data() const override {
-        return Mesh::DeviceStaged{vb_staging, prev_vb_staging, ib_shared};
+    MeshVertexData get_vertices() const override {
+        return DeviceStaged{vb_staging};
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        if (!prev_vb_staging)
+            return std::monostate{};
+        return DeviceStaged{prev_vb_staging};
+    }
+    MeshIndexData get_indices() const override {
+        return DeviceLocal{ib_shared};
     }
 };
 
@@ -86,8 +104,14 @@ class BrushEntityMesh : public merian::Mesh {
         return primitive_count;
     }
 
-    Mesh::MeshData get_data() const override {
-        return Mesh::DeviceLocal{vb, {}, ib};
+    MeshVertexData get_vertices() const override {
+        return DeviceLocal{vb};
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        return std::monostate{};
+    }
+    MeshIndexData get_indices() const override {
+        return DeviceLocal{ib};
     }
 };
 

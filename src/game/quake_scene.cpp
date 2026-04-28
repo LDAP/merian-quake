@@ -905,13 +905,15 @@ void ensure_non_empty(QuakeHostDynamicMesh& mesh) {
         seed_with_degenerate_triangle(mesh);
 }
 
+// Quake's AngleVectors fills rows (row-vector convention), but the Scene
+// expects column-major transforms (column-vector convention for TLAS / shaders).
 merian::float4x4 entity_transform(entity_t* ent) {
     std::array<float, 3> a = {-ent->angles[0], ent->angles[1], ent->angles[2]};
     merian::float4x4 m = merian::identity();
     AngleVectors(a.data(), &m[0].x, &m[1].x, &m[2].x);
     m[1] *= -1;
     m[3] = merian::float4(ent->origin[0], ent->origin[1], ent->origin[2], 1.f);
-    return m;
+    return merian::transpose(m);
 }
 
 QuakeMaterial make_alias_material(aliashdr_t* hdr, int skin) {
@@ -1013,7 +1015,7 @@ void QuakeScene::init_particle_batch() {
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = "particles";
     mesh->material_id = particle_material_id;
-    mesh->flags = merian::MeshFlags::IsDynamic | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     seed_with_degenerate_triangle(*mesh);
     particle_mesh_id = add_mesh(std::move(mesh));
     add_mesh_instance(particle_mesh_id, particle_node_id);
@@ -1063,13 +1065,14 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     merian::SceneNode node;
     node.name = fmt::format("alias:{}", ent->model->name);
+    node.is_animated = true;
     node.local_transform = entity_transform(ent);
     const merian::NodeID nid = add_node(std::move(node));
 
     auto mesh = std::make_unique<AliasInstanceMesh>();
     mesh->name = fmt::format("alias:{}", ent->model->name);
     mesh->material_id = mid;
-    mesh->flags = merian::MeshFlags::IsDynamic | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     mesh->vb_staging = std::move(vb);
     mesh->prev_vb_staging = std::move(prev_vb);
     mesh->ib_shared = info.index_buffer;
@@ -1179,6 +1182,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
 
     merian::SceneNode node;
     node.name = fmt::format("brush:{}", ent->model->name);
+    node.is_animated = true;
     node.local_transform = entity_transform(ent);
     const merian::NodeID nid = add_node(std::move(node));
 
@@ -1230,7 +1234,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = fmt::format("sprite:{}", ent->model->name);
     mesh->material_id = mid;
-    mesh->flags = merian::MeshFlags::IsDynamic | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     seed_with_degenerate_triangle(*mesh);
 
     const merian::MeshID mesh_id = add_mesh(std::move(mesh));
@@ -1254,14 +1258,15 @@ void QuakeScene::fill_alias_pose(QuakeScene::EntityMeshSlot& slot, entity_t* ent
     auto* vb = mesh.vb_staging->get_memory()->map_as<merian::PackedVertexData>();
     auto* prev_vb = mesh.prev_vb_staging->get_memory()->map_as<merian::PackedPrevVertexData>();
 
-    compute_alias_lerped(ent, vb, prev_vb);
+    merian::float4x4 lerped_transform;
+    compute_alias_lerped(ent, vb, prev_vb, &lerped_transform);
 
     mesh.vb_staging->get_memory()->unmap();
     mesh.prev_vb_staging->get_memory()->unmap();
 
-    update_node(slot.node_id, entity_transform(ent));
+    update_node(slot.node_id, lerped_transform);
 
-    mark_mesh_dirty(slot.mesh_ids[0]);
+    get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
 }
 
 void QuakeScene::retire_stale_entity_slots() {
@@ -1322,7 +1327,8 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
                 if (mat_it != material_id_for_sprite_frame.end())
                     mesh.material_id = mat_it->second;
 
-                mark_mesh_dirty(slot.mesh_ids[0]);
+                get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
+                get_meshes()[slot.mesh_ids[0]]->indices_dirty = true;
                 slot.last_seen_frame = frame_counter;
             }
             break;
@@ -1363,7 +1369,8 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
             mesh.prev_vertices[i].position = prev_pos[i];
 
         ensure_non_empty(mesh);
-        mark_mesh_dirty(particle_mesh_id);
+        mesh.vertices_dirty = true;
+        mesh.indices_dirty = true;
     }
 
     retire_stale_entity_slots();

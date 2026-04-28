@@ -202,8 +202,7 @@ void extract_brush_entity_geo(entity_t* ent,
         const uint32_t enc_n = merian::encode_normal(merian::normalize(plane_n));
 
         for (glpoly_t* p = surf->polys; p != nullptr; p = nullptr) {
-            emit_brush_poly(p, mat_model, mat_prev_model, enc_n, vertices, prev_positions,
-                            indices);
+            emit_brush_poly(p, mat_model, mat_prev_model, enc_n, vertices, prev_positions, indices);
         }
     }
 
@@ -401,8 +400,7 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
                 const float rand_scale = static_cast<float>(xrand.next_double());
                 const merian::float4 corner(scale * voff[k] * (1.f + rand_scale) + vert_off, 1.f);
                 vert[k] = origin + particle_offset + merian::mul(rot, corner).xyz();
-                prev_vert[k] =
-                    prev_origin + particle_offset + merian::mul(prev_rot, corner).xyz();
+                prev_vert[k] = prev_origin + particle_offset + merian::mul(prev_rot, corner).xyz();
             }
         }
         VectorCopy(p->org, p->mv_prev_origin);
@@ -412,7 +410,8 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
         // uv.x carries the palette index ([0,255] / 255) so the particle
         // material samples the diffuse / emission palette texture by uv.
         const uint32_t base = static_cast<uint32_t>(vertices.size());
-        const float palette_uv = (static_cast<float>(static_cast<int>(p->color) & 0xff) + 0.5f) / 256.f;
+        const float palette_uv =
+            (static_cast<float>(static_cast<int>(p->color) & 0xff) + 0.5f) / 256.f;
         for (int k = 0; k < 4; k++) {
             merian::PackedVertexData pv{};
             pv.position = vert[k];
@@ -437,7 +436,8 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
 
 AliasIndices compute_alias_lerped(entity_t* ent,
                                   merian::PackedVertexData* vertices_dst,
-                                  merian::PackedPrevVertexData* prev_dst) {
+                                  merian::PackedPrevVertexData* prev_dst,
+                                  merian::float4x4* out_transform) {
     qmodel_t* m = ent->model;
     assert(m && m->type == mod_alias);
 
@@ -513,8 +513,16 @@ AliasIndices compute_alias_lerped(entity_t* ent,
     VectorCopy(lerpdata.angles, ent->mv_prev_angles);
     VectorCopy(lerpdata.origin, ent->mv_prev_origin);
 
-    return {indexes,
-            static_cast<uint32_t>(hdr->numindexes / 3),
+    if (out_transform) {
+        lerpdata.angles[0] *= -1;
+        merian::float4x4 m = merian::identity();
+        AngleVectors(lerpdata.angles, &m[0].x, &m[1].x, &m[2].x);
+        m[1] *= -1;
+        m[3] = merian::float4(merian::as_float3(lerpdata.origin), 1.f);
+        *out_transform = merian::transpose(m);
+    }
+
+    return {indexes, static_cast<uint32_t>(hdr->numindexes / 3),
             static_cast<uint32_t>(hdr->numverts_vbo)};
 }
 

@@ -68,6 +68,7 @@ struct AliasIndices {
 };
 AliasIndices compute_alias_lerped(entity_t* ent,
                                   merian::PackedVertexData* vertices_dst,
-                                  merian::PackedPrevVertexData* prev_dst);
+                                  merian::PackedPrevVertexData* prev_dst,
+                                  merian::float4x4* out_transform = nullptr);
 
 } // namespace merian_quake
