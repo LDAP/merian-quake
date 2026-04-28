@@ -323,19 +323,7 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
 
     const auto& tm = get_texture_manager();
 
-    // Two extra slots past MAX_GLTEXTURES hold the diffuse and emission palettes
     tm->resize(MAX_GLTEXTURES + 2);
-    // Upload Quake's 256-colour palette as 256x1 RGBA8 textures into the
-    // two reserved slots. d_8to24table is diffuse, d_8to24table_fbright is emission/fullbright.
-    {
-        tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES), d_8to24table,
-                                   256, 1, vk::SamplerAddressMode::eClampToEdge,
-                                   vk::Filter::eNearest, vk::Filter::eNearest, true, false);
-        tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES + 1),
-                                   d_8to24table_fbright, 256, 1,
-                                   vk::SamplerAddressMode::eClampToEdge, vk::Filter::eNearest,
-                                   vk::Filter::eNearest, true, false);
-    }
     quake_material_type_id = material_system->register_material_type(
         QUAKE_MATERIAL_SLANG_TYPE_NAME, QUAKE_MATERIAL_SLANG_MODULE_PATH);
 
@@ -354,6 +342,14 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
     host_parms = &g_quake_data.params;
 
     init_quakespasm(quakespasm_argc, quakespasm_argv);
+
+    // Upload palette textures AFTER Quake init so d_8to24table is populated.
+    tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES), d_8to24table, 256, 1,
+                               vk::SamplerAddressMode::eClampToEdge, vk::Filter::eNearest,
+                               vk::Filter::eNearest, true, false);
+    tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES + 1),
+                               d_8to24table_fbright, 256, 1, vk::SamplerAddressMode::eClampToEdge,
+                               vk::Filter::eNearest, vk::Filter::eNearest, true, false);
 
     game_thread = std::thread([this] {
         merian::Stopwatch sw;
