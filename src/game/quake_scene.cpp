@@ -519,7 +519,7 @@ void QuakeScene::cb_VID_Changed() {
 void QuakeScene::cb_QS_worldspawn() {
     SPDLOG_DEBUG("worldspawn");
     parse_worldspawn();
-    last_worldspawn_frame = frame_counter;
+    last_worldspawn_frame = frame;
 }
 
 void QuakeScene::cb_IN_Move(usercmd_t* cmd) {
@@ -605,108 +605,128 @@ void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
 void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
                            const float /*time*/,
                            const float time_diff,
-                           const uint32_t /*frame*/) {
+                           const uint32_t frame) {
+    MERIAN_PROFILE_SCOPE_GPU(cmd, "QuakeScene::on_update");
+
+    this->frame = frame;
+
     if (update_gamestate) {
-        sync_render.push(time_diff, 1);
-        sync_gamestate.pop();
-    }
-
-    render_next = render_next && (scr_drawloading == 0);
-
-    if ((cl.worldmodel != nullptr) && frame_counter == last_worldspawn_frame) {
-        key_dest = key_game;
-        m_state = m_none;
-        sv_player = nullptr;
-
-        if (world_meshes_built || particle_mesh_built) {
-            teardown_world();
-        }
-        rebuild_static_world();
-        build_model_registries(cmd);
-        world_meshes_built = true;
-        init_particle_batch();
-        particle_mesh_built = true;
-    }
-
-    if (world_meshes_built && (cl.worldmodel != nullptr)) {
-        refresh_entities(cmd);
-    }
-
-    if (world_meshes_built) {
-        cycle_animated_materials();
-    }
-
-    {
         {
-            const auto cam = get_camera(quake_camera);
-            assert(cam);
+            MERIAN_PROFILE_SCOPE("game thread sync");
 
-            float fwd[3];
-            float rgt[3];
-            float up[3];
-            AngleVectors(r_refdef.viewangles, fwd, rgt, up);
-
-            const merian::float3 pos = merian::as_float3(r_refdef.vieworg);
-            const merian::float3 fwd_v(fwd[0], fwd[1], fwd[2]);
-            const float aspect =
-                (resolution.height > 0)
-                    ? (static_cast<float>(resolution.width) / static_cast<float>(resolution.height))
-                    : (16.F / 9.F);
-            cam->look_at(pos, pos + fwd_v, get_up(), r_refdef.fov_x);
-            cam->set_aspect_ratio(aspect);
+            sync_render.push(time_diff, 1);
+            sync_gamestate.pop();
         }
 
-        if (overwrite_sun) {
-            sun_color = overwrite_sun_col;
-            sun_direction = overwrite_sun_dir;
-        } else {
-            sun_color = g_quake_data.current_sun_color;
-            sun_direction = g_quake_data.current_sun_direction;
+        render_next = render_next && (scr_drawloading == 0);
+
+        if ((cl.worldmodel != nullptr) && frame == last_worldspawn_frame) {
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "worldspawn");
+            key_dest = key_game;
+            m_state = m_none;
+            sv_player = nullptr;
+
+            if (world_meshes_built || particle_mesh_built) {
+                MERIAN_PROFILE_SCOPE("teardown_world");
+                teardown_world();
+            }
+            {
+                MERIAN_PROFILE_SCOPE("rebuild_static_world");
+                rebuild_static_world();
+            }
+            {
+                MERIAN_PROFILE_SCOPE_GPU(cmd, "build_model_registries");
+                build_model_registries(cmd);
+            }
+            world_meshes_built = true;
+            {
+                MERIAN_PROFILE_SCOPE("init_particle_batch");
+                init_particle_batch();
+            }
+            particle_mesh_built = true;
         }
-        if (merian::length(sun_direction) > 0) {
-            sun_direction = merian::normalize(sun_direction);
+
+        if (world_meshes_built && (cl.worldmodel != nullptr)) {
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "refresh_entities");
+            refresh_entities(cmd);
         }
 
-        // if (!render_info.render) {
-        //     render_info.uniform.sky.fill(notexture->texnum);
-        // } else if (skybox_name[0] != 0) {
-        //     for (int i = 0; i < 6; i++)
-        //         render_info.uniform.sky[i] = skybox_textures[i]->texnum;
-        // } else if (solidskytexture != nullptr) {
-        //     render_info.uniform.sky[0] = solidskytexture->texnum;
-        //     render_info.uniform.sky[1] = alphaskytexture->texnum;
-        //     render_info.uniform.sky[2] = static_cast<uint16_t>(-1u);
-        // }
+        if (world_meshes_built) {
+            MERIAN_PROFILE_SCOPE("cycle_animated_materials");
+            cycle_animated_materials();
+        }
 
-        // if (mu_t_s_overwrite) {
-        //     render_info.uniform.cam_x_mu_t.a = mu_t;
-        //     render_info.uniform.prev_cam_x_mu_sx.a = mu_s_div_mu_t.r * mu_t;
-        //     render_info.uniform.prev_cam_w_mu_sy.a = mu_s_div_mu_t.g * mu_t;
-        //     render_info.uniform.prev_cam_u_mu_sz.a = mu_s_div_mu_t.b * mu_t;
-        // } else {
-        //     render_info.uniform.cam_x_mu_t.a = std::pow(Fog_GetDensity(), 2.f) * 0.1f;
+        {
+            MERIAN_PROFILE_SCOPE("camera & sun");
+            {
+                const auto cam = get_camera(quake_camera);
+                assert(cam);
 
-        //     const float* fog_color = Fog_GetColor();
-        //     render_info.uniform.prev_cam_x_mu_sx.a =
-        //         std::pow(fog_color[0], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
-        //     render_info.uniform.prev_cam_w_mu_sy.a =
-        //         std::pow(fog_color[1], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
-        //     render_info.uniform.prev_cam_u_mu_sz.a =
-        //         std::pow(fog_color[2], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
-        // }
+                float fwd[3];
+                float rgt[3];
+                float up[3];
+                AngleVectors(r_refdef.viewangles, fwd, rgt, up);
+
+                const merian::float3 pos = merian::as_float3(r_refdef.vieworg);
+                const merian::float3 fwd_v(fwd[0], fwd[1], fwd[2]);
+                const float aspect = (resolution.height > 0)
+                                         ? (static_cast<float>(resolution.width) /
+                                            static_cast<float>(resolution.height))
+                                         : (16.F / 9.F);
+                cam->look_at(pos, pos + fwd_v, get_up(), r_refdef.fov_x);
+                cam->set_aspect_ratio(aspect);
+            }
+
+            if (overwrite_sun) {
+                sun_color = overwrite_sun_col;
+                sun_direction = overwrite_sun_dir;
+            } else {
+                sun_color = g_quake_data.current_sun_color;
+                sun_direction = g_quake_data.current_sun_direction;
+            }
+            if (merian::length(sun_direction) > 0) {
+                sun_direction = merian::normalize(sun_direction);
+            }
+
+            // if (!render_info.render) {
+            //     render_info.uniform.sky.fill(notexture->texnum);
+            // } else if (skybox_name[0] != 0) {
+            //     for (int i = 0; i < 6; i++)
+            //         render_info.uniform.sky[i] = skybox_textures[i]->texnum;
+            // } else if (solidskytexture != nullptr) {
+            //     render_info.uniform.sky[0] = solidskytexture->texnum;
+            //     render_info.uniform.sky[1] = alphaskytexture->texnum;
+            //     render_info.uniform.sky[2] = static_cast<uint16_t>(-1u);
+            // }
+
+            // if (mu_t_s_overwrite) {
+            //     render_info.uniform.cam_x_mu_t.a = mu_t;
+            //     render_info.uniform.prev_cam_x_mu_sx.a = mu_s_div_mu_t.r * mu_t;
+            //     render_info.uniform.prev_cam_w_mu_sy.a = mu_s_div_mu_t.g * mu_t;
+            //     render_info.uniform.prev_cam_u_mu_sz.a = mu_s_div_mu_t.b * mu_t;
+            // } else {
+            //     render_info.uniform.cam_x_mu_t.a = std::pow(Fog_GetDensity(), 2.f) * 0.1f;
+
+            //     const float* fog_color = Fog_GetColor();
+            //     render_info.uniform.prev_cam_x_mu_sx.a =
+            //         std::pow(fog_color[0], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
+            //     render_info.uniform.prev_cam_w_mu_sy.a =
+            //         std::pow(fog_color[1], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
+            //     render_info.uniform.prev_cam_u_mu_sz.a =
+            //         std::pow(fog_color[2], 1.f / 1.2f) * render_info.uniform.cam_x_mu_t.a;
+            // }
+        }
+
+        const bool in_game = update_gamestate && key_dest == key_game;
+        controller->set_mouse_grabbed(in_game);
+        if (input_listener)
+            controller->add_listener(input_listener, in_game ? 100 : 0);
     }
-
-    const bool in_game = update_gamestate && key_dest == key_game;
-    controller->set_mouse_grabbed(in_game);
-    if (input_listener)
-        controller->add_listener(input_listener, in_game ? 100 : 0);
 
     if (stop_after_worldspawn >= 0 &&
-        (frame_counter - last_worldspawn_frame) == static_cast<uint64_t>(stop_after_worldspawn)) {
+        (frame - last_worldspawn_frame) == static_cast<uint64_t>(stop_after_worldspawn)) {
         update_gamestate = false;
     }
-
-    frame_counter++;
 }
 
 namespace {
@@ -901,8 +921,6 @@ void ensure_non_empty(QuakeHostDynamicMesh& mesh) {
         seed_with_degenerate_triangle(mesh);
 }
 
-// Quake's AngleVectors fills rows (row-vector convention), but the Scene
-// expects column-major transforms (column-vector convention for TLAS / shaders).
 merian::float4x4 entity_transform(entity_t* ent) {
     std::array<float, 3> a = {-ent->angles[0], ent->angles[1], ent->angles[2]};
     merian::float4x4 m = merian::identity();
@@ -1270,7 +1288,7 @@ void QuakeScene::fill_alias_pose(QuakeScene::EntityMeshSlot& slot, entity_t* ent
 void QuakeScene::retire_stale_entity_slots() {
     constexpr uint64_t STALE_THRESHOLD = 8;
     for (auto it = entity_slots.begin(); it != entity_slots.end();) {
-        if (frame_counter - it->second.last_seen_frame > STALE_THRESHOLD) {
+        if (frame - it->second.last_seen_frame > STALE_THRESHOLD) {
             for (const merian::MeshID id : it->second.mesh_ids)
                 remove_mesh(id);
             if (it->second.node_id != merian::NODE_ID_INVALID)
@@ -1292,7 +1310,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
             auto& slot = ensure_alias_slot(ent);
             if (!slot.mesh_ids.empty()) {
                 fill_alias_pose(slot, ent);
-                slot.last_seen_frame = frame_counter;
+                slot.last_seen_frame = frame;
             }
             break;
         }
@@ -1300,7 +1318,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
             auto& slot = ensure_brush_slot(ent, cmd);
             if (!slot.mesh_ids.empty()) {
                 update_node(slot.node_id, entity_transform(ent));
-                slot.last_seen_frame = frame_counter;
+                slot.last_seen_frame = frame;
             }
             break;
         }
@@ -1327,7 +1345,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
 
                 get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
                 get_meshes()[slot.mesh_ids[0]]->indices_dirty = true;
-                slot.last_seen_frame = frame_counter;
+                slot.last_seen_frame = frame;
             }
             break;
         }
@@ -1407,7 +1425,7 @@ void QuakeScene::cycle_animated_materials() {
 void QuakeScene::properties(merian::Properties& config) {
     config.st_separate("General");
     config.config_bool("gamestate update", update_gamestate);
-    update_gamestate = update_gamestate || frame_counter == 0;
+    update_gamestate = update_gamestate || frame == 0;
 
     std::string cmd;
     if (config.config_text("command", cmd, true)) {
@@ -1420,7 +1438,7 @@ void QuakeScene::properties(merian::Properties& config) {
     bool changed = config.config_text_multiline(
         "startup commands", startup_commands, false,
         "multiple commands separated by newline, lines starting with # are ignored");
-    if (changed && frame_counter == 0) {
+    if (changed && frame == 0) {
         merian::split(startup_commands, "\n", [&](const std::string& cmd) {
             if (!cmd.starts_with("#"))
                 queue_command(cmd);

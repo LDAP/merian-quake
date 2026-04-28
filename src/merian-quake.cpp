@@ -234,8 +234,7 @@ int main(const int argc, const char** argv) {
     merian::Stopwatch frametime;
     if (output) {
         output->set_on_blit_completed([&](const merian::CommandBufferHandle& cmd,
-                                          const merian::SwapchainAcquireResult& aquire_result,
-                                          const merian::ProfilerHandle& profiler) {
+                                          const merian::SwapchainAcquireResult& aquire_result) {
             const double frametime_ms = frametime.millis();
             frametime.reset();
             imgui_backend->new_frame(static_cast<float>(frametime_ms / 1000.0));
@@ -260,7 +259,7 @@ int main(const int argc, const char** argv) {
 
             QuakeMessageOverlay();
 
-            imgui_renderer->render(cmd, aquire_result.image_view, profiler);
+            imgui_renderer->render(cmd, aquire_result.image_view);
         });
     }
 

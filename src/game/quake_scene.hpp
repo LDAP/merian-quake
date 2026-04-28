@@ -112,7 +112,7 @@ class QuakeScene : public merian::Scene {
 
     bool render_next = false;
     bool update_gamestate = true;
-    uint64_t frame_counter = 0;
+    uint64_t frame = 0;
     uint64_t last_worldspawn_frame = 0;
     double server_fps = 0;
 
