@@ -1188,9 +1188,11 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
             auto ib =
                 alloc->create_buffer(cmd, idxs, buf_usage, fmt::format("brush_ib:{}", mod->name));
 
-            geo_parts.push_back(BrushSubmodelGeoPart{std::move(vb), std::move(ib),
-                                                     static_cast<uint32_t>(verts.size()),
-                                                     static_cast<uint32_t>(idxs.size()), mid});
+            const bool has_alpha =
+                key.tex->gltexture != nullptr && (key.tex->gltexture->flags & TEXPREF_ALPHA) != 0;
+            geo_parts.push_back(BrushSubmodelGeoPart{
+                std::move(vb), std::move(ib), static_cast<uint32_t>(verts.size()),
+                static_cast<uint32_t>(idxs.size()), mid, has_alpha});
         }
         geo_it = brush_submodel_geo.find(mod);
     }
@@ -1214,7 +1216,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
         mesh->name = fmt::format("brush:{}:{}", ent->model->name, part.material_id);
         mesh->material_id = part.material_id;
         mesh->flags = merian::MeshFlags::FrontCounterClockwise;
-        if ((geo_it->first->texinfo->texture->gltexture->flags & TEXPREF_ALPHA) == 0) {
+        if (!part.has_alpha) {
             mesh->flags = mesh->flags | merian::MeshFlags::IsOpaque;
         }
         mesh->vb = part.vb;

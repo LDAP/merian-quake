@@ -188,6 +188,7 @@ class QuakeScene : public merian::Scene {
         uint32_t vertex_count;
         uint32_t primitive_count;
         merian::MaterialID material_id;
+        bool has_alpha;
     };
     std::unordered_map<qmodel_t*, std::vector<BrushSubmodelGeoPart>> brush_submodel_geo;
 
