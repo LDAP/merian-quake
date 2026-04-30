@@ -605,10 +605,8 @@ void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
 void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
                            const float /*time*/,
                            const float time_diff,
-                           const uint32_t frame) {
+                           const uint32_t /*frame*/) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "QuakeScene::on_update");
-
-    this->frame = frame;
 
     if (update_gamestate) {
         {
@@ -620,7 +618,7 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
 
         render_next = render_next && (scr_drawloading == 0);
 
-        if ((cl.worldmodel != nullptr) && frame == last_worldspawn_frame) {
+        if ((cl.worldmodel != nullptr) && this->frame == last_worldspawn_frame) {
             MERIAN_PROFILE_SCOPE_GPU(cmd, "worldspawn");
             key_dest = key_game;
             m_state = m_none;
@@ -725,9 +723,11 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
     }
 
     if (stop_after_worldspawn >= 0 &&
-        (frame - last_worldspawn_frame) == static_cast<uint64_t>(stop_after_worldspawn)) {
+        (this->frame - last_worldspawn_frame) == static_cast<uint64_t>(stop_after_worldspawn)) {
         update_gamestate = false;
     }
+
+    this->frame++;
 }
 
 namespace {
@@ -1346,14 +1346,14 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
 
                 ensure_non_empty(mesh);
 
-                int frame = std::max(ent->frame, 0);
-                auto mat_it = material_id_for_sprite_frame.find({ent->model, frame});
+                const int sprite_frame = std::max(ent->frame, 0);
+                auto mat_it = material_id_for_sprite_frame.find({ent->model, sprite_frame});
                 if (mat_it != material_id_for_sprite_frame.end())
                     mesh.material_id = mat_it->second;
 
                 get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
                 get_meshes()[slot.mesh_ids[0]]->indices_dirty = true;
-                slot.last_seen_frame = frame;
+                slot.last_seen_frame = this->frame;
             }
             break;
         }
