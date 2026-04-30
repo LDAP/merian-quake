@@ -1034,7 +1034,8 @@ void QuakeScene::init_particle_batch() {
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = "particles";
     mesh->material_id = particle_material_id;
-    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::HasVariableTopology |
+                  merian::MeshFlags::FrontCounterClockwise;
     seed_with_degenerate_triangle(*mesh);
     particle_mesh_id = add_mesh(std::move(mesh));
     add_mesh_instance(particle_mesh_id, particle_node_id);
@@ -1258,7 +1259,8 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = fmt::format("sprite:{}", ent->model->name);
     mesh->material_id = mid;
-    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::HasVariableTopology |
+                  merian::MeshFlags::FrontCounterClockwise;
     seed_with_degenerate_triangle(*mesh);
 
     const merian::MeshID mesh_id = add_mesh(std::move(mesh));
