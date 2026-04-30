@@ -697,11 +697,12 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
 
                 const merian::float3 pos = merian::as_float3(r_refdef.vieworg);
                 const merian::float3 fwd_v(fwd[0], fwd[1], fwd[2]);
+                const merian::float3 up_v(up[0], up[1], up[2]);
                 const float aspect = (resolution.height > 0)
                                          ? (static_cast<float>(resolution.width) /
                                             static_cast<float>(resolution.height))
                                          : (16.F / 9.F);
-                cam->look_at(pos, pos + fwd_v, get_up(), r_refdef.fov_x);
+                cam->look_at(pos, pos + fwd_v, up_v, r_refdef.fov_x);
                 cam->set_aspect_ratio(aspect);
             }
 
