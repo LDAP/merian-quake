@@ -10,9 +10,7 @@
 #include "merian/utils/input_controller_dummy.hpp"
 #include "merian/utils/input_listener.hpp"
 #include "merian/utils/properties.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include <atomic>
@@ -177,9 +175,7 @@ class QuakeScene : public merian::Scene {
     // Per-model info built at worldspawn; stable across frames.
     struct AliasModelInfo {
         aliashdr_t* hdr;
-        merian::BufferHandle index_buffer;     // device-local, uploaded once
-        merian::BufferHandle pose_data_buffer; // trivertx_t[] for all poses
-        merian::BufferHandle mesh_desc_buffer; // {float s, float t, uint vertindex}[] per vbo vert
+        merian::BufferHandle index_buffer; // device-local, uploaded once
         uint32_t vertex_count;
         uint32_t primitive_count;
     };
@@ -236,11 +232,7 @@ class QuakeScene : public merian::Scene {
     EntityMeshSlot& ensure_alias_slot(entity_t* ent);
     EntityMeshSlot& ensure_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
     EntityMeshSlot& ensure_sprite_slot(entity_t* ent);
-    void fill_alias_pose(const merian::CommandBufferHandle& cmd,
-                         EntityMeshSlot& slot,
-                         entity_t* ent,
-                         const AliasModelInfo& info);
-    void ensure_alias_animate_pipeline();
+    void fill_alias_pose(EntityMeshSlot& slot, entity_t* ent);
 
     // Particle batch: single mesh, palette-encoded color.
     bool particle_mesh_built = false;
@@ -277,12 +269,6 @@ class QuakeScene : public merian::Scene {
     merian::float3 mu_s_div_mu_t{1};
     int playermodel = 1;
     bool reproducible_renders = false;
-
-    // GPU alias animation pipeline.
-    merian::DescriptorSetLayoutHandle alias_animate_descriptor_layout;
-    merian::PipelineHandle alias_animate_pipeline;
-    merian::PipelineLayoutHandle alias_animate_pipeline_layout;
-    merian::BufferHandle normal_table_buffer;
 
     // HACK texture ids stored once at load.
     uint32_t texnum_blood = 0;

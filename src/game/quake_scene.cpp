@@ -1,21 +1,15 @@
 #include "game/quake_scene.hpp"
 
 #include "../../res/shader/config.h"
-#include "alias_animate.slang.spv.h"
 #include "game/quake_extraction.hpp"
 #include "game/quake_material.hpp"
 #include "game/quake_meshes.hpp"
-#include "merian/shader/entry_point.hpp"
 #include "merian/utils/audio/audio_device_provider.hpp"
 #include "merian/utils/camera/camera.hpp"
 #include "merian/utils/colors.hpp"
 #include "merian/utils/normal_encoding.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/string.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "merian/vk/pipeline/pipeline_compute.hpp"
-#include "merian/vk/pipeline/pipeline_layout_builder.hpp"
-#include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -32,8 +26,6 @@ extern "C" {
 
 extern cvar_t cl_maxpitch;
 extern cvar_t cl_minpitch;
-extern cvar_t scr_fov;
-extern cvar_t cl_gun_fovscale;
 extern qboolean scr_drawloading;
 }
 
@@ -52,26 +44,6 @@ struct QuakeData {
     float timediff = 0;
 };
 QuakeData g_quake_data;
-
-struct GpuAliasMeshDesc {
-    float s;
-    float t;
-    uint32_t vertindex;
-};
-
-struct AliasAnimatePushConstant {
-    merian::float3 scale;
-    uint32_t pose1_offset;
-    merian::float3 scale_origin;
-    uint32_t pose2_offset;
-    float blend;
-    float prev_blend;
-    float inv_skin_w;
-    float inv_skin_h;
-    uint32_t vertex_count;
-};
-
-constexpr uint32_t ALIAS_ANIMATE_LOCAL_SIZE_X = 64;
 
 void init_quakespasm(const uint32_t quakespasm_argc, const char** quakespasm_argv) {
     std::vector<const char*> quakespasm_args = {"quakespasm"};
@@ -1023,29 +995,7 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
             merian::BufferHandle ib =
                 alloc->create_buffer(cmd, tris, buf_usage, fmt::format("alias_ib:{}", mod->name));
 
-            trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
-            const uint32_t pose_data_count =
-                static_cast<uint32_t>(hdr->numposes) * static_cast<uint32_t>(hdr->numverts);
-            merian::BufferHandle pose_buf = alloc->create_buffer(
-                cmd, pose_data_count * sizeof(trivertx_t),
-                vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                trivertexes, merian::MemoryMappingType::NONE,
-                fmt::format("alias_pose:{}", mod->name));
-
-            aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
-            std::vector<GpuAliasMeshDesc> gpu_descs(vert_count);
-            for (uint32_t v = 0; v < vert_count; v++) {
-                gpu_descs[v] = {desc[v].st[0], desc[v].st[1],
-                                static_cast<uint32_t>(desc[v].vertindex)};
-            }
-            merian::BufferHandle desc_buf = alloc->create_buffer(
-                cmd, gpu_descs,
-                vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                fmt::format("alias_desc:{}", mod->name));
-
-            alias_model_info[mod] =
-                AliasModelInfo{hdr,        std::move(ib), std::move(pose_buf), std::move(desc_buf),
-                               vert_count, prim_count};
+            alias_model_info[mod] = AliasModelInfo{hdr, std::move(ib), vert_count, prim_count};
 
             for (int s = 0; s < hdr->numskins; s++) {
                 const QuakeMaterial mat = make_alias_material(hdr, s);
@@ -1065,16 +1015,6 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
                     ms->add_material(quake_material_type_id, mat);
             }
         }
-    }
-
-    if (!normal_table_buffer && !alias_model_info.empty()) {
-        std::vector<merian::float3> normals(NUMVERTEXNORMALS);
-        for (int i = 0; i < NUMVERTEXNORMALS; i++)
-            normals[i] = merian::as_float3(r_avertexnormals[i]);
-        normal_table_buffer = alloc->create_buffer(cmd, normals,
-                                                   vk::BufferUsageFlagBits::eStorageBuffer |
-                                                       vk::BufferUsageFlagBits::eTransferDst,
-                                                   "alias_normals");
     }
 }
 
@@ -1127,13 +1067,14 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     const vk::DeviceSize vb_size = info.vertex_count * sizeof(merian::PackedVertexData);
     const vk::DeviceSize prev_vb_size = info.vertex_count * sizeof(merian::PackedPrevVertexData);
-    const auto device_usage = vk::BufferUsageFlagBits::eStorageBuffer |
-                              vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
-                              vk::BufferUsageFlagBits::eShaderDeviceAddress;
+    const auto staging_usage =
+        vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer;
 
-    auto vb = alloc->create_buffer(vb_size, device_usage, merian::MemoryMappingType::NONE,
+    auto vb = alloc->create_buffer(vb_size, staging_usage,
+                                   merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
                                    fmt::format("alias_vb:{}", ent->model->name));
-    auto prev_vb = alloc->create_buffer(prev_vb_size, device_usage, merian::MemoryMappingType::NONE,
+    auto prev_vb = alloc->create_buffer(prev_vb_size, staging_usage,
+                                        merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
                                         fmt::format("alias_prev_vb:{}", ent->model->name));
 
     const int skin = std::clamp(ent->skinnum, 0, info.hdr->numskins - 1);
@@ -1151,8 +1092,8 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     mesh->name = fmt::format("alias:{}", ent->model->name);
     mesh->material_id = mid;
     mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
-    mesh->vb_device = std::move(vb);
-    mesh->prev_vb_device = std::move(prev_vb);
+    mesh->vb_staging = std::move(vb);
+    mesh->prev_vb_staging = std::move(prev_vb);
     mesh->ib_shared = info.index_buffer;
     mesh->vertex_count = info.vertex_count;
     mesh->primitive_count = info.primitive_count;
@@ -1331,105 +1272,23 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     return slot;
 }
 
-void QuakeScene::ensure_alias_animate_pipeline() {
-    if (alias_animate_pipeline)
+void QuakeScene::fill_alias_pose(QuakeScene::EntityMeshSlot& slot, entity_t* ent) {
+    if (slot.mesh_ids.empty())
         return;
 
-    const auto& context = get_context();
+    const auto& meshes = get_meshes();
+    auto& mesh = static_cast<AliasInstanceMesh&>(*meshes[slot.mesh_ids[0]]);
 
-    alias_animate_descriptor_layout =
-        merian::DescriptorSetLayoutBuilder()
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
-            .add_binding_storage_buffer(1, vk::ShaderStageFlagBits::eCompute)
-            .build_push_descriptor_layout(context);
+    auto* vb = mesh.vb_staging->get_memory()->map_as<merian::PackedVertexData>();
+    auto* prev_vb = mesh.prev_vb_staging->get_memory()->map_as<merian::PackedPrevVertexData>();
 
-    auto entry = merian::EntryPoint::create(context, merian_quake_alias_animate_slang_spv(),
-                                            merian_quake_alias_animate_slang_spv_size(), "main",
-                                            vk::ShaderStageFlagBits::eCompute);
+    merian::float4x4 lerped_transform;
+    compute_alias_lerped(ent, vb, prev_vb, &lerped_transform);
 
-    alias_animate_pipeline_layout =
-        merian::PipelineLayoutBuilder(context)
-            .add_descriptor_set_layout(alias_animate_descriptor_layout)
-            .add_push_constant<AliasAnimatePushConstant>(vk::ShaderStageFlagBits::eCompute)
-            .build_pipeline_layout();
+    mesh.vb_staging->get_memory()->unmap();
+    mesh.prev_vb_staging->get_memory()->unmap();
 
-    auto spec_builder = merian::SpecializationInfoBuilder();
-    spec_builder.add_entry(ALIAS_ANIMATE_LOCAL_SIZE_X);
-    const auto spec = spec_builder.build();
-
-    alias_animate_pipeline =
-        merian::ComputePipeline::create(alias_animate_pipeline_layout, entry, spec);
-}
-
-void QuakeScene::fill_alias_pose(const merian::CommandBufferHandle& cmd,
-                                 QuakeScene::EntityMeshSlot& slot,
-                                 entity_t* ent,
-                                 const AliasModelInfo& info) {
-    aliashdr_t* hdr = info.hdr;
-
-    const int f = ent->frame;
-    if (f < 0 || f >= hdr->numposes)
-        return;
-
-    merian::float3 fovscale(1.f);
-    if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value != 0.f) {
-        const float t = std::tan(scr_fov.value * static_cast<float>(0.5 * M_PI / 180.0));
-        fovscale.y = t;
-        fovscale.z = t;
-    }
-
-    const float prev_blend = ent->mv_prev_blend;
-
-    lerpdata_t lerpdata;
-    {
-        static std::mutex quake_mutex;
-        std::lock_guard<std::mutex> lock(quake_mutex);
-        R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
-        R_SetupEntityTransform(ent, &lerpdata);
-    }
-
-    ent->mv_prev_blend = lerpdata.blend;
-    VectorCopy(lerpdata.angles, ent->mv_prev_angles);
-    VectorCopy(lerpdata.origin, ent->mv_prev_origin);
-
-    lerpdata.angles[0] *= -1;
-    merian::float4x4 transform = merian::identity();
-    AngleVectors(lerpdata.angles, &transform[0].x, &transform[1].x, &transform[2].x);
-    transform[1] *= -1;
-    transform[3] = merian::float4(merian::as_float3(lerpdata.origin), 1.f);
-    update_node(slot.node_id, merian::transpose(transform));
-
-    auto& mesh = static_cast<AliasInstanceMesh&>(*get_meshes()[slot.mesh_ids[0]]);
-
-    AliasAnimatePushConstant pc{};
-    pc.scale = merian::as_float3(hdr->scale) * fovscale;
-    pc.pose1_offset = static_cast<uint32_t>(hdr->numverts * lerpdata.pose1);
-    pc.scale_origin = merian::as_float3(hdr->scale_origin) * fovscale;
-    pc.pose2_offset = static_cast<uint32_t>(hdr->numverts * lerpdata.pose2);
-    pc.blend = lerpdata.blend;
-    pc.prev_blend = prev_blend;
-    pc.inv_skin_w = 1.f / static_cast<float>(hdr->skinwidth);
-    pc.inv_skin_h = 1.f / static_cast<float>(hdr->skinheight);
-    pc.vertex_count = info.vertex_count;
-
-    cmd->push_constant(alias_animate_pipeline, pc);
-
-    const auto set_layout = alias_animate_pipeline->get_layout()->get_descriptor_set_layout(0);
-    const auto vb_info = mesh.vb_device->get_descriptor_info();
-    const auto prev_vb_info = mesh.prev_vb_device->get_descriptor_info();
-    const std::array<vk::WriteDescriptorSet, 2> writes = {
-        vk::WriteDescriptorSet{{}, 3, 0, 1, set_layout->get_type_for_binding(3), nullptr, &vb_info},
-        vk::WriteDescriptorSet{
-            {}, 4, 0, 1, set_layout->get_type_for_binding(4), nullptr, &prev_vb_info},
-    };
-    cmd->push_descriptor_set(alias_animate_pipeline, 0, writes);
-
-    const uint32_t groups =
-        (info.vertex_count + ALIAS_ANIMATE_LOCAL_SIZE_X - 1) / ALIAS_ANIMATE_LOCAL_SIZE_X;
-    cmd->dispatch(groups, 1, 1);
+    update_node(slot.node_id, lerped_transform);
 
     get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
 }
@@ -1450,14 +1309,6 @@ void QuakeScene::retire_stale_entity_slots() {
 }
 
 void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
-    ensure_alias_animate_pipeline();
-
-    struct AliasWork {
-        entity_t* ent;
-        EntityMeshSlot* slot;
-    };
-    std::unordered_map<qmodel_t*, std::vector<AliasWork>> alias_by_model;
-
     auto process_entity = [&](entity_t* ent) {
         if (ent == nullptr || ent->model == nullptr)
             return;
@@ -1466,7 +1317,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         case mod_alias: {
             auto& slot = ensure_alias_slot(ent);
             if (!slot.mesh_ids.empty()) {
-                alias_by_model[ent->model].push_back({ent, &slot});
+                fill_alias_pose(slot, ent);
                 slot.last_seen_frame = frame;
             }
             break;
@@ -1511,54 +1362,22 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         }
     };
 
-    {
-        MERIAN_PROFILE_SCOPE("process entities");
-        if (playermodel == 1) {
-            process_entity(&cl.viewent);
-        } else if (playermodel == 2) {
-            process_entity(&cl.viewent);
-            if (cl.viewentity > 0 && cl.viewentity < cl_max_edicts && (cl_entities != nullptr))
-                process_entity(&cl_entities[cl.viewentity]);
-        }
-
-        for (int i = 0; i < cl_numvisedicts; i++)
-            process_entity(cl_visedicts[i]);
-
-        for (int i = 0; i < cl.num_statics; i++)
-            process_entity(&cl_static_entities[i]);
+    if (playermodel == 1) {
+        process_entity(&cl.viewent);
+    } else if (playermodel == 2) {
+        process_entity(&cl.viewent);
+        if (cl.viewentity > 0 && cl.viewentity < cl_max_edicts && (cl_entities != nullptr))
+            process_entity(&cl_entities[cl.viewentity]);
     }
 
+    for (int i = 0; i < cl_numvisedicts; i++)
+        process_entity(cl_visedicts[i]);
+
+    for (int i = 0; i < cl.num_statics; i++)
+        process_entity(&cl_static_entities[i]);
+
+    // Particle batch.
     {
-        MERIAN_PROFILE_SCOPE("alias dispatches");
-        cmd->bind(alias_animate_pipeline);
-        for (auto& [model, work_items] : alias_by_model) {
-            const auto info_it = alias_model_info.find(model);
-            if (info_it == alias_model_info.end())
-                continue;
-            const AliasModelInfo& info = info_it->second;
-
-            const auto set_layout =
-                alias_animate_pipeline->get_layout()->get_descriptor_set_layout(0);
-            const auto pose_info = info.pose_data_buffer->get_descriptor_info();
-            const auto desc_info = info.mesh_desc_buffer->get_descriptor_info();
-            const auto norm_info = normal_table_buffer->get_descriptor_info();
-            const std::array<vk::WriteDescriptorSet, 3> model_writes = {
-                vk::WriteDescriptorSet{
-                    {}, 0, 0, 1, set_layout->get_type_for_binding(0), nullptr, &pose_info},
-                vk::WriteDescriptorSet{
-                    {}, 1, 0, 1, set_layout->get_type_for_binding(1), nullptr, &desc_info},
-                vk::WriteDescriptorSet{
-                    {}, 2, 0, 1, set_layout->get_type_for_binding(2), nullptr, &norm_info},
-            };
-            cmd->push_descriptor_set(alias_animate_pipeline, 0, model_writes);
-
-            for (auto& [ent, slot] : work_items)
-                fill_alias_pose(cmd, *slot, ent, info);
-        }
-    }
-
-    {
-        MERIAN_PROFILE_SCOPE("particle batch");
         auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_meshes()[particle_mesh_id]);
         mesh.vertices.clear();
         mesh.prev_vertices.clear();

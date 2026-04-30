@@ -58,11 +58,12 @@ class QuakeHostDynamicMesh : public merian::Mesh {
     }
 };
 
-// One per visible alias entity. Device-local buffers filled by GPU compute shader.
+// One per visible alias entity. Host-visible staging buffers filled with lerped
+// model-space vertices each frame; Scene copies them to device-local.
 class AliasInstanceMesh : public merian::Mesh {
   public:
-    merian::BufferHandle vb_device;
-    merian::BufferHandle prev_vb_device;
+    merian::BufferHandle vb_staging;
+    merian::BufferHandle prev_vb_staging;
     merian::BufferHandle ib_shared; // borrowed from AliasModelInfo
     uint32_t vertex_count = 0;
     uint32_t primitive_count = 0;
@@ -75,12 +76,12 @@ class AliasInstanceMesh : public merian::Mesh {
     }
 
     MeshVertexData get_vertices() const override {
-        return DeviceLocal{vb_device};
+        return DeviceStaged{vb_staging};
     }
     MeshPrevVertexData get_prev_vertices() const override {
-        if (!prev_vb_device)
+        if (!prev_vb_staging)
             return std::monostate{};
-        return DeviceLocal{prev_vb_device};
+        return DeviceStaged{prev_vb_staging};
     }
     MeshIndexData get_indices() const override {
         return DeviceLocal{ib_shared};
