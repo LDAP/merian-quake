@@ -1072,8 +1072,9 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     const vk::DeviceSize vb_size = info.vertex_count * sizeof(merian::PackedVertexData);
     const vk::DeviceSize prev_vb_size = info.vertex_count * sizeof(merian::PackedPrevVertexData);
-    const auto staging_usage =
-        vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eStorageBuffer;
+    const auto staging_usage = vk::BufferUsageFlagBits::eTransferSrc |
+                               vk::BufferUsageFlagBits::eStorageBuffer |
+                               vk::BufferUsageFlagBits::eShaderDeviceAddress;
 
     auto vb = alloc->create_buffer(vb_size, staging_usage,
                                    merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,

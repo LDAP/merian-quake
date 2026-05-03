@@ -16,7 +16,8 @@ QuakeNode::~QuakeNode() {
 
 merian::DeviceSupportInfo
 QuakeNode::query_device_support(const merian::DeviceSupportQueryInfo& query_info) {
-    return merian::DeviceSupportInfo::check(query_info, {"rayQuery", "accelerationStructure"});
+    return merian::DeviceSupportInfo::check(
+        query_info, {"rayQuery", "accelerationStructure", "shaderInt64", "bufferDeviceAddress"});
 }
 
 void QuakeNode::initialize(const merian::ContextHandle& context,
