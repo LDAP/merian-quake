@@ -174,10 +174,10 @@ class QuakeScene : public merian::Scene {
 
     // Per-model info built at worldspawn; stable across frames.
     struct AliasModelInfo {
-        aliashdr_t* hdr;
         merian::BufferHandle index_buffer; // device-local, uploaded once
         uint32_t vertex_count;
         uint32_t primitive_count;
+        int numskins;
     };
     std::unordered_map<qmodel_t*, AliasModelInfo> alias_model_info;
 
@@ -225,9 +225,9 @@ class QuakeScene : public merian::Scene {
         std::vector<merian::MeshID> mesh_ids;
         qmodel_t* model = nullptr;
         int kind = 0; // 0=alias, 1=brush, 2=sprite
-        uint64_t last_seen_frame = 0;
 
         // Alias change detection: cached state that was last written.
+        int cached_skinnum = -1;
         int cached_pose1 = -1;
         int cached_pose2 = -1;
         float cached_blend = -1.f;

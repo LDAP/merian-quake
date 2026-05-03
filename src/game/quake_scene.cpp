@@ -736,6 +736,8 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
 
 namespace {
 
+static std::mutex quake_cache_mutex;
+
 // Map SURF_DRAW* bits (set by Quake's BSP loader from the texture name into
 // surf->flags at gl_model.c:1351-1395) to QuakeSurfaceFlags values. No
 // texture-name parsing — we trust Quake's already-parsed bits.
@@ -999,7 +1001,8 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
             merian::BufferHandle ib =
                 alloc->create_buffer(cmd, tris, buf_usage, fmt::format("alias_ib:{}", mod->name));
 
-            alias_model_info[mod] = AliasModelInfo{hdr, std::move(ib), vert_count, prim_count};
+            alias_model_info[mod] =
+                AliasModelInfo{std::move(ib), vert_count, prim_count, hdr->numskins};
 
             for (int s = 0; s < hdr->numskins; s++) {
                 const QuakeMaterial mat = make_alias_material(hdr, s);
@@ -1064,7 +1067,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     }
 
     auto info_it = alias_model_info.find(ent->model);
-    if (info_it == alias_model_info.end() || info_it->second.hdr->numskins <= 0)
+    if (info_it == alias_model_info.end() || info_it->second.numskins <= 0)
         return entity_slots[ent]; // empty slot; caller will skip
 
     const AliasModelInfo& info = info_it->second;
@@ -1083,15 +1086,18 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
                                         merian::MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE,
                                         fmt::format("alias_prev_vb:{}", ent->model->name));
 
-    const int skin = std::clamp(ent->skinnum, 0, info.hdr->numskins - 1);
+    const int skin = std::clamp(ent->skinnum, 0, info.numskins - 1);
     auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
     merian::MaterialID mid =
         (mat_it != material_id_for_alias_skin.end()) ? mat_it->second : merian::MaterialID{};
 
-    // Initial transform includes model scale — process_alias_model overwrites immediately.
-    const merian::float4x4 scale_col =
-        merian::mul(merian::translation(merian::as_float3(info.hdr->scale_origin)),
-                    merian::scale(merian::as_float3(info.hdr->scale)));
+    merian::float4x4 scale_col;
+    {
+        std::lock_guard<std::mutex> lock(quake_cache_mutex);
+        const auto* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
+        scale_col = merian::mul(merian::translation(merian::as_float3(hdr->scale_origin)),
+                                merian::scale(merian::as_float3(hdr->scale)));
+    }
 
     merian::SceneNode node;
     node.name = fmt::format("alias:{}", ent->model->name);
@@ -1120,6 +1126,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     slot.mesh_ids = {mesh_id};
     slot.model = ent->model;
     slot.kind = 0;
+    slot.cached_skinnum = ent->skinnum;
     return slot;
 }
 
@@ -1293,11 +1300,17 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
 
     auto& mesh = static_cast<AliasInstanceMesh&>(*get_meshes()[slot.mesh_ids[0]]);
 
-    // Mod_Extradata can evict other cache entries — hold the mutex for all hdr access.
-    static std::mutex quake_mutex;
-    std::lock_guard<std::mutex> lock(quake_mutex);
+    std::lock_guard<std::mutex> lock(quake_cache_mutex);
 
     auto* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
+
+    if (ent->skinnum != slot.cached_skinnum && hdr->numskins > 0) {
+        const int skin = std::clamp(ent->skinnum, 0, hdr->numskins - 1);
+        auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
+        if (mat_it != material_id_for_alias_skin.end())
+            mesh.material_id = mat_it->second;
+        slot.cached_skinnum = ent->skinnum;
+    }
 
     lerpdata_t lerpdata;
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
@@ -1361,9 +1374,8 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
 }
 
 void QuakeScene::retire_stale_entity_slots() {
-    constexpr uint64_t STALE_THRESHOLD = 8;
     for (auto it = entity_slots.begin(); it != entity_slots.end();) {
-        if (frame - it->second.last_seen_frame > STALE_THRESHOLD) {
+        if (it->first->model == nullptr) {
             for (const merian::MeshID id : it->second.mesh_ids)
                 remove_mesh(id);
             if (it->second.node_id != merian::NODE_ID_INVALID)
@@ -1385,7 +1397,6 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
             auto& slot = ensure_alias_slot(ent);
             if (!slot.mesh_ids.empty()) {
                 process_alias_model(slot, ent);
-                slot.last_seen_frame = frame;
             }
             break;
         }
@@ -1393,7 +1404,6 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
             auto& slot = ensure_brush_slot(ent, cmd);
             if (!slot.mesh_ids.empty()) {
                 update_node(slot.node_id, entity_transform(ent));
-                slot.last_seen_frame = frame;
             }
             break;
         }
@@ -1420,7 +1430,6 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
 
                 get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
                 get_meshes()[slot.mesh_ids[0]]->indices_dirty = true;
-                slot.last_seen_frame = this->frame;
             }
             break;
         }
