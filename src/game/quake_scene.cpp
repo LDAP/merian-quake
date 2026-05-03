@@ -648,6 +648,9 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
             particle_mesh_built = true;
         }
 
+        if (!render_next)
+            return;
+
         if (world_meshes_built && (cl.worldmodel != nullptr)) {
             MERIAN_PROFILE_SCOPE_GPU(cmd, "refresh_entities");
             refresh_entities(cmd);
@@ -809,8 +812,19 @@ void QuakeScene::teardown_world() {
     material_id_for_alias_skin.clear();
     material_id_for_sprite_frame.clear();
     animated_brush_materials.clear();
+
+    for (auto& [_, info] : alias_model_info)
+        defer_buffer_release(std::move(info.index_buffer));
     alias_model_info.clear();
+
+    for (auto& [_, parts] : brush_submodel_geo) {
+        for (auto& part : parts) {
+            defer_buffer_release(std::move(part.vb));
+            defer_buffer_release(std::move(part.ib));
+        }
+    }
     brush_submodel_geo.clear();
+
     get_material_system()->clear();
 
     world_meshes_built = false;
