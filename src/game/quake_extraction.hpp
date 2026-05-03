@@ -55,20 +55,18 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
                           bool no_random,
                           double prev_cl_time);
 
-// Per-instance alias-pose lerp for the BYO-buffer path. Writes
-// `hdr->numverts_vbo` PackedVertexData / PackedPrevVertexData entries into
-// `vertices_dst` / `prev_dst` in **model space** (the SceneNode applies the
-// entity transform via the BLAS instance). `vertices_dst` / `prev_dst` must
-// hold at least hdr->numverts_vbo entries each. Updates the entity's
-// mv_prev_* bookkeeping so the next frame produces correct motion vectors.
-struct AliasIndices {
-    const int16_t* indexes;
-    uint32_t primitive_count;
-    uint32_t vertex_count;
-};
-AliasIndices compute_alias_lerped(entity_t* ent,
-                                  merian::PackedVertexData* vertices_dst,
-                                  merian::PackedPrevVertexData* prev_dst,
-                                  merian::float4x4* out_transform = nullptr);
+// Lerp alias vertices in raw (unscaled) object space — positions are direct
+// byte-coord lerps, normals are normalized lerps of the Quake normal table.
+// The caller puts scale/scale_origin into the SceneNode transform.
+// `vertices_dst` / `prev_dst` must hold at least hdr->numverts_vbo entries.
+void lerp_alias_vertices(aliashdr_t* hdr,
+                         int pose1,
+                         int pose2,
+                         float blend,
+                         int prev_pose1,
+                         int prev_pose2,
+                         float prev_blend,
+                         merian::PackedVertexData* vertices_dst,
+                         merian::PackedPrevVertexData* prev_dst);
 
 } // namespace merian_quake

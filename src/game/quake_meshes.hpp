@@ -59,7 +59,7 @@ class QuakeHostDynamicMesh : public merian::Mesh {
 };
 
 // One per visible alias entity. Host-visible staging buffers filled with lerped
-// model-space vertices each frame; Scene copies them to device-local.
+// object-space vertices; Scene copies them to device-local. Persistently mapped.
 class AliasInstanceMesh : public merian::Mesh {
   public:
     merian::BufferHandle vb_staging;
@@ -67,6 +67,16 @@ class AliasInstanceMesh : public merian::Mesh {
     merian::BufferHandle ib_shared; // borrowed from AliasModelInfo
     uint32_t vertex_count = 0;
     uint32_t primitive_count = 0;
+
+    merian::PackedVertexData* vb_mapped = nullptr;
+    merian::PackedPrevVertexData* prev_vb_mapped = nullptr;
+
+    ~AliasInstanceMesh() override {
+        if (vb_staging)
+            vb_staging->get_memory()->unmap();
+        if (prev_vb_staging)
+            prev_vb_staging->get_memory()->unmap();
+    }
 
     uint32_t get_vertex_count() const override {
         return vertex_count;

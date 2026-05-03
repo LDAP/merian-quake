@@ -434,96 +434,43 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
     }
 }
 
-AliasIndices compute_alias_lerped(entity_t* ent,
-                                  merian::PackedVertexData* vertices_dst,
-                                  merian::PackedPrevVertexData* prev_dst,
-                                  merian::float4x4* out_transform) {
-    qmodel_t* m = ent->model;
-    assert(m && m->type == mod_alias);
-
-    static std::mutex quake_mutex;
-    std::lock_guard<std::mutex> lock(quake_mutex);
-
-    aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(m);
-    aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
-    int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
-    trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
-
-    int f = ent->frame;
-    if (f < 0 || f >= hdr->numposes)
-        return {indexes, 0, 0};
-
-    // FOV scaling for the player gun.
-    merian::float3 fovscale(1.f);
-    if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value != 0.f) {
-        const float t = std::tan(scr_fov.value * static_cast<float>(0.5 * M_PI / 180.0));
-        fovscale.y = t;
-        fovscale.z = t;
-    }
-
-    const merian::float4x4 scale = merian::transpose(
-        merian::mul(merian::translation(merian::as_float3(hdr->scale_origin) * fovscale),
-                    merian::scale(merian::as_float3(hdr->scale) * fovscale)));
-
-    const merian::float3x3 scale_inv_t =
-        merian::float3x3(merian::transpose(merian::inverse(scale)));
-
-    const float prev_blend = ent->mv_prev_blend;
-
-    lerpdata_t lerpdata;
-    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
-    R_SetupEntityTransform(ent, &lerpdata);
+void lerp_alias_vertices(aliashdr_t* hdr,
+                         const int pose1,
+                         const int pose2,
+                         const float blend,
+                         const int prev_pose1,
+                         const int prev_pose2,
+                         const float prev_blend,
+                         merian::PackedVertexData* vertices_dst,
+                         merian::PackedPrevVertexData* prev_dst) {
+    const auto* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
+    const auto* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
 
     const float skin_w = static_cast<float>(hdr->skinwidth);
     const float skin_h = static_cast<float>(hdr->skinheight);
 
     for (int v = 0; v < hdr->numverts_vbo; v++) {
-        const int i_pose1 = (hdr->numverts * lerpdata.pose1) + desc[v].vertindex;
-        const int i_pose2 = (hdr->numverts * lerpdata.pose2) + desc[v].vertindex;
+        const int vi = desc[v].vertindex;
 
-        merian::float3 p1{static_cast<float>(trivertexes[i_pose1].v[0]),
-                          static_cast<float>(trivertexes[i_pose1].v[1]),
-                          static_cast<float>(trivertexes[i_pose1].v[2])};
-        merian::float3 p2{static_cast<float>(trivertexes[i_pose2].v[0]),
-                          static_cast<float>(trivertexes[i_pose2].v[1]),
-                          static_cast<float>(trivertexes[i_pose2].v[2])};
+        const auto& tv1 = trivertexes[hdr->numverts * pose1 + vi];
+        const auto& tv2 = trivertexes[hdr->numverts * pose2 + vi];
+        const merian::float3 p1{float(tv1.v[0]), float(tv1.v[1]), float(tv1.v[2])};
+        const merian::float3 p2{float(tv2.v[0]), float(tv2.v[1]), float(tv2.v[2])};
 
-        const merian::float3 model_pos =
-            merian::mul(merian::float4(merian::lerp(p1, p2, lerpdata.blend), 1.f), scale).xyz();
-        const merian::float3 prev_model_pos =
-            merian::mul(merian::float4(merian::lerp(p1, p2, prev_blend), 1.f), scale).xyz();
-
-        const merian::float3 n1 =
-            merian::as_float3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
-        const merian::float3 n2 =
-            merian::as_float3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
-        const merian::float3 model_n =
-            merian::normalize(merian::mul(merian::lerp(n1, n2, lerpdata.blend), scale_inv_t));
-
-        vertices_dst[v].position = model_pos;
-        vertices_dst[v].encoded_normal = merian::encode_normal(model_n);
+        vertices_dst[v].position = merian::lerp(p1, p2, blend);
+        vertices_dst[v].encoded_normal = merian::encode_normal(merian::normalize(
+            merian::lerp(merian::as_float3(r_avertexnormals[tv1.lightnormalindex]),
+                         merian::as_float3(r_avertexnormals[tv2.lightnormalindex]), blend)));
         vertices_dst[v].uv =
             merian::half2((desc[v].st[0] + 0.5f) / skin_w, (desc[v].st[1] + 0.5f) / skin_h);
         vertices_dst[v].encoded_tangent = 0;
 
-        prev_dst[v].position = prev_model_pos;
+        const auto& ptv1 = trivertexes[hdr->numverts * prev_pose1 + vi];
+        const auto& ptv2 = trivertexes[hdr->numverts * prev_pose2 + vi];
+        const merian::float3 pp1{float(ptv1.v[0]), float(ptv1.v[1]), float(ptv1.v[2])};
+        const merian::float3 pp2{float(ptv2.v[0]), float(ptv2.v[1]), float(ptv2.v[2])};
+        prev_dst[v].position = merian::lerp(pp1, pp2, prev_blend);
     }
-
-    ent->mv_prev_blend = lerpdata.blend;
-    VectorCopy(lerpdata.angles, ent->mv_prev_angles);
-    VectorCopy(lerpdata.origin, ent->mv_prev_origin);
-
-    if (out_transform) {
-        lerpdata.angles[0] *= -1;
-        merian::float4x4 m = merian::identity();
-        AngleVectors(lerpdata.angles, &m[0].x, &m[1].x, &m[2].x);
-        m[1] *= -1;
-        m[3] = merian::float4(merian::as_float3(lerpdata.origin), 1.f);
-        *out_transform = merian::transpose(m);
-    }
-
-    return {indexes, static_cast<uint32_t>(hdr->numindexes / 3),
-            static_cast<uint32_t>(hdr->numverts_vbo)};
 }
 
 } // namespace merian_quake

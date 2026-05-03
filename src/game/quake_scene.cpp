@@ -14,8 +14,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <map>
+#include <mutex>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -26,6 +28,8 @@ extern "C" {
 
 extern cvar_t cl_maxpitch;
 extern cvar_t cl_minpitch;
+extern cvar_t scr_fov;
+extern cvar_t cl_gun_fovscale;
 extern qboolean scr_drawloading;
 }
 
@@ -1083,10 +1087,15 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     merian::MaterialID mid =
         (mat_it != material_id_for_alias_skin.end()) ? mat_it->second : merian::MaterialID{};
 
+    // Initial transform includes model scale — process_alias_model overwrites immediately.
+    const merian::float4x4 scale_col =
+        merian::mul(merian::translation(merian::as_float3(info.hdr->scale_origin)),
+                    merian::scale(merian::as_float3(info.hdr->scale)));
+
     merian::SceneNode node;
     node.name = fmt::format("alias:{}", ent->model->name);
     node.is_animated = true;
-    node.local_transform = entity_transform(ent);
+    node.local_transform = merian::mul(entity_transform(ent), scale_col);
     const merian::NodeID nid = add_node(std::move(node));
 
     auto mesh = std::make_unique<AliasInstanceMesh>();
@@ -1095,6 +1104,9 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     mesh->vb_staging = std::move(vb);
     mesh->prev_vb_staging = std::move(prev_vb);
+    mesh->vb_mapped = mesh->vb_staging->get_memory()->map_as<merian::PackedVertexData>();
+    mesh->prev_vb_mapped =
+        mesh->prev_vb_staging->get_memory()->map_as<merian::PackedPrevVertexData>();
     mesh->ib_shared = info.index_buffer;
     mesh->vertex_count = info.vertex_count;
     mesh->primitive_count = info.primitive_count;
@@ -1274,25 +1286,77 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     return slot;
 }
 
-void QuakeScene::fill_alias_pose(QuakeScene::EntityMeshSlot& slot, entity_t* ent) {
+void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t* ent) {
     if (slot.mesh_ids.empty())
         return;
 
-    const auto& meshes = get_meshes();
-    auto& mesh = static_cast<AliasInstanceMesh&>(*meshes[slot.mesh_ids[0]]);
+    auto& mesh = static_cast<AliasInstanceMesh&>(*get_meshes()[slot.mesh_ids[0]]);
 
-    auto* vb = mesh.vb_staging->get_memory()->map_as<merian::PackedVertexData>();
-    auto* prev_vb = mesh.prev_vb_staging->get_memory()->map_as<merian::PackedPrevVertexData>();
+    // Mod_Extradata can evict other cache entries — hold the mutex for all hdr access.
+    static std::mutex quake_mutex;
+    std::lock_guard<std::mutex> lock(quake_mutex);
 
-    merian::float4x4 lerped_transform;
-    compute_alias_lerped(ent, vb, prev_vb, &lerped_transform);
+    auto* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
 
-    mesh.vb_staging->get_memory()->unmap();
-    mesh.prev_vb_staging->get_memory()->unmap();
+    lerpdata_t lerpdata;
+    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
+    R_SetupEntityTransform(ent, &lerpdata);
 
-    update_node(slot.node_id, lerped_transform);
+    // Prev pose = last frame's current (or current itself on the first frame).
+    const int prev_pose1 = (slot.cached_pose1 >= 0) ? slot.cached_pose1 : lerpdata.pose1;
+    const int prev_pose2 = (slot.cached_pose2 >= 0) ? slot.cached_pose2 : lerpdata.pose2;
+    const float prev_blend = (slot.cached_blend >= 0.f) ? slot.cached_blend : lerpdata.blend;
 
-    get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
+    const bool pose_changed =
+        lerpdata.pose1 != slot.cached_pose1 || lerpdata.pose2 != slot.cached_pose2 ||
+        lerpdata.blend != slot.cached_blend || prev_pose1 != slot.cached_prev_pose1 ||
+        prev_pose2 != slot.cached_prev_pose2 || prev_blend != slot.cached_prev_blend;
+
+    if (pose_changed) {
+        lerp_alias_vertices(hdr, lerpdata.pose1, lerpdata.pose2, lerpdata.blend, prev_pose1,
+                            prev_pose2, prev_blend, mesh.vb_mapped, mesh.prev_vb_mapped);
+
+        slot.cached_pose1 = lerpdata.pose1;
+        slot.cached_pose2 = lerpdata.pose2;
+        slot.cached_blend = lerpdata.blend;
+        slot.cached_prev_pose1 = prev_pose1;
+        slot.cached_prev_pose2 = prev_pose2;
+        slot.cached_prev_blend = prev_blend;
+
+        get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
+    }
+
+    // Copy scale from hdr before the lock scope ends.
+    const merian::float3 hdr_scale = merian::as_float3(hdr->scale);
+    const merian::float3 hdr_scale_origin = merian::as_float3(hdr->scale_origin);
+
+    const bool transform_changed = !VectorCompare(lerpdata.origin, slot.cached_origin) ||
+                                   !VectorCompare(lerpdata.angles, slot.cached_angles);
+
+    if (transform_changed) {
+        merian::float3 fovscale(1.f);
+        if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value != 0.f) {
+            const float t = std::tan(scr_fov.value * static_cast<float>(0.5 * M_PI / 180.0));
+            fovscale.y = t;
+            fovscale.z = t;
+        }
+
+        // Scale: raw byte coords → model space (column-vector convention).
+        const merian::float4x4 scale_col = merian::mul(
+            merian::translation(hdr_scale_origin * fovscale), merian::scale(hdr_scale * fovscale));
+
+        // Rotation + translation → column-vector convention.
+        std::array<float, 3> a = {-lerpdata.angles[0], lerpdata.angles[1], lerpdata.angles[2]};
+        merian::float4x4 rt = merian::identity();
+        AngleVectors(a.data(), &rt[0].x, &rt[1].x, &rt[2].x);
+        rt[1] *= -1;
+        rt[3] = merian::float4(merian::as_float3(lerpdata.origin), 1.f);
+
+        update_node(slot.node_id, merian::mul(merian::transpose(rt), scale_col));
+
+        VectorCopy(lerpdata.origin, slot.cached_origin);
+        VectorCopy(lerpdata.angles, slot.cached_angles);
+    }
 }
 
 void QuakeScene::retire_stale_entity_slots() {
@@ -1319,7 +1383,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         case mod_alias: {
             auto& slot = ensure_alias_slot(ent);
             if (!slot.mesh_ids.empty()) {
-                fill_alias_pose(slot, ent);
+                process_alias_model(slot, ent);
                 slot.last_seen_frame = frame;
             }
             break;

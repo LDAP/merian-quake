@@ -226,13 +226,23 @@ class QuakeScene : public merian::Scene {
         qmodel_t* model = nullptr;
         int kind = 0; // 0=alias, 1=brush, 2=sprite
         uint64_t last_seen_frame = 0;
+
+        // Alias change detection: cached state that was last written.
+        int cached_pose1 = -1;
+        int cached_pose2 = -1;
+        float cached_blend = -1.f;
+        int cached_prev_pose1 = -1;
+        int cached_prev_pose2 = -1;
+        float cached_prev_blend = -1.f;
+        vec3_t cached_origin = {};
+        vec3_t cached_angles = {};
     };
     std::unordered_map<entity_t*, EntityMeshSlot> entity_slots;
 
     EntityMeshSlot& ensure_alias_slot(entity_t* ent);
     EntityMeshSlot& ensure_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
     EntityMeshSlot& ensure_sprite_slot(entity_t* ent);
-    void fill_alias_pose(EntityMeshSlot& slot, entity_t* ent);
+    void process_alias_model(EntityMeshSlot& slot, entity_t* ent);
 
     // Particle batch: single mesh, palette-encoded color.
     bool particle_mesh_built = false;
