@@ -228,6 +228,7 @@ class QuakeScene : public merian::Scene {
 
         // Alias change detection: cached state that was last written.
         int cached_skinnum = -1;
+        merian::TextureID cached_skin_texnum{};
         int cached_pose1 = -1;
         int cached_pose2 = -1;
         float cached_blend = -1.f;

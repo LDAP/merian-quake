@@ -939,20 +939,22 @@ merian::float4x4 entity_transform(entity_t* ent) {
     return merian::transpose(m);
 }
 
-QuakeMaterial make_alias_material(aliashdr_t* hdr, int skin) {
+QuakeMaterial make_alias_material(aliashdr_t* hdr, int skin, int fm = 0) {
     if (hdr->numskins <= 0)
         return {};
     skin = std::clamp(skin, 0, hdr->numskins - 1);
+    fm &= 3;
     QuakeMaterial m;
-    if (hdr->gltextures[skin][0] != nullptr)
+    if (hdr->gltextures[skin][fm] != nullptr)
         m.header.alpha_texture_id =
-            static_cast<merian::TextureID>(hdr->gltextures[skin][0]->texnum);
-    if (hdr->fbtextures[skin][0] != nullptr)
-        m.payload.fullbright_tex = static_cast<merian::TextureID>(hdr->fbtextures[skin][0]->texnum);
-    if (hdr->nmtextures[skin][0] != nullptr)
-        m.payload.normal_tex = static_cast<merian::TextureID>(hdr->nmtextures[skin][0]->texnum);
-    if (hdr->gstextures[skin][0] != nullptr)
-        m.payload.gloss_tex = static_cast<merian::TextureID>(hdr->gstextures[skin][0]->texnum);
+            static_cast<merian::TextureID>(hdr->gltextures[skin][fm]->texnum);
+    if (hdr->fbtextures[skin][fm] != nullptr)
+        m.payload.fullbright_tex =
+            static_cast<merian::TextureID>(hdr->fbtextures[skin][fm]->texnum);
+    if (hdr->nmtextures[skin][fm] != nullptr)
+        m.payload.normal_tex = static_cast<merian::TextureID>(hdr->nmtextures[skin][fm]->texnum);
+    if (hdr->gstextures[skin][fm] != nullptr)
+        m.payload.gloss_tex = static_cast<merian::TextureID>(hdr->gstextures[skin][fm]->texnum);
     m.payload.surface_flags = static_cast<uint16_t>(QuakeSurfaceFlags::None);
     m.payload.alpha_mode = 15;
     return m;
@@ -1304,12 +1306,25 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
 
     auto* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
 
-    if (ent->skinnum != slot.cached_skinnum && hdr->numskins > 0) {
+    if (hdr->numskins > 0) {
         const int skin = std::clamp(ent->skinnum, 0, hdr->numskins - 1);
-        auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
-        if (mat_it != material_id_for_alias_skin.end())
-            mesh.material_id = mat_it->second;
-        slot.cached_skinnum = ent->skinnum;
+        const int fm = ((int)(cl.time * 10)) & 3;
+        const auto* skin_tex = hdr->gltextures[skin][fm];
+        const merian::TextureID current_texnum =
+            skin_tex ? static_cast<merian::TextureID>(skin_tex->texnum) : merian::TextureID{};
+
+        if (ent->skinnum != slot.cached_skinnum) {
+            auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
+            if (mat_it != material_id_for_alias_skin.end())
+                mesh.material_id = mat_it->second;
+            slot.cached_skinnum = ent->skinnum;
+        }
+
+        if (current_texnum != slot.cached_skin_texnum && mesh.material_id != merian::MaterialID{}) {
+            get_material_system()->update_material(mesh.material_id,
+                                                   make_alias_material(hdr, skin, fm));
+            slot.cached_skin_texnum = current_texnum;
+        }
     }
 
     lerpdata_t lerpdata;
