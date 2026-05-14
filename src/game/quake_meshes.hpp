@@ -33,6 +33,34 @@ class QuakeBrushMesh : public merian::Mesh {
     }
 };
 
+// Static sprite-frame mesh: 6 sequential vertices (two triangles), no index buffer,
+// no prev_vertices (the engine synthesizes motion vectors from the node transform).
+class QuakeSpriteFrameMesh : public merian::Mesh {
+  public:
+    std::vector<merian::PackedVertexData> vertices;
+
+    QuakeSpriteFrameMesh() {
+        index_type = vk::IndexType::eNoneKHR;
+    }
+
+    uint32_t get_vertex_count() const override {
+        return static_cast<uint32_t>(vertices.size());
+    }
+    uint32_t get_primitive_count() const override {
+        return static_cast<uint32_t>(vertices.size()) / 3;
+    }
+
+    MeshVertexData get_vertices() const override {
+        return HostPacked<merian::PackedVertexData>{vertices.data()};
+    }
+    MeshPrevVertexData get_prev_vertices() const override {
+        return std::monostate{};
+    }
+    MeshIndexData get_indices() const override {
+        return std::monostate{};
+    }
+};
+
 // Per-frame CPU-rebuilt mesh (sprites, particles). Stores prev_vertices for motion vectors.
 class QuakeHostDynamicMesh : public merian::Mesh {
   public:

@@ -210,19 +210,12 @@ void extract_brush_entity_geo(entity_t* ent,
     VectorCopy(ent->angles, ent->mv_prev_angles);
 }
 
-void extract_sprite_geo(entity_t* ent,
-                        std::vector<merian::PackedVertexData>& vertices,
-                        std::vector<merian::float3>& prev_positions) {
-    qmodel_t* m = ent->model;
-    if (m == nullptr || m->type != mod_sprite)
-        return;
-
-    mspriteframe_t* frame = R_GetSpriteFrame(ent);
-    if (frame == nullptr || frame->gltexture == nullptr)
-        return;
-    msprite_t* psprite = (msprite_t*)ent->model->cache.data;
-
-    const float scale = ENTSCALE_DECODE(ent->scale);
+bool sprite_world_basis(entity_t* ent,
+                        msprite_t* psprite,
+                        merian::float3& s_up,
+                        merian::float3& s_right) {
+    if (psprite == nullptr)
+        return false;
 
     merian::float3 vpn, vright, vup, r_origin;
     VectorCopy(r_refdef.vieworg, r_origin);
@@ -231,8 +224,6 @@ void extract_sprite_geo(entity_t* ent,
     merian::float3 v_forward;
     merian::float3 v_right;
     merian::float3 v_up;
-    merian::float3 s_up;
-    merian::float3 s_right;
 
     switch (psprite->type) {
     case SPR_VP_PARALLEL_UPRIGHT:
@@ -270,70 +261,11 @@ void extract_sprite_geo(entity_t* ent,
         break;
     }
     default:
-        return;
+        return false;
     }
     s_up = merian::normalize(s_up);
     s_right = merian::normalize(s_right);
-
-    // Single quad with TwoSided rendering — two-sided visibility comes from
-    // disabled backface culling rather than emitting a mirrored quad.
-    const merian::float3 v0 = scale * (frame->down * s_up + frame->left * s_right);
-    const merian::float3 v1 = scale * (frame->up * s_up + frame->left * s_right);
-    const merian::float3 v2 = scale * (frame->up * s_up + frame->right * s_right);
-    const merian::float3 v3 = scale * (frame->down * s_up + frame->right * s_right);
-
-    const merian::float3 origin = merian::as_float3(ent->origin);
-    const merian::float3 prev_origin = merian::as_float3(ent->mv_prev_origin);
-    const merian::float3 e0 = v2 - v0;
-    const merian::float3 e1 = v1 - v0;
-    const uint32_t enc_n = merian::encode_normal(merian::normalize(merian::cross(e0, e1)));
-
-    const float smax = frame->smax;
-    const float tmax = frame->tmax;
-
-    // Triangle-list, sequential layout (IndexType::None).
-    // Triangles: (v0, v1, v2) and (v0, v2, v3).
-    auto push = [&](const merian::float3& p, float s, float t) {
-        merian::PackedVertexData pv{};
-        pv.position = p + origin;
-        pv.encoded_normal = enc_n;
-        pv.uv = merian::half2(s, t);
-        pv.encoded_tangent = 0;
-        vertices.push_back(pv);
-        // Sprites only translate; reuse the local-space corner at the
-        // previous origin so motion vectors track entity movement.
-        prev_positions.push_back(p + prev_origin);
-    };
-    push(v0, 0.f, tmax);
-    push(v1, 0.f, 0.f);
-    push(v2, smax, 0.f);
-    push(v0, 0.f, tmax);
-    push(v2, smax, 0.f);
-    push(v3, smax, tmax);
-
-    VectorCopy(ent->origin, ent->mv_prev_origin);
-}
-
-void extract_entity_geo(entity_t* ent,
-                        std::vector<merian::PackedVertexData>& vertices,
-                        std::vector<merian::float3>& prev_positions,
-                        std::vector<merian::uint3>& indices) {
-    if (ent == nullptr || ent->model == nullptr)
-        return;
-    switch (ent->model->type) {
-    case mod_alias:
-        extract_alias_geo(ent, vertices, prev_positions, indices);
-        break;
-    case mod_brush:
-        extract_brush_entity_geo(ent, vertices, prev_positions, indices);
-        break;
-    case mod_sprite:
-        // Sprites use IndexType::None — caller must not consume `indices`.
-        extract_sprite_geo(ent, vertices, prev_positions);
-        break;
-    default:
-        break;
-    }
+    return true;
 }
 
 void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,

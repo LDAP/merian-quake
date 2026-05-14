@@ -799,6 +799,10 @@ void QuakeScene::teardown_world() {
     }
     entity_slots.clear();
 
+    for (const auto& [_, info] : sprite_frame_info) {
+        if (info.mesh_id != merian::MeshID{})
+            remove_mesh(info.mesh_id);
+    }
     sprite_frame_info.clear();
 
     if (particle_mesh_built) {
@@ -1038,14 +1042,51 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
             auto* spr = (msprite_t*)mod->cache.data;
             if (spr == nullptr)
                 continue;
-            for (int f = 0; f < spr->numframes; f++) {
-                mspriteframe_t* frame = spr->frames[f].frameptr;
-                if (frame == nullptr)
-                    continue;
+
+            auto register_frame = [&](mspriteframe_t* frame, int debug_idx) {
+                if (frame == nullptr || sprite_frame_info.contains(frame))
+                    return;
                 const QuakeMaterial mat = make_sprite_frame_material(frame);
-                sprite_frame_info[{mod, f}] =
-                    SpriteFrameInfo{merian::MeshID{},
-                                    ms->add_material(quake_material_type_id, mat)};
+                const merian::MaterialID material_id =
+                    ms->add_material(quake_material_type_id, mat);
+
+                auto sprite_mesh = std::make_unique<QuakeSpriteFrameMesh>();
+                sprite_mesh->name = fmt::format("sprite:{}:{}", mod->name, debug_idx);
+                sprite_mesh->material_id = material_id;
+                sprite_mesh->flags = merian::MeshFlags::TwoSided;
+
+                const uint32_t enc_n = merian::encode_normal(merian::float3(1, 0, 0));
+                const float smax = frame->smax;
+                const float tmax = frame->tmax;
+                auto push = [&](float y, float z, float u, float v) {
+                    merian::PackedVertexData pv{};
+                    pv.position = merian::float3(0.f, y, z);
+                    pv.encoded_normal = enc_n;
+                    pv.uv = merian::half2(u, v);
+                    pv.encoded_tangent = 0;
+                    sprite_mesh->vertices.push_back(pv);
+                };
+                push(frame->left, frame->down, 0.f, tmax);
+                push(frame->left, frame->up, 0.f, 0.f);
+                push(frame->right, frame->up, smax, 0.f);
+                push(frame->left, frame->down, 0.f, tmax);
+                push(frame->right, frame->up, smax, 0.f);
+                push(frame->right, frame->down, smax, tmax);
+
+                const merian::MeshID mesh_id = add_mesh(std::move(sprite_mesh));
+                sprite_frame_info[frame] = SpriteFrameInfo{mesh_id, material_id};
+            };
+
+            for (int f = 0; f < spr->numframes; f++) {
+                if (spr->frames[f].type == SPR_SINGLE) {
+                    register_frame(spr->frames[f].frameptr, f);
+                } else {
+                    auto* group = (mspritegroup_t*)spr->frames[f].frameptr;
+                    if (group == nullptr)
+                        continue;
+                    for (int g = 0; g < group->numframes; g++)
+                        register_frame(group->frames[g], (f << 8) | g);
+                }
             }
         }
         // mod_brush submodels keep their lazy build path inside
@@ -1084,6 +1125,9 @@ void QuakeScene::destroy_slot(EntityMeshSlot& slot) {
     if (slot.kind == EntityKind::Alias) {
         for (const merian::MeshID id : slot.mesh_ids)
             remove_mesh(id);
+    } else if (slot.kind == EntityKind::Sprite) {
+        if (!slot.mesh_ids.empty() && slot.node_id != merian::NODE_ID_INVALID)
+            remove_mesh_instance(slot.mesh_ids[0], slot.node_id);
     }
     if (slot.node_id != merian::NODE_ID_INVALID)
         remove_node(slot.node_id);
@@ -1300,31 +1344,24 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
         entity_slots.erase(it);
     }
 
+    mspriteframe_t* frame = R_GetSpriteFrame(ent);
+    auto info_it = sprite_frame_info.find(frame);
+    if (info_it == sprite_frame_info.end())
+        return entity_slots[ent];
+
     merian::SceneNode node;
     node.name = fmt::format("sprite:{}", ent->model->name);
+    node.is_animated = true;
     const merian::NodeID nid = add_node(std::move(node));
 
-    const int frame = std::max(ent->frame, 0);
-    auto info_it = sprite_frame_info.find({ent->model, frame});
-    const merian::MaterialID mid =
-        (info_it != sprite_frame_info.end()) ? info_it->second.material_id : merian::MaterialID{};
-
-    auto mesh = std::make_unique<QuakeHostDynamicMesh>();
-    mesh->name = fmt::format("sprite:{}", ent->model->name);
-    mesh->material_id = mid;
-    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::HasVariableTopology |
-                  merian::MeshFlags::TwoSided;
-    mesh->index_type = vk::IndexType::eNoneKHR;
-    seed_with_degenerate_triangle(*mesh);
-
-    const merian::MeshID mesh_id = add_mesh(std::move(mesh));
-    add_mesh_instance(mesh_id, nid);
+    add_mesh_instance(info_it->second.mesh_id, nid);
 
     auto& slot = entity_slots[ent];
     slot.node_id = nid;
-    slot.mesh_ids = {mesh_id};
+    slot.mesh_ids = {info_it->second.mesh_id};
     slot.model = ent->model;
     slot.kind = EntityKind::Sprite;
+    slot.cached_sprite_frame = frame;
     current_entity_stats.sprite.newly_created++;
     return slot;
 }
@@ -1450,27 +1487,40 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         }
         case mod_sprite: {
             auto& slot = ensure_sprite_slot(ent);
-            if (!slot.mesh_ids.empty()) {
-                auto& mesh =
-                    static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[slot.mesh_ids[0]].mesh);
-                mesh.vertices.clear();
-                mesh.prev_vertices.clear();
+            if (slot.node_id == merian::NODE_ID_INVALID || slot.mesh_ids.empty())
+                break;
 
-                std::vector<merian::float3> prev_pos;
-                extract_sprite_geo(ent, mesh.vertices, prev_pos);
-                mesh.prev_vertices.resize(prev_pos.size());
-                for (size_t i = 0; i < prev_pos.size(); ++i)
-                    mesh.prev_vertices[i].position = prev_pos[i];
-
-                ensure_non_empty(mesh);
-
-                const int sprite_frame = std::max(ent->frame, 0);
-                auto mat_it = sprite_frame_info.find({ent->model, sprite_frame});
-                if (mat_it != sprite_frame_info.end())
-                    mesh.material_id = mat_it->second.material_id;
-
-                get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
+            mspriteframe_t* sprite_frame = R_GetSpriteFrame(ent);
+            if (sprite_frame != slot.cached_sprite_frame) {
+                auto info_it = sprite_frame_info.find(sprite_frame);
+                if (info_it != sprite_frame_info.end()) {
+                    remove_mesh_instance(slot.mesh_ids[0], slot.node_id);
+                    add_mesh_instance(info_it->second.mesh_id, slot.node_id);
+                    slot.mesh_ids[0] = info_it->second.mesh_id;
+                    slot.cached_sprite_frame = sprite_frame;
+                }
             }
+
+            auto* psprite = (msprite_t*)ent->model->cache.data;
+            merian::float3 s_up;
+            merian::float3 s_right;
+            if (!sprite_world_basis(ent, psprite, s_up, s_right))
+                break;
+
+            const float scale = ENTSCALE_DECODE(ent->scale);
+            const merian::float3 origin = merian::as_float3(ent->origin);
+            // Map local (1,0,0)/(0,1,0)/(0,0,1) -> (cross(s_right, s_up), s_right, s_up).
+            // Local quads live in the y-z plane so column 0 only needs to be a
+            // sane basis vector for determinant sign.
+            const merian::float3 n = merian::normalize(merian::cross(s_right, s_up));
+            merian::float4x4 m = merian::identity();
+            m[0] = merian::float4(n * scale, 0.f);
+            m[1] = merian::float4(s_right * scale, 0.f);
+            m[2] = merian::float4(s_up * scale, 0.f);
+            m[3] = merian::float4(origin, 1.f);
+            update_node(slot.node_id, merian::transpose(m));
+
+            VectorCopy(ent->origin, ent->mv_prev_origin);
             break;
         }
         default:

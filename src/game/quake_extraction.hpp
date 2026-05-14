@@ -35,18 +35,12 @@ void extract_brush_entity_geo(entity_t* ent,
                               std::vector<merian::float3>& prev_positions,
                               std::vector<merian::uint3>& indices);
 
-// Sprites use IndexType::None — vertices are emitted in triangle-list order,
-// six per quad. No index buffer is needed.
-void extract_sprite_geo(entity_t* ent,
-                        std::vector<merian::PackedVertexData>& vertices,
-                        std::vector<merian::float3>& prev_positions);
-
-// Dispatches based on ent->model->type. Silently skips entities without a
-// model or with an unsupported type.
-void extract_entity_geo(entity_t* ent,
-                        std::vector<merian::PackedVertexData>& vertices,
-                        std::vector<merian::float3>& prev_positions,
-                        std::vector<merian::uint3>& indices);
+// Compute the world-space (up, right) basis for a sprite entity given its
+// model's sprite type. Returns false if the type is unsupported.
+bool sprite_world_basis(entity_t* ent,
+                        msprite_t* psprite,
+                        merian::float3& s_up,
+                        merian::float3& s_right);
 
 // Particle billboards. `no_random` makes the per-particle jitter
 // reproducible across frames (used by the reference render path).

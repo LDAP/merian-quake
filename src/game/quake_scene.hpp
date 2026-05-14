@@ -206,25 +206,16 @@ class QuakeScene : public merian::Scene {
     std::unordered_map<AliasSkinKey, merian::MaterialID, AliasSkinKeyHash>
         material_id_for_alias_skin;
 
-    struct SpriteFrameKey {
-        qmodel_t* model;
-        int frame;
-        bool operator==(const SpriteFrameKey& o) const = default;
-    };
-    struct SpriteFrameKeyHash {
-        size_t operator()(const SpriteFrameKey& k) const noexcept {
-            return std::hash<qmodel_t*>()(k.model) ^ (std::hash<int>()(k.frame) << 1u);
-        }
-    };
-    // Shared mesh + material per sprite frame. Geometry is a local-space quad
-    // sized by frame->left/right/up/down; orientation, scale and translation
-    // live on the per-entity node. Built at worldspawn for every mod_sprite
-    // in cl.model_precache.
+    // Shared mesh + material per real mspriteframe_t*. Geometry is a
+    // local-space quad sized by frame->left/right/up/down; orientation, scale
+    // and translation live on the per-entity node. Built at worldspawn for
+    // every mod_sprite in cl.model_precache, walking SPR_SINGLE frames
+    // directly and SPR_ANGLED/animated groups via their mspritegroup_t*.
     struct SpriteFrameInfo {
         merian::MeshID mesh_id;
         merian::MaterialID material_id;
     };
-    std::unordered_map<SpriteFrameKey, SpriteFrameInfo, SpriteFrameKeyHash> sprite_frame_info;
+    std::unordered_map<mspriteframe_t*, SpriteFrameInfo> sprite_frame_info;
 
 
     enum class EntityKind : uint8_t {
@@ -242,10 +233,10 @@ class QuakeScene : public merian::Scene {
         qmodel_t* model = nullptr;
         EntityKind kind = EntityKind::Alias;
 
-        // Sprite-only: which (model, frame) shared mesh we're currently
-        // instanced on, so frame changes can swap to a different sprite-frame
-        // mesh without rebuilding the node.
-        int cached_frame = -1;
+        // Sprite-only: which mspriteframe_t* the shared mesh we're currently
+        // instanced on corresponds to, so frame changes can swap to a
+        // different sprite-frame mesh without rebuilding the node.
+        mspriteframe_t* cached_sprite_frame = nullptr;
 
         // Alias change detection.
         int cached_skinnum = -1;
