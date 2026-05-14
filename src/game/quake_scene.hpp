@@ -183,8 +183,8 @@ class QuakeScene : public merian::Scene {
 
     // One per (texture_t*, surf_flags) partition in a brush submodel.
     struct BrushSubmodelGeoPart {
-        merian::BufferHandle vb; // device-local, model space
-        merian::BufferHandle ib; // device-local
+        merian::BufferHandle vb;
+        merian::BufferHandle ib;
         uint32_t vertex_count;
         uint32_t primitive_count;
         merian::MaterialID material_id;
@@ -216,17 +216,38 @@ class QuakeScene : public merian::Scene {
             return std::hash<qmodel_t*>()(k.model) ^ (std::hash<int>()(k.frame) << 1u);
         }
     };
-    std::unordered_map<SpriteFrameKey, merian::MaterialID, SpriteFrameKeyHash>
-        material_id_for_sprite_frame;
+    // Shared mesh + material per sprite frame. Geometry is a local-space quad
+    // sized by frame->left/right/up/down; orientation, scale and translation
+    // live on the per-entity node. Built at worldspawn for every mod_sprite
+    // in cl.model_precache.
+    struct SpriteFrameInfo {
+        merian::MeshID mesh_id;
+        merian::MaterialID material_id;
+    };
+    std::unordered_map<SpriteFrameKey, SpriteFrameInfo, SpriteFrameKeyHash> sprite_frame_info;
 
-    // Per-entity slot: one SceneNode + one or more MeshIDs.
+
+    enum class EntityKind : uint8_t {
+        Alias = 0,  // per-entity AliasInstanceMesh
+        Brush = 1,  // per-entity BrushEntityMesh wrapping shared submodel vb/ib
+        Sprite = 2, // instance into shared sprite-frame mesh
+    };
+
+    // Per-entity slot: one SceneNode plus the MeshIDs currently instanced on
+    // it. Only Sprite slots share their mesh across entities; Alias and Brush
+    // own their per-entity meshes.
     struct EntityMeshSlot {
         merian::NodeID node_id = merian::NODE_ID_INVALID;
         merian::SmallVector<merian::MeshID, 1> mesh_ids;
         qmodel_t* model = nullptr;
-        int kind = 0; // 0=alias, 1=brush, 2=sprite
+        EntityKind kind = EntityKind::Alias;
 
-        // Alias change detection: cached state that was last written.
+        // Sprite-only: which (model, frame) shared mesh we're currently
+        // instanced on, so frame changes can swap to a different sprite-frame
+        // mesh without rebuilding the node.
+        int cached_frame = -1;
+
+        // Alias change detection.
         int cached_skinnum = -1;
         merian::TextureID cached_skin_texnum{};
         int cached_pose1 = -1;
@@ -244,6 +265,10 @@ class QuakeScene : public merian::Scene {
     EntityMeshSlot& ensure_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
     EntityMeshSlot& ensure_sprite_slot(entity_t* ent);
     void process_alias_model(EntityMeshSlot& slot, entity_t* ent);
+    // Tear down a slot: removes owned meshes (Alias, Brush) and its node; for
+    // Sprite slots the shared mesh stays and remove_node detaches the
+    // instance.
+    void destroy_slot(EntityMeshSlot& slot);
 
     // Particle batch: single mesh, palette-encoded color.
     bool particle_mesh_built = false;
@@ -286,6 +311,20 @@ class QuakeScene : public merian::Scene {
     uint32_t texnum_explosion = 0;
 
     merian::CameraID quake_camera;
+
+    // Per-frame entity counters; "newly_created" is bumped inside ensure_*_slot
+    // when a fresh slot is allocated for a new entity.
+    struct CategoryStats {
+        uint32_t active = 0;
+        uint32_t newly_created = 0;
+    };
+    struct EntityStats {
+        CategoryStats alias;
+        CategoryStats brush;
+        CategoryStats sprite;
+    };
+    EntityStats current_entity_stats{};
+    EntityStats last_frame_entity_stats{};
 };
 
 using QuakeSceneHandle = std::shared_ptr<QuakeScene>;

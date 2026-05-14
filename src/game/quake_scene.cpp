@@ -786,13 +786,20 @@ void QuakeScene::teardown_world() {
         remove_mesh(id);
     world_mesh_ids.clear();
 
+    // Alias and Brush slots own their per-entity mesh; Sprite slots only
+    // instance a shared sprite-frame mesh which we drop below. remove_node
+    // detaches all instances.
     for (auto& [_, slot] : entity_slots) {
-        for (const merian::MeshID id : slot.mesh_ids)
-            remove_mesh(id);
+        if (slot.kind == EntityKind::Alias || slot.kind == EntityKind::Brush) {
+            for (const merian::MeshID id : slot.mesh_ids)
+                remove_mesh(id);
+        }
         if (slot.node_id != merian::NODE_ID_INVALID)
             remove_node(slot.node_id);
     }
     entity_slots.clear();
+
+    sprite_frame_info.clear();
 
     if (particle_mesh_built) {
         remove_mesh(particle_mesh_id);
@@ -810,7 +817,6 @@ void QuakeScene::teardown_world() {
 
     material_id_for_tex.clear();
     material_id_for_alias_skin.clear();
-    material_id_for_sprite_frame.clear();
     animated_brush_materials.clear();
 
     for (auto& [_, info] : alias_model_info)
@@ -999,17 +1005,19 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
                            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                            vk::BufferUsageFlagBits::eShaderDeviceAddress;
 
+    // model_precache[0] is the worldmodel, handled separately by
+    // rebuild_static_world. Skip it.
     for (int i = 1; i < MAX_MODELS; i++) {
         qmodel_t* mod = cl.model_precache[i];
         if (mod == nullptr)
             break;
 
         if (mod->type == mod_alias) {
-            aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(mod);
+            auto* hdr = (aliashdr_t*)Mod_Extradata(mod);
             if (hdr == nullptr)
                 continue;
 
-            const int16_t* indexes = (const int16_t*)((uint8_t*)hdr + hdr->indexes);
+            const auto* indexes = (const int16_t*)((uint8_t*)hdr + hdr->indexes);
             const uint32_t prim_count = static_cast<uint32_t>(hdr->numindexes / 3);
             const uint32_t vert_count = static_cast<uint32_t>(hdr->numverts_vbo);
 
@@ -1027,7 +1035,7 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
                     ms->add_material(quake_material_type_id, mat);
             }
         } else if (mod->type == mod_sprite) {
-            msprite_t* spr = (msprite_t*)mod->cache.data;
+            auto* spr = (msprite_t*)mod->cache.data;
             if (spr == nullptr)
                 continue;
             for (int f = 0; f < spr->numframes; f++) {
@@ -1035,10 +1043,13 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
                 if (frame == nullptr)
                     continue;
                 const QuakeMaterial mat = make_sprite_frame_material(frame);
-                material_id_for_sprite_frame[{mod, f}] =
-                    ms->add_material(quake_material_type_id, mat);
+                sprite_frame_info[{mod, f}] =
+                    SpriteFrameInfo{merian::MeshID{},
+                                    ms->add_material(quake_material_type_id, mat)};
             }
         }
+        // mod_brush submodels keep their lazy build path inside
+        // ensure_brush_slot — sharing isn't enabled here.
     }
 }
 
@@ -1069,17 +1080,23 @@ void QuakeScene::init_particle_batch() {
 // Per-entity slot management
 // -----------------------------------------------------------------------
 
+void QuakeScene::destroy_slot(EntityMeshSlot& slot) {
+    if (slot.kind == EntityKind::Alias) {
+        for (const merian::MeshID id : slot.mesh_ids)
+            remove_mesh(id);
+    }
+    if (slot.node_id != merian::NODE_ID_INVALID)
+        remove_node(slot.node_id);
+}
+
 QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model && it->second.kind == 0)
+    if (it != entity_slots.end() && it->second.model == ent->model &&
+        it->second.kind == EntityKind::Alias)
         return it->second;
 
-    // Model changed or first time — tear down old slot if any.
     if (it != entity_slots.end()) {
-        for (const merian::MeshID id : it->second.mesh_ids)
-            remove_mesh(id);
-        if (it->second.node_id != merian::NODE_ID_INVALID)
-            remove_node(it->second.node_id);
+        destroy_slot(it->second);
         entity_slots.erase(it);
     }
 
@@ -1089,7 +1106,6 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     const AliasModelInfo& info = info_it->second;
     const auto& alloc = get_allocator();
-
     const vk::DeviceSize vb_size = info.vertex_count * sizeof(merian::PackedVertexData);
     const vk::DeviceSize prev_vb_size = info.vertex_count * sizeof(merian::PackedPrevVertexData);
     const auto staging_usage = vk::BufferUsageFlagBits::eTransferSrc |
@@ -1105,7 +1121,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     const int skin = std::clamp(ent->skinnum, 0, info.numskins - 1);
     auto mat_it = material_id_for_alias_skin.find({ent->model, skin});
-    merian::MaterialID mid =
+    const merian::MaterialID material_id =
         (mat_it != material_id_for_alias_skin.end()) ? mat_it->second : merian::MaterialID{};
 
     merian::float4x4 scale_col;
@@ -1124,7 +1140,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
 
     auto mesh = std::make_unique<AliasInstanceMesh>();
     mesh->name = fmt::format("alias:{}", ent->model->name);
-    mesh->material_id = mid;
+    mesh->material_id = material_id;
     mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     mesh->vb_staging = std::move(vb);
     mesh->prev_vb_staging = std::move(prev_vb);
@@ -1142,22 +1158,21 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     slot.node_id = nid;
     slot.mesh_ids = {mesh_id};
     slot.model = ent->model;
-    slot.kind = 0;
+    slot.kind = EntityKind::Alias;
     slot.cached_skinnum = ent->skinnum;
+    current_entity_stats.alias.newly_created++;
     return slot;
 }
 
 QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
                                                           const merian::CommandBufferHandle& cmd) {
     auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model && it->second.kind == 1)
+    if (it != entity_slots.end() && it->second.model == ent->model &&
+        it->second.kind == EntityKind::Brush)
         return it->second;
 
     if (it != entity_slots.end()) {
-        for (const merian::MeshID id : it->second.mesh_ids)
-            remove_mesh(id);
-        if (it->second.node_id != merian::NODE_ID_INVALID)
-            remove_node(it->second.node_id);
+        destroy_slot(it->second);
         entity_slots.erase(it);
     }
 
@@ -1165,8 +1180,10 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
     auto geo_it = brush_submodel_geo.find(ent->model);
     if (geo_it == brush_submodel_geo.end()) {
         qmodel_t* mod = ent->model;
-        std::map<TexFlagsKey,
-                 std::pair<std::vector<merian::PackedVertexData>, std::vector<merian::uint3>>>
+        std::unordered_map<TexFlagsKey,
+                           std::pair<std::vector<merian::PackedVertexData>,
+                                     std::vector<merian::uint3>>,
+                           TexFlagsKeyHash>
             parts;
 
         for (int i = 0; i < mod->nummodelsurfaces; i++) {
@@ -1192,7 +1209,6 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
                     pv.encoded_tangent = 0;
                     verts.push_back(pv);
                 }
-                // Fan-triangulate p->numverts verts into (numverts-2) triangles.
                 for (int v = 2; v < p->numverts; v++) {
                     idxs.push_back(merian::uint3(base, base + static_cast<uint32_t>(v) - 1u,
                                                  base + static_cast<uint32_t>(v)));
@@ -1214,15 +1230,14 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
             if (idxs.empty())
                 continue;
 
-            // Find or create material for this (texture, flags) combo.
             auto mat_it = material_id_for_tex.find(key);
-            merian::MaterialID mid;
+            merian::MaterialID material_id;
             if (mat_it != material_id_for_tex.end()) {
-                mid = mat_it->second;
+                material_id = mat_it->second;
             } else {
                 const QuakeMaterial mat = make_brush_material_for(key.tex, key.surf_flags);
-                mid = ms->add_material(quake_material_type_id, mat);
-                material_id_for_tex.emplace(key, mid);
+                material_id = ms->add_material(quake_material_type_id, mat);
+                material_id_for_tex.emplace(key, material_id);
             }
 
             auto vb =
@@ -1234,7 +1249,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
                 key.tex->gltexture != nullptr && (key.tex->gltexture->flags & TEXPREF_ALPHA) != 0;
             geo_parts.push_back(BrushSubmodelGeoPart{
                 std::move(vb), std::move(ib), static_cast<uint32_t>(verts.size()),
-                static_cast<uint32_t>(idxs.size()), mid, has_alpha});
+                static_cast<uint32_t>(idxs.size()), material_id, has_alpha});
         }
         geo_it = brush_submodel_geo.find(mod);
     }
@@ -1251,16 +1266,15 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
     auto& slot = entity_slots[ent];
     slot.node_id = nid;
     slot.model = ent->model;
-    slot.kind = 1;
+    slot.kind = EntityKind::Brush;
 
     for (const auto& part : geo_it->second) {
         auto mesh = std::make_unique<BrushEntityMesh>();
         mesh->name = fmt::format("brush:{}:{}", ent->model->name, part.material_id);
         mesh->material_id = part.material_id;
         mesh->flags = merian::MeshFlags::FrontCounterClockwise;
-        if (!part.has_alpha) {
+        if (!part.has_alpha)
             mesh->flags = mesh->flags | merian::MeshFlags::IsOpaque;
-        }
         mesh->vb = part.vb;
         mesh->ib = part.ib;
         mesh->vertex_count = part.vertex_count;
@@ -1271,19 +1285,18 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
         slot.mesh_ids.push_back(mesh_id);
     }
 
+    current_entity_stats.brush.newly_created++;
     return slot;
 }
 
 QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model && it->second.kind == 2)
+    if (it != entity_slots.end() && it->second.model == ent->model &&
+        it->second.kind == EntityKind::Sprite)
         return it->second;
 
     if (it != entity_slots.end()) {
-        for (const merian::MeshID id : it->second.mesh_ids)
-            remove_mesh(id);
-        if (it->second.node_id != merian::NODE_ID_INVALID)
-            remove_node(it->second.node_id);
+        destroy_slot(it->second);
         entity_slots.erase(it);
     }
 
@@ -1291,15 +1304,14 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     node.name = fmt::format("sprite:{}", ent->model->name);
     const merian::NodeID nid = add_node(std::move(node));
 
-    int frame = std::max(ent->frame, 0);
-    auto mat_it = material_id_for_sprite_frame.find({ent->model, frame});
-    merian::MaterialID mid =
-        (mat_it != material_id_for_sprite_frame.end()) ? mat_it->second : merian::MaterialID{};
+    const int frame = std::max(ent->frame, 0);
+    auto info_it = sprite_frame_info.find({ent->model, frame});
+    const merian::MaterialID mid =
+        (info_it != sprite_frame_info.end()) ? info_it->second.material_id : merian::MaterialID{};
 
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = fmt::format("sprite:{}", ent->model->name);
     mesh->material_id = mid;
-    // Two-sided via disabled backface culling; vertices are sequential (None type).
     mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::HasVariableTopology |
                   merian::MeshFlags::TwoSided;
     mesh->index_type = vk::IndexType::eNoneKHR;
@@ -1312,7 +1324,8 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     slot.node_id = nid;
     slot.mesh_ids = {mesh_id};
     slot.model = ent->model;
-    slot.kind = 2;
+    slot.kind = EntityKind::Sprite;
+    current_entity_stats.sprite.newly_created++;
     return slot;
 }
 
@@ -1351,7 +1364,6 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
     R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
     R_SetupEntityTransform(ent, &lerpdata);
 
-    // Prev pose = last frame's current (or current itself on the first frame).
     const int prev_pose1 = (slot.cached_pose1 >= 0) ? slot.cached_pose1 : lerpdata.pose1;
     const int prev_pose2 = (slot.cached_pose2 >= 0) ? slot.cached_pose2 : lerpdata.pose2;
     const float prev_blend = (slot.cached_blend >= 0.f) ? slot.cached_blend : lerpdata.blend;
@@ -1375,7 +1387,6 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
         get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
     }
 
-    // Copy scale from hdr before the lock scope ends.
     const merian::float3 hdr_scale = merian::as_float3(hdr->scale);
     const merian::float3 hdr_scale_origin = merian::as_float3(hdr->scale_origin);
 
@@ -1390,11 +1401,9 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
             fovscale.z = t;
         }
 
-        // Scale: raw byte coords → model space (column-vector convention).
         const merian::float4x4 scale_col = merian::mul(
             merian::translation(hdr_scale_origin * fovscale), merian::scale(hdr_scale * fovscale));
 
-        // Rotation + translation → column-vector convention.
         std::array<float, 3> a = {-lerpdata.angles[0], lerpdata.angles[1], lerpdata.angles[2]};
         merian::float4x4 rt = merian::identity();
         AngleVectors(a.data(), &rt[0].x, &rt[1].x, &rt[2].x);
@@ -1411,10 +1420,7 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
 void QuakeScene::retire_stale_entity_slots() {
     for (auto it = entity_slots.begin(); it != entity_slots.end();) {
         if (it->first->model == nullptr) {
-            for (const merian::MeshID id : it->second.mesh_ids)
-                remove_mesh(id);
-            if (it->second.node_id != merian::NODE_ID_INVALID)
-                remove_node(it->second.node_id);
+            destroy_slot(it->second);
             it = entity_slots.erase(it);
         } else {
             ++it;
@@ -1423,6 +1429,8 @@ void QuakeScene::retire_stale_entity_slots() {
 }
 
 void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
+    current_entity_stats = {};
+
     auto process_entity = [&](entity_t* ent) {
         if (ent == nullptr || ent->model == nullptr)
             return;
@@ -1430,16 +1438,14 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         switch (ent->model->type) {
         case mod_alias: {
             auto& slot = ensure_alias_slot(ent);
-            if (!slot.mesh_ids.empty()) {
+            if (!slot.mesh_ids.empty())
                 process_alias_model(slot, ent);
-            }
             break;
         }
         case mod_brush: {
             auto& slot = ensure_brush_slot(ent, cmd);
-            if (!slot.mesh_ids.empty()) {
+            if (!slot.mesh_ids.empty())
                 update_node(slot.node_id, entity_transform(ent));
-            }
             break;
         }
         case mod_sprite: {
@@ -1459,9 +1465,9 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
                 ensure_non_empty(mesh);
 
                 const int sprite_frame = std::max(ent->frame, 0);
-                auto mat_it = material_id_for_sprite_frame.find({ent->model, sprite_frame});
-                if (mat_it != material_id_for_sprite_frame.end())
-                    mesh.material_id = mat_it->second;
+                auto mat_it = sprite_frame_info.find({ent->model, sprite_frame});
+                if (mat_it != sprite_frame_info.end())
+                    mesh.material_id = mat_it->second.material_id;
 
                 get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
             }
@@ -1486,7 +1492,6 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
     for (int i = 0; i < cl.num_statics; i++)
         process_entity(&cl_static_entities[i]);
 
-    // Particle batch.
     {
         auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[particle_mesh_id].mesh);
         mesh.vertices.clear();
@@ -1508,6 +1513,21 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
     }
 
     retire_stale_entity_slots();
+
+    for (const auto& [_, slot] : entity_slots) {
+        switch (slot.kind) {
+        case EntityKind::Alias:
+            current_entity_stats.alias.active++;
+            break;
+        case EntityKind::Brush:
+            current_entity_stats.brush.active++;
+            break;
+        case EntityKind::Sprite:
+            current_entity_stats.sprite.active++;
+            break;
+        }
+    }
+    last_frame_entity_stats = current_entity_stats;
 }
 
 void QuakeScene::cycle_animated_materials() {
@@ -1600,6 +1620,19 @@ void QuakeScene::properties(merian::Properties& config) {
                                    r_refdef.viewangles[1], r_refdef.viewangles[2]));
     config.output_text(fmt::format("server fps: {}", server_fps));
     config.config_options("player model", playermodel, {"none", "gun only", "full"});
+
+    config.st_separate("Entity counts");
+    const auto& s = last_frame_entity_stats;
+    config.output_text(fmt::format(
+        "alias:  {} active (+{} new)\n"
+        "brush:  {} active (+{} new)\n"
+        "sprite: {} active (+{} new)\n"
+        "sprite frames: {}\n"
+        "brush submodels: {}",
+        s.alias.active, s.alias.newly_created,
+        s.brush.active, s.brush.newly_created,
+        s.sprite.active, s.sprite.newly_created,
+        sprite_frame_info.size(), brush_submodel_geo.size()));
 
     config.st_separate("Scene");
 
