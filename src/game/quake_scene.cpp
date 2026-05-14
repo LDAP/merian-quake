@@ -875,7 +875,7 @@ void QuakeScene::rebuild_static_world() {
         const uint32_t enc_n = merian::encode_normal(merian::normalize(plane_n));
 
         for (glpoly_t* p = surf->polys; p != nullptr; p = nullptr) {
-            const uint32_t base_vertex = static_cast<uint32_t>(bucket.vertices.size());
+            const uint32_t base = static_cast<uint32_t>(bucket.vertices.size());
             for (int v = 0; v < p->numverts; v++) {
                 merian::PackedVertexData pv{};
                 pv.position = merian::as_float3(p->verts[v]);
@@ -884,9 +884,10 @@ void QuakeScene::rebuild_static_world() {
                 pv.encoded_tangent = 0;
                 bucket.vertices.push_back(pv);
             }
+            // Fan-triangulate p->numverts verts into (numverts-2) triangles.
             for (int v = 2; v < p->numverts; v++) {
-                bucket.indices.push_back(merian::uint3(base_vertex, base_vertex + uint32_t(v) - 1u,
-                                                       base_vertex + uint32_t(v)));
+                bucket.indices.push_back(merian::uint3(base, base + static_cast<uint32_t>(v) - 1u,
+                                                       base + static_cast<uint32_t>(v)));
             }
         }
     }
@@ -936,11 +937,15 @@ namespace {
 void seed_with_degenerate_triangle(QuakeHostDynamicMesh& mesh) {
     mesh.vertices.assign(3, merian::PackedVertexData{});
     mesh.prev_vertices.assign(3, merian::PackedPrevVertexData{});
-    mesh.indices.assign(1, merian::uint3(0u, 1u, 2u));
+    if (mesh.has_indices()) {
+        mesh.indices.assign(1, merian::uint3(0u, 1u, 2u));
+    } else {
+        mesh.indices.clear();
+    }
 }
 
 void ensure_non_empty(QuakeHostDynamicMesh& mesh) {
-    if (mesh.vertices.empty() || mesh.indices.empty())
+    if (mesh.vertices.empty() || (mesh.has_indices() && mesh.indices.empty()))
         seed_with_degenerate_triangle(mesh);
 }
 
@@ -1004,19 +1009,14 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
             if (hdr == nullptr)
                 continue;
 
-            int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
+            const int16_t* indexes = (const int16_t*)((uint8_t*)hdr + hdr->indexes);
             const uint32_t prim_count = static_cast<uint32_t>(hdr->numindexes / 3);
             const uint32_t vert_count = static_cast<uint32_t>(hdr->numverts_vbo);
 
-            std::vector<merian::uint3> tris(prim_count);
-            for (uint32_t t = 0; t < prim_count; t++) {
-                tris[t] = merian::uint3(static_cast<uint32_t>(indexes[(t * 3) + 0]),
-                                        static_cast<uint32_t>(indexes[(t * 3) + 1]),
-                                        static_cast<uint32_t>(indexes[(t * 3) + 2]));
-            }
-
-            merian::BufferHandle ib =
-                alloc->create_buffer(cmd, tris, buf_usage, fmt::format("alias_ib:{}", mod->name));
+            // Quake mdl indices are int16 with non-negative values: same bit pattern as uint16.
+            merian::BufferHandle ib = alloc->create_buffer(
+                cmd, sizeof(int16_t) * prim_count * 3, buf_usage, indexes,
+                merian::MemoryMappingType::NONE, fmt::format("alias_ib:{}", mod->name));
 
             alias_model_info[mod] =
                 AliasModelInfo{std::move(ib), vert_count, prim_count, hdr->numskins};
@@ -1192,9 +1192,11 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
                     pv.encoded_tangent = 0;
                     verts.push_back(pv);
                 }
-                for (int v = 2; v < p->numverts; v++)
-                    idxs.push_back(
-                        merian::uint3(base, base + uint32_t(v) - 1u, base + uint32_t(v)));
+                // Fan-triangulate p->numverts verts into (numverts-2) triangles.
+                for (int v = 2; v < p->numverts; v++) {
+                    idxs.push_back(merian::uint3(base, base + static_cast<uint32_t>(v) - 1u,
+                                                 base + static_cast<uint32_t>(v)));
+                }
             }
         }
 
@@ -1297,8 +1299,10 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
     auto mesh = std::make_unique<QuakeHostDynamicMesh>();
     mesh->name = fmt::format("sprite:{}", ent->model->name);
     mesh->material_id = mid;
+    // Two-sided via disabled backface culling; vertices are sequential (None type).
     mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::HasVariableTopology |
-                  merian::MeshFlags::FrontCounterClockwise;
+                  merian::MeshFlags::TwoSided;
+    mesh->index_type = vk::IndexType::eNoneKHR;
     seed_with_degenerate_triangle(*mesh);
 
     const merian::MeshID mesh_id = add_mesh(std::move(mesh));
@@ -1445,10 +1449,9 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
                     static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[slot.mesh_ids[0]].mesh);
                 mesh.vertices.clear();
                 mesh.prev_vertices.clear();
-                mesh.indices.clear();
 
                 std::vector<merian::float3> prev_pos;
-                extract_sprite_geo(ent, mesh.vertices, prev_pos, mesh.indices);
+                extract_sprite_geo(ent, mesh.vertices, prev_pos);
                 mesh.prev_vertices.resize(prev_pos.size());
                 for (size_t i = 0; i < prev_pos.size(); ++i)
                     mesh.prev_vertices[i].position = prev_pos[i];
@@ -1461,7 +1464,6 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
                     mesh.material_id = mat_it->second;
 
                 get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
-                get_mesh_infos()[slot.mesh_ids[0]].mesh->indices_dirty = true;
             }
             break;
         }

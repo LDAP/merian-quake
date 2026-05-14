@@ -8,6 +8,8 @@
 namespace merian_quake {
 
 // Static brush geometry in world space. HostPacked source, never dirty after creation.
+// uint32 because gl_warp SubdividePolygon expands water/sky into many small polys —
+// a single texture bucket can exceed 65k verts.
 class QuakeBrushMesh : public merian::Mesh {
   public:
     std::vector<merian::PackedVertexData> vertices;
@@ -36,12 +38,15 @@ class QuakeHostDynamicMesh : public merian::Mesh {
   public:
     std::vector<merian::PackedVertexData> vertices;
     std::vector<merian::PackedPrevVertexData> prev_vertices;
+    // Empty for IndexType::None — primitive count is then vertices.size() / 3.
     std::vector<merian::uint3> indices;
 
     uint32_t get_vertex_count() const override {
         return static_cast<uint32_t>(vertices.size());
     }
     uint32_t get_primitive_count() const override {
+        if (!has_indices())
+            return static_cast<uint32_t>(vertices.size()) / 3;
         return static_cast<uint32_t>(indices.size());
     }
 
@@ -54,6 +59,8 @@ class QuakeHostDynamicMesh : public merian::Mesh {
         return HostPacked<merian::PackedPrevVertexData>{prev_vertices.data()};
     }
     MeshIndexData get_indices() const override {
+        if (!has_indices())
+            return std::monostate{};
         return HostPacked<void>{indices.data()};
     }
 };
@@ -70,6 +77,11 @@ class AliasInstanceMesh : public merian::Mesh {
 
     merian::PackedVertexData* vb_mapped = nullptr;
     merian::PackedPrevVertexData* prev_vb_mapped = nullptr;
+
+    AliasInstanceMesh() {
+        // Quake mdl indices are int16.
+        index_type = vk::IndexType::eUint16;
+    }
 
     ~AliasInstanceMesh() override {
         if (vb_staging)
