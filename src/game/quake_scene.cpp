@@ -989,6 +989,7 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
     const auto& ms = get_material_system();
     const auto& alloc = get_allocator();
     const auto buf_usage = vk::BufferUsageFlagBits::eStorageBuffer |
+                           vk::BufferUsageFlagBits::eTransferSrc |
                            vk::BufferUsageFlagBits::eTransferDst |
                            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                            vk::BufferUsageFlagBits::eShaderDeviceAddress;
@@ -1200,7 +1201,8 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
         const auto& alloc = get_allocator();
         const auto& ms = get_material_system();
         const auto buf_usage =
-            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc |
+            vk::BufferUsageFlagBits::eTransferDst |
             vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
             vk::BufferUsageFlagBits::eShaderDeviceAddress;
 
@@ -1314,7 +1316,7 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
     if (slot.mesh_ids.empty())
         return;
 
-    auto& mesh = static_cast<AliasInstanceMesh&>(*get_meshes()[slot.mesh_ids[0]]);
+    auto& mesh = static_cast<AliasInstanceMesh&>(*get_mesh_infos()[slot.mesh_ids[0]].mesh);
 
     std::lock_guard<std::mutex> lock(quake_cache_mutex);
 
@@ -1366,7 +1368,7 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
         slot.cached_prev_pose2 = prev_pose2;
         slot.cached_prev_blend = prev_blend;
 
-        get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
+        get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
     }
 
     // Copy scale from hdr before the lock scope ends.
@@ -1439,7 +1441,8 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         case mod_sprite: {
             auto& slot = ensure_sprite_slot(ent);
             if (!slot.mesh_ids.empty()) {
-                auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_meshes()[slot.mesh_ids[0]]);
+                auto& mesh =
+                    static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[slot.mesh_ids[0]].mesh);
                 mesh.vertices.clear();
                 mesh.prev_vertices.clear();
                 mesh.indices.clear();
@@ -1457,8 +1460,8 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
                 if (mat_it != material_id_for_sprite_frame.end())
                     mesh.material_id = mat_it->second;
 
-                get_meshes()[slot.mesh_ids[0]]->vertices_dirty = true;
-                get_meshes()[slot.mesh_ids[0]]->indices_dirty = true;
+                get_mesh_infos()[slot.mesh_ids[0]].mesh->vertices_dirty = true;
+                get_mesh_infos()[slot.mesh_ids[0]].mesh->indices_dirty = true;
             }
             break;
         }
@@ -1483,7 +1486,7 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
 
     // Particle batch.
     {
-        auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_meshes()[particle_mesh_id]);
+        auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[particle_mesh_id].mesh);
         mesh.vertices.clear();
         mesh.prev_vertices.clear();
         mesh.indices.clear();

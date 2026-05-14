@@ -15,6 +15,7 @@ Run `build/merian-quake`, better with timeout: `timeout 15 build/merian-quake`
 # Tests
 
 Enable tests: `meson configure build -Dmerian:tests=true`
+Run one: `build/subprojects/merian/tests/test-<name>` (e.g. `test-small-vector`)
 
 # Coding style
 
@@ -26,5 +27,6 @@ Enable tests: `meson configure build -Dmerian:tests=true`
 - Don't `std::move` trivially copyable types.
 - Prefer `std::unordered_*` and only use others when iteration order must be deterministic.
 - Keep comments minimal: no multi-line docstrings, no section separator banners. A single short line is enough when a comment is needed at all. Target an very experienced programmer.
+- Very long methods can be organized with `// section` few-word comments. 
 
 Use clang-format on the modified files.

@@ -222,7 +222,7 @@ class QuakeScene : public merian::Scene {
     // Per-entity slot: one SceneNode + one or more MeshIDs.
     struct EntityMeshSlot {
         merian::NodeID node_id = merian::NODE_ID_INVALID;
-        std::vector<merian::MeshID> mesh_ids;
+        merian::SmallVector<merian::MeshID, 1> mesh_ids;
         qmodel_t* model = nullptr;
         int kind = 0; // 0=alias, 1=brush, 2=sprite
 
