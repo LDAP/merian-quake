@@ -1053,6 +1053,7 @@ QuakeMaterial make_sprite_frame_material(mspriteframe_t* frame) {
         m.header.alpha_texture_id = static_cast<merian::TextureID>(frame->gltexture->texnum);
     m.payload.surface_flags = static_cast<uint16_t>(QuakeSurfaceFlags::Sprite);
     m.payload.alpha_mode = 0;
+    m.payload.fullbright_tex = m.header.alpha_texture_id;
     return m;
 }
 
