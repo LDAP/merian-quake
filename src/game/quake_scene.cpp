@@ -351,8 +351,13 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
     tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES), d_8to24table, 256, 1,
                                vk::SamplerAddressMode::eClampToEdge, vk::Filter::eNearest,
                                vk::Filter::eNearest, true, false);
+    // hack for rocket trails and explosions
+    std::array<uint32_t, 256> fb_palette{};
+    std::memcpy(fb_palette.data(), d_8to24table_fbright, sizeof(fb_palette));
+    for (uint32_t i = 96; i <= 111; i++)
+        fb_palette[i] = d_8to24table[i];
     tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES + 1),
-                               d_8to24table_fbright, 256, 1, vk::SamplerAddressMode::eClampToEdge,
+                               fb_palette.data(), 256, 1, vk::SamplerAddressMode::eClampToEdge,
                                vk::Filter::eNearest, vk::Filter::eNearest, true, false);
 
     game_thread = std::thread([this] {
@@ -646,10 +651,16 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
                 init_particle_batch();
             }
             particle_mesh_built = true;
+            {
+                MERIAN_PROFILE_SCOPE("update_sky");
+                update_sky();
+            }
         }
 
-        if (!render_next)
+        if (!render_next) {
+            this->frame++;
             return;
+        }
 
         if (world_meshes_built && (cl.worldmodel != nullptr)) {
             MERIAN_PROFILE_SCOPE_GPU(cmd, "refresh_entities");
@@ -776,6 +787,15 @@ QuakeMaterial make_brush_material_for(texture_t* tex, int surf_flags) {
     const bool has_alpha =
         (tex->gltexture != nullptr) && ((tex->gltexture->flags & TEXPREF_ALPHA) != 0u);
     m.payload.alpha_mode = has_alpha ? 0u : 15u;
+    // hack for ad_tears emissive waterfalls
+    if ((tex->gltexture != nullptr) && (strstr(tex->gltexture->name, "wfall") != nullptr)) {
+        m.payload.surface_flags = static_cast<uint16_t>(QuakeSurfaceFlags::Waterfall);
+    }
+    // Teleporters glow the full surface; if no fullbright was authored, use the base texture.
+    if (m.payload.surface_flags == static_cast<uint16_t>(QuakeSurfaceFlags::Tele) &&
+        m.payload.fullbright_tex == QUAKE_NO_TEXTURE) {
+        m.payload.fullbright_tex = m.header.alpha_texture_id;
+    }
     return m;
 }
 
@@ -940,6 +960,44 @@ void QuakeScene::rebuild_static_world() {
 
     SPDLOG_DEBUG("static world: {} brush partitions, {} surfaces, {} animated materials",
                  buckets.size(), world->nummodelsurfaces, animated_brush_materials.size());
+}
+
+void QuakeScene::update_sky() {
+    const merian::float3 active_sun_dir =
+        overwrite_sun ? overwrite_sun_dir : g_quake_data.current_sun_direction;
+    const merian::float3 active_sun_color =
+        overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
+
+    std::string source = "import shader.quake_sky;\n";
+    source += "namespace merian {\n";
+    source += fmt::format(
+        "export static const float3 sun_dir = float3({:.6f}, {:.6f}, {:.6f});\n",
+        active_sun_dir.x, active_sun_dir.y, active_sun_dir.z);
+    source += fmt::format(
+        "export static const float3 sun_color = float3({:.6f}, {:.6f}, {:.6f});\n",
+        active_sun_color.r, active_sun_color.g, active_sun_color.b);
+
+    if (skybox_name[0] != 0) {
+        const auto t = [](int i) -> uint32_t {
+            return skybox_textures[i] != nullptr ? skybox_textures[i]->texnum : 0u;
+        };
+        source += fmt::format("export static const QuakeSky sky = CubemapSky("
+                              "TextureID({}), TextureID({}), TextureID({}), "
+                              "TextureID({}), TextureID({}), TextureID({}));\n",
+                              t(0), t(1), t(2), t(3), t(4), t(5));
+    } else if (solidskytexture != nullptr) {
+        const uint32_t solid = solidskytexture->texnum;
+        const uint32_t alpha = alphaskytexture != nullptr ? alphaskytexture->texnum : 0u;
+        source += fmt::format(
+            "export static const QuakeSky sky = ClassicSky(TextureID({}), TextureID({}));\n",
+            solid, alpha);
+    } else {
+        source += "export static const QuakeSky sky = BlackSky();\n";
+    }
+    source += "}\n";
+
+    get_material_system()->get_composition()->add_module_from_string("merian_quake_scene_spec",
+                                                                     source);
 }
 
 namespace {
@@ -1282,6 +1340,13 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
                 const QuakeMaterial mat = make_brush_material_for(key.tex, key.surf_flags);
                 material_id = ms->add_material(quake_material_type_id, mat);
                 material_id_for_tex.emplace(key, material_id);
+                if (key.tex->anim_total > 0) {
+                    animated_brush_materials.push_back(AnimatedBrushMaterial{
+                        material_id, key.tex, mat.payload.fullbright_tex,
+                        mat.payload.normal_tex, mat.payload.gloss_tex,
+                        mat.payload.surface_flags, mat.payload.alpha_mode,
+                        mat.header.alpha_texture_id});
+                }
             }
 
             auto vb =

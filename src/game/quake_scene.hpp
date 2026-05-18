@@ -98,6 +98,7 @@ class QuakeScene : public merian::Scene {
     void retire_stale_entity_slots();
     void cycle_animated_materials();
     void teardown_world();
+    void update_sky();
 
   private:
     merian::MaterialModelID quake_material_type_id{};
