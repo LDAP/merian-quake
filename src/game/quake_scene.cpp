@@ -663,8 +663,8 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
         }
 
         if (world_meshes_built && (cl.worldmodel != nullptr)) {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "refresh_entities");
-            refresh_entities(cmd);
+            MERIAN_PROFILE_SCOPE_GPU(cmd, "update_dynamic");
+            update_dynamic(cmd);
         }
 
         if (world_meshes_built) {
@@ -818,6 +818,7 @@ void QuakeScene::teardown_world() {
             remove_node(slot.node_id);
     }
     entity_slots.clear();
+    previous_entity_slots.clear();
 
     for (const auto& [_, info] : sprite_frame_info) {
         if (info.mesh_id != merian::MeshID{})
@@ -1192,20 +1193,10 @@ void QuakeScene::destroy_slot(EntityMeshSlot& slot) {
         remove_node(slot.node_id);
 }
 
-QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
-    auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model &&
-        it->second.kind == EntityKind::Alias)
-        return it->second;
-
-    if (it != entity_slots.end()) {
-        destroy_slot(it->second);
-        entity_slots.erase(it);
-    }
-
+QuakeScene::EntityMeshSlot QuakeScene::build_alias_slot(entity_t* ent) {
     auto info_it = alias_model_info.find(ent->model);
     if (info_it == alias_model_info.end() || info_it->second.numskins <= 0)
-        return entity_slots[ent]; // empty slot; caller will skip
+        return {};
 
     const AliasModelInfo& info = info_it->second;
     const auto& alloc = get_allocator();
@@ -1258,28 +1249,17 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     const merian::MeshID mesh_id = add_mesh(std::move(mesh));
     add_mesh_instance(mesh_id, nid);
 
-    auto& slot = entity_slots[ent];
+    EntityMeshSlot slot;
     slot.node_id = nid;
     slot.mesh_ids = {mesh_id};
     slot.model = ent->model;
     slot.kind = EntityKind::Alias;
     slot.cached_skinnum = ent->skinnum;
-    current_entity_stats.alias.newly_created++;
     return slot;
 }
 
-QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
-                                                          const merian::CommandBufferHandle& cmd) {
-    auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model &&
-        it->second.kind == EntityKind::Brush)
-        return it->second;
-
-    if (it != entity_slots.end()) {
-        destroy_slot(it->second);
-        entity_slots.erase(it);
-    }
-
+QuakeScene::EntityMeshSlot QuakeScene::build_brush_slot(entity_t* ent,
+                                                        const merian::CommandBufferHandle& cmd) {
     // Lazily build submodel geometry on first reference.
     auto geo_it = brush_submodel_geo.find(ent->model);
     if (geo_it == brush_submodel_geo.end()) {
@@ -1366,7 +1346,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
     }
 
     if (geo_it == brush_submodel_geo.end() || geo_it->second.empty())
-        return entity_slots[ent];
+        return {};
 
     merian::SceneNode node;
     node.name = fmt::format("brush:{}", ent->model->name);
@@ -1374,7 +1354,7 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
     node.local_transform = entity_transform(ent);
     const merian::NodeID nid = add_node(std::move(node));
 
-    auto& slot = entity_slots[ent];
+    EntityMeshSlot slot;
     slot.node_id = nid;
     slot.model = ent->model;
     slot.kind = EntityKind::Brush;
@@ -1396,25 +1376,14 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_brush_slot(entity_t* ent,
         slot.mesh_ids.push_back(mesh_id);
     }
 
-    current_entity_stats.brush.newly_created++;
     return slot;
 }
 
-QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
-    auto it = entity_slots.find(ent);
-    if (it != entity_slots.end() && it->second.model == ent->model &&
-        it->second.kind == EntityKind::Sprite)
-        return it->second;
-
-    if (it != entity_slots.end()) {
-        destroy_slot(it->second);
-        entity_slots.erase(it);
-    }
-
+QuakeScene::EntityMeshSlot QuakeScene::build_sprite_slot(entity_t* ent) {
     mspriteframe_t* frame = R_GetSpriteFrame(ent);
     auto info_it = sprite_frame_info.find(frame);
     if (info_it == sprite_frame_info.end())
-        return entity_slots[ent];
+        return {};
 
     merian::SceneNode node;
     node.name = fmt::format("sprite:{}", ent->model->name);
@@ -1423,17 +1392,55 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_sprite_slot(entity_t* ent) {
 
     add_mesh_instance(info_it->second.mesh_id, nid);
 
-    auto& slot = entity_slots[ent];
+    EntityMeshSlot slot;
     slot.node_id = nid;
     slot.mesh_ids = {info_it->second.mesh_id};
     slot.model = ent->model;
     slot.kind = EntityKind::Sprite;
     slot.cached_sprite_frame = frame;
-    current_entity_stats.sprite.newly_created++;
     return slot;
 }
 
-void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t* ent) {
+QuakeScene::EntityMeshSlot* QuakeScene::acquire_slot(entity_t* ent,
+                                                    const merian::CommandBufferHandle& cmd) {
+    EntityKind kind;
+    switch (ent->model->type) {
+    case mod_alias:  kind = EntityKind::Alias;  break;
+    case mod_brush:  kind = EntityKind::Brush;  break;
+    case mod_sprite: kind = EntityKind::Sprite; break;
+    default: return nullptr;
+    }
+
+    // Migrate intact when previous frame's slot still matches this entity.
+    auto node = previous_entity_slots.extract(ent);
+    if (!node.empty()) {
+        if (node.mapped().model == ent->model && node.mapped().kind == kind) {
+            auto [it, _, __] = entity_slots.insert(std::move(node));
+            return &it->second;
+        }
+        destroy_slot(node.mapped());
+    }
+
+    EntityMeshSlot fresh;
+    switch (kind) {
+    case EntityKind::Alias:  fresh = build_alias_slot(ent);       break;
+    case EntityKind::Brush:  fresh = build_brush_slot(ent, cmd);  break;
+    case EntityKind::Sprite: fresh = build_sprite_slot(ent);      break;
+    }
+    if (fresh.node_id == merian::NODE_ID_INVALID)
+        return nullptr;
+
+    switch (kind) {
+    case EntityKind::Alias:  current_entity_stats.alias.newly_created++;  break;
+    case EntityKind::Brush:  current_entity_stats.brush.newly_created++;  break;
+    case EntityKind::Sprite: current_entity_stats.sprite.newly_created++; break;
+    }
+
+    auto [it, _] = entity_slots.emplace(ent, std::move(fresh));
+    return &it->second;
+}
+
+void QuakeScene::refresh_alias(QuakeScene::EntityMeshSlot& slot, entity_t* ent) {
     if (slot.mesh_ids.empty())
         return;
 
@@ -1521,94 +1528,90 @@ void QuakeScene::process_alias_model(QuakeScene::EntityMeshSlot& slot, entity_t*
     }
 }
 
-void QuakeScene::retire_stale_entity_slots() {
-    for (auto it = entity_slots.begin(); it != entity_slots.end();) {
-        if (it->first->model == nullptr) {
-            destroy_slot(it->second);
-            it = entity_slots.erase(it);
-        } else {
-            ++it;
+void QuakeScene::refresh_brush(EntityMeshSlot& slot, entity_t* ent) {
+    update_node(slot.node_id, entity_transform(ent));
+}
+
+void QuakeScene::refresh_sprite(EntityMeshSlot& slot, entity_t* ent) {
+    mspriteframe_t* sprite_frame = R_GetSpriteFrame(ent);
+    if (sprite_frame != slot.cached_sprite_frame) {
+        auto info_it = sprite_frame_info.find(sprite_frame);
+        if (info_it != sprite_frame_info.end()) {
+            remove_mesh_instance(slot.mesh_ids[0], slot.node_id);
+            add_mesh_instance(info_it->second.mesh_id, slot.node_id);
+            slot.mesh_ids[0] = info_it->second.mesh_id;
+            slot.cached_sprite_frame = sprite_frame;
         }
+    }
+
+    auto* psprite = (msprite_t*)ent->model->cache.data;
+    merian::float3 s_up;
+    merian::float3 s_right;
+    if (!sprite_world_basis(ent, psprite, s_up, s_right))
+        return;
+
+    const float scale = ENTSCALE_DECODE(ent->scale);
+    const merian::float3 origin = merian::as_float3(ent->origin);
+    // Map local (1,0,0)/(0,1,0)/(0,0,1) -> (cross(s_right, s_up), s_right, s_up).
+    // Local quads live in the y-z plane so column 0 only needs to be a
+    // sane basis vector for determinant sign.
+    const merian::float3 n = merian::normalize(merian::cross(s_right, s_up));
+    merian::float4x4 m = merian::identity();
+    m[0] = merian::float4(n * scale, 0.f);
+    m[1] = merian::float4(s_right * scale, 0.f);
+    m[2] = merian::float4(s_up * scale, 0.f);
+    m[3] = merian::float4(origin, 1.f);
+    update_node(slot.node_id, merian::transpose(m));
+
+    VectorCopy(ent->origin, ent->mv_prev_origin);
+}
+
+void QuakeScene::process_entity(entity_t* ent, const merian::CommandBufferHandle& cmd) {
+    if (ent == nullptr || ent->model == nullptr)
+        return;
+
+    EntityMeshSlot* slot = acquire_slot(ent, cmd);
+    if (slot == nullptr)
+        return;
+
+    switch (slot->kind) {
+    case EntityKind::Alias:  refresh_alias(*slot, ent);  break;
+    case EntityKind::Brush:  refresh_brush(*slot, ent);  break;
+    case EntityKind::Sprite: refresh_sprite(*slot, ent); break;
     }
 }
 
-void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
+void QuakeScene::update_dynamic(const merian::CommandBufferHandle& cmd) {
+    // Swap: every slot from last frame starts in previous_entity_slots.
+    // acquire_slot migrates each one back as its entity is visited. Anything
+    // left in previous_entity_slots after the visit pass belonged to entities
+    // that vanished this frame (server removed them, culling dropped them,
+    // or — most importantly for lightning beams — a temp-entity slot in
+    // cl_temp_entities was recycled without nulling ent->model when the
+    // beam expired). Those slots get destroyed in one sweep at the end.
+    previous_entity_slots = std::move(entity_slots);
+    entity_slots.clear();
     current_entity_stats = {};
 
-    auto process_entity = [&](entity_t* ent) {
-        if (ent == nullptr || ent->model == nullptr)
-            return;
-
-        switch (ent->model->type) {
-        case mod_alias: {
-            auto& slot = ensure_alias_slot(ent);
-            if (!slot.mesh_ids.empty())
-                process_alias_model(slot, ent);
-            break;
-        }
-        case mod_brush: {
-            auto& slot = ensure_brush_slot(ent, cmd);
-            if (!slot.mesh_ids.empty())
-                update_node(slot.node_id, entity_transform(ent));
-            break;
-        }
-        case mod_sprite: {
-            auto& slot = ensure_sprite_slot(ent);
-            if (slot.node_id == merian::NODE_ID_INVALID || slot.mesh_ids.empty())
-                break;
-
-            mspriteframe_t* sprite_frame = R_GetSpriteFrame(ent);
-            if (sprite_frame != slot.cached_sprite_frame) {
-                auto info_it = sprite_frame_info.find(sprite_frame);
-                if (info_it != sprite_frame_info.end()) {
-                    remove_mesh_instance(slot.mesh_ids[0], slot.node_id);
-                    add_mesh_instance(info_it->second.mesh_id, slot.node_id);
-                    slot.mesh_ids[0] = info_it->second.mesh_id;
-                    slot.cached_sprite_frame = sprite_frame;
-                }
-            }
-
-            auto* psprite = (msprite_t*)ent->model->cache.data;
-            merian::float3 s_up;
-            merian::float3 s_right;
-            if (!sprite_world_basis(ent, psprite, s_up, s_right))
-                break;
-
-            const float scale = ENTSCALE_DECODE(ent->scale);
-            const merian::float3 origin = merian::as_float3(ent->origin);
-            // Map local (1,0,0)/(0,1,0)/(0,0,1) -> (cross(s_right, s_up), s_right, s_up).
-            // Local quads live in the y-z plane so column 0 only needs to be a
-            // sane basis vector for determinant sign.
-            const merian::float3 n = merian::normalize(merian::cross(s_right, s_up));
-            merian::float4x4 m = merian::identity();
-            m[0] = merian::float4(n * scale, 0.f);
-            m[1] = merian::float4(s_right * scale, 0.f);
-            m[2] = merian::float4(s_up * scale, 0.f);
-            m[3] = merian::float4(origin, 1.f);
-            update_node(slot.node_id, merian::transpose(m));
-
-            VectorCopy(ent->origin, ent->mv_prev_origin);
-            break;
-        }
-        default:
-            break;
-        }
-    };
-
     if (playermodel == 1) {
-        process_entity(&cl.viewent);
+        process_entity(&cl.viewent, cmd);
     } else if (playermodel == 2) {
-        process_entity(&cl.viewent);
+        process_entity(&cl.viewent, cmd);
         if (cl.viewentity > 0 && cl.viewentity < cl_max_edicts && (cl_entities != nullptr))
-            process_entity(&cl_entities[cl.viewentity]);
+            process_entity(&cl_entities[cl.viewentity], cmd);
     }
 
     for (int i = 0; i < cl_numvisedicts; i++)
-        process_entity(cl_visedicts[i]);
+        process_entity(cl_visedicts[i], cmd);
 
     for (int i = 0; i < cl.num_statics; i++)
-        process_entity(&cl_static_entities[i]);
+        process_entity(&cl_static_entities[i], cmd);
 
+    for (auto& [_, slot] : previous_entity_slots)
+        destroy_slot(slot);
+    previous_entity_slots.clear();
+
+    // Particle batch: one shared mesh, fully re-extracted every frame.
     {
         auto& mesh = static_cast<QuakeHostDynamicMesh&>(*get_mesh_infos()[particle_mesh_id].mesh);
         mesh.vertices.clear();
@@ -1629,19 +1632,11 @@ void QuakeScene::refresh_entities(const merian::CommandBufferHandle& cmd) {
         mesh.indices_dirty = true;
     }
 
-    retire_stale_entity_slots();
-
     for (const auto& [_, slot] : entity_slots) {
         switch (slot.kind) {
-        case EntityKind::Alias:
-            current_entity_stats.alias.active++;
-            break;
-        case EntityKind::Brush:
-            current_entity_stats.brush.active++;
-            break;
-        case EntityKind::Sprite:
-            current_entity_stats.sprite.active++;
-            break;
+        case EntityKind::Alias:  current_entity_stats.alias.active++;  break;
+        case EntityKind::Brush:  current_entity_stats.brush.active++;  break;
+        case EntityKind::Sprite: current_entity_stats.sprite.active++; break;
         }
     }
     last_frame_entity_stats = current_entity_stats;

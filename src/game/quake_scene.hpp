@@ -94,8 +94,7 @@ class QuakeScene : public merian::Scene {
     void rebuild_static_world();
     void build_model_registries(const merian::CommandBufferHandle& cmd);
     void init_particle_batch();
-    void refresh_entities(const merian::CommandBufferHandle& cmd);
-    void retire_stale_entity_slots();
+    void update_dynamic(const merian::CommandBufferHandle& cmd);
     void cycle_animated_materials();
     void teardown_world();
     void update_sky();
@@ -252,11 +251,27 @@ class QuakeScene : public merian::Scene {
         vec3_t cached_angles = {};
     };
     std::unordered_map<entity_t*, EntityMeshSlot> entity_slots;
+    // update_dynamic swaps entity_slots into here at the start of each frame.
+    // acquire_slot migrates entries back as entities are visited; anything
+    // left at the end belonged to entities that disappeared (removed, culled,
+    // or temp-entity slots that got recycled without nulling ent->model, like
+    // expired lightning beams) and gets destroyed.
+    std::unordered_map<entity_t*, EntityMeshSlot> previous_entity_slots;
 
-    EntityMeshSlot& ensure_alias_slot(entity_t* ent);
-    EntityMeshSlot& ensure_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
-    EntityMeshSlot& ensure_sprite_slot(entity_t* ent);
-    void process_alias_model(EntityMeshSlot& slot, entity_t* ent);
+    void process_entity(entity_t* ent, const merian::CommandBufferHandle& cmd);
+    // Migrate-or-build: if previous_entity_slots holds a compatible slot for
+    // ent it moves back into entity_slots intact; otherwise builds a fresh
+    // one. Returns nullptr if the model type is unsupported or its registry
+    // entry isn't ready yet (e.g. brush submodel geometry pending) — in that
+    // case nothing lands in entity_slots and the entity is silently dropped
+    // for this frame.
+    EntityMeshSlot* acquire_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
+    EntityMeshSlot build_alias_slot(entity_t* ent);
+    EntityMeshSlot build_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
+    EntityMeshSlot build_sprite_slot(entity_t* ent);
+    void refresh_alias(EntityMeshSlot& slot, entity_t* ent);
+    void refresh_brush(EntityMeshSlot& slot, entity_t* ent);
+    void refresh_sprite(EntityMeshSlot& slot, entity_t* ent);
     // Tear down a slot: removes owned meshes (Alias, Brush) and its node; for
     // Sprite slots the shared mesh stays and remove_node detaches the
     // instance.
