@@ -51,10 +51,13 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
                           double prev_cl_time);
 
 // Lerp alias vertices in raw (unscaled) object space — positions are direct
-// byte-coord lerps, normals are normalized lerps of the Quake normal table.
-// The caller puts scale/scale_origin into the SceneNode transform.
-// `vertices_dst` / `prev_dst` must hold at least hdr->numverts_vbo entries.
+// byte-coord lerps, normals are normalized lerps of pre-baked smooth per-pose
+// normals (layout: numposes * numverts float3 entries, indexed by original
+// vertindex from hdr->meshdesc). The caller puts scale/scale_origin into the
+// SceneNode transform. `vertices_dst` / `prev_dst` must hold at least
+// hdr->numverts_vbo entries.
 void lerp_alias_vertices(aliashdr_t* hdr,
+                         const merian::float3* baked_normals,
                          int pose1,
                          int pose2,
                          float blend,

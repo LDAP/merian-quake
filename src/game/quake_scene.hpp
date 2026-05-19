@@ -178,6 +178,11 @@ class QuakeScene : public merian::Scene {
         uint32_t vertex_count;
         uint32_t primitive_count;
         int numskins;
+        // Smooth vertex normals computed from face geometry, laid out as
+        // numposes * numverts. MDL only stores a quantized 162-direction
+        // index per vertex; computing actual per-pose smooth normals gives
+        // far better shading especially on high-poly Arcane Dimensions models.
+        std::vector<merian::float3> baked_normals;
     };
     std::unordered_map<qmodel_t*, AliasModelInfo> alias_model_info;
 

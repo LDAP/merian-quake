@@ -1082,16 +1082,56 @@ void QuakeScene::build_model_registries(const merian::CommandBufferHandle& cmd) 
                 continue;
 
             const auto* indexes = (const int16_t*)((uint8_t*)hdr + hdr->indexes);
+            const auto* desc = (const aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
+            const auto* trivertexes = (const trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
             const uint32_t prim_count = static_cast<uint32_t>(hdr->numindexes / 3);
             const uint32_t vert_count = static_cast<uint32_t>(hdr->numverts_vbo);
+            const uint32_t numverts = static_cast<uint32_t>(hdr->numverts);
+            const uint32_t numposes = static_cast<uint32_t>(hdr->numposes);
 
             // Quake mdl indices are int16 with non-negative values: same bit pattern as uint16.
             merian::BufferHandle ib = alloc->create_buffer(
                 cmd, sizeof(int16_t) * prim_count * 3, buf_usage, indexes,
                 merian::MemoryMappingType::NONE, fmt::format("alias_ib:{}", mod->name));
 
-            alias_model_info[mod] =
-                AliasModelInfo{std::move(ib), vert_count, prim_count, hdr->numskins};
+            // Bake per-pose smooth normals (one float3 per (pose, original
+            // vertex)). For Quake's CW-wound triangles, the outward face
+            // normal is cross(v2-v0, v1-v0); we accumulate at adjacent
+            // vertices and normalize. Positions stay in raw byte-coord space:
+            // the per-axis scale cancels at normalize-time after the inverse-
+            // transposed instance transform is applied in the shader.
+            std::vector<merian::float3> baked_normals(
+                static_cast<size_t>(numposes) * numverts, merian::float3(0.f));
+            for (uint32_t pose = 0; pose < numposes; pose++) {
+                merian::float3* pose_normals = baked_normals.data() + pose * numverts;
+                const trivertx_t* pose_verts = trivertexes + pose * numverts;
+                for (uint32_t t = 0; t < prim_count; t++) {
+                    const int vi0 = desc[indexes[t * 3 + 0]].vertindex;
+                    const int vi1 = desc[indexes[t * 3 + 1]].vertindex;
+                    const int vi2 = desc[indexes[t * 3 + 2]].vertindex;
+                    const merian::float3 p0(pose_verts[vi0].v[0], pose_verts[vi0].v[1],
+                                            pose_verts[vi0].v[2]);
+                    const merian::float3 p1(pose_verts[vi1].v[0], pose_verts[vi1].v[1],
+                                            pose_verts[vi1].v[2]);
+                    const merian::float3 p2(pose_verts[vi2].v[0], pose_verts[vi2].v[1],
+                                            pose_verts[vi2].v[2]);
+                    const merian::float3 face_n = merian::cross(p2 - p0, p1 - p0);
+                    pose_normals[vi0] += face_n;
+                    pose_normals[vi1] += face_n;
+                    pose_normals[vi2] += face_n;
+                }
+                for (uint32_t v = 0; v < numverts; v++) {
+                    const float len2 = merian::dot(pose_normals[v], pose_normals[v]);
+                    pose_normals[v] = (len2 > 0.f) ? pose_normals[v] / std::sqrt(len2)
+                                                   : merian::float3(0.f, 0.f, 1.f);
+                }
+            }
+
+            alias_model_info[mod] = AliasModelInfo{std::move(ib),
+                                                   vert_count,
+                                                   prim_count,
+                                                   hdr->numskins,
+                                                   std::move(baked_normals)};
 
             for (int s = 0; s < hdr->numskins; s++) {
                 const QuakeMaterial mat = make_alias_material(hdr, s);
@@ -1235,8 +1275,7 @@ QuakeScene::EntityMeshSlot QuakeScene::build_alias_slot(entity_t* ent) {
     auto mesh = std::make_unique<AliasInstanceMesh>();
     mesh->name = fmt::format("alias:{}", ent->model->name);
     mesh->material_id = material_id;
-    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise |
-                  merian::MeshFlags::FlatShading;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
     mesh->vb_staging = std::move(vb);
     mesh->prev_vb_staging = std::move(prev_vb);
     mesh->vb_mapped = mesh->vb_staging->get_memory()->map_as<merian::PackedVertexData>();
@@ -1485,8 +1524,12 @@ void QuakeScene::refresh_alias(QuakeScene::EntityMeshSlot& slot, entity_t* ent) 
         prev_pose2 != slot.cached_prev_pose2 || prev_blend != slot.cached_prev_blend;
 
     if (pose_changed) {
-        lerp_alias_vertices(hdr, lerpdata.pose1, lerpdata.pose2, lerpdata.blend, prev_pose1,
-                            prev_pose2, prev_blend, mesh.vb_mapped, mesh.prev_vb_mapped);
+        const auto info_it = alias_model_info.find(ent->model);
+        const merian::float3* baked_normals =
+            (info_it != alias_model_info.end()) ? info_it->second.baked_normals.data() : nullptr;
+        lerp_alias_vertices(hdr, baked_normals, lerpdata.pose1, lerpdata.pose2, lerpdata.blend,
+                            prev_pose1, prev_pose2, prev_blend, mesh.vb_mapped,
+                            mesh.prev_vb_mapped);
 
         slot.cached_pose1 = lerpdata.pose1;
         slot.cached_pose2 = lerpdata.pose2;

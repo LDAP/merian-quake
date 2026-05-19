@@ -358,6 +358,7 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
 }
 
 void lerp_alias_vertices(aliashdr_t* hdr,
+                         const merian::float3* baked_normals,
                          const int pose1,
                          const int pose2,
                          const float blend,
@@ -371,6 +372,8 @@ void lerp_alias_vertices(aliashdr_t* hdr,
 
     const float skin_w = static_cast<float>(hdr->skinwidth);
     const float skin_h = static_cast<float>(hdr->skinheight);
+    const merian::float3* normals_pose1 = baked_normals + hdr->numverts * pose1;
+    const merian::float3* normals_pose2 = baked_normals + hdr->numverts * pose2;
 
     for (int v = 0; v < hdr->numverts_vbo; v++) {
         const int vi = desc[v].vertindex;
@@ -381,9 +384,8 @@ void lerp_alias_vertices(aliashdr_t* hdr,
         const merian::float3 p2{float(tv2.v[0]), float(tv2.v[1]), float(tv2.v[2])};
 
         vertices_dst[v].position = merian::lerp(p1, p2, blend);
-        vertices_dst[v].encoded_normal = merian::encode_normal(merian::normalize(
-            merian::lerp(merian::as_float3(r_avertexnormals[tv1.lightnormalindex]),
-                         merian::as_float3(r_avertexnormals[tv2.lightnormalindex]), blend)));
+        vertices_dst[v].encoded_normal = merian::encode_normal(
+            merian::normalize(merian::lerp(normals_pose1[vi], normals_pose2[vi], blend)));
         vertices_dst[v].uv =
             merian::half2((desc[v].st[0] + 0.5f) / skin_w, (desc[v].st[1] + 0.5f) / skin_h);
         vertices_dst[v].encoded_tangent = 0;
