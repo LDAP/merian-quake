@@ -1244,7 +1244,8 @@ QuakeScene::EntityMeshSlot& QuakeScene::ensure_alias_slot(entity_t* ent) {
     auto mesh = std::make_unique<AliasInstanceMesh>();
     mesh->name = fmt::format("alias:{}", ent->model->name);
     mesh->material_id = material_id;
-    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise;
+    mesh->flags = merian::MeshFlags::IsMorphed | merian::MeshFlags::FrontCounterClockwise |
+                  merian::MeshFlags::FlatShading;
     mesh->vb_staging = std::move(vb);
     mesh->prev_vb_staging = std::move(prev_vb);
     mesh->vb_mapped = mesh->vb_staging->get_memory()->map_as<merian::PackedVertexData>();
