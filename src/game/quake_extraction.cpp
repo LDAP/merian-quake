@@ -4,10 +4,7 @@
 #include "merian/utils/vector_matrix.hpp"
 #include "merian/utils/xorshift.hpp"
 
-#include <array>
-#include <cassert>
 #include <cmath>
-#include <mutex>
 
 extern "C" {
 #include "quakedef.h"
@@ -18,196 +15,43 @@ extern cvar_t scr_fov, cl_gun_fovscale;
 
 namespace merian_quake {
 
-namespace {
+std::vector<merian::float3> bake_alias_pose_normals(aliashdr_t* hdr) {
+    const auto* indexes = (const int16_t*)((uint8_t*)hdr + hdr->indexes);
+    const auto* desc = (const aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
+    const auto* trivertexes = (const trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
+    const uint32_t numverts = static_cast<uint32_t>(hdr->numverts);
+    const uint32_t numposes = static_cast<uint32_t>(hdr->numposes);
+    const uint32_t prim_count = static_cast<uint32_t>(hdr->numindexes / 3);
 
-// Triangulate a Quake glpoly_t (n>=3 vertices) as a fan into `indices`,
-// emitting positions/normals/uvs into `vertices`. `enc_n` is the (already
-// encoded) plane normal in world space. `mat_prev_model` transforms the
-// same model-space verts into their previous-frame world position.
-void emit_brush_poly(const glpoly_t* p,
-                     const merian::float4x4& mat_model,
-                     const merian::float4x4& mat_prev_model,
-                     const uint32_t enc_n,
-                     std::vector<merian::PackedVertexData>& vertices,
-                     std::vector<merian::float3>& prev_positions,
-                     std::vector<merian::uint3>& indices) {
-    if (p->numverts < 3)
-        return;
-    const uint32_t base = static_cast<uint32_t>(vertices.size());
-    for (int v = 0; v < p->numverts; v++) {
-        const merian::float4 mv(merian::as_float3(p->verts[v]), 1.f);
-        merian::PackedVertexData pv{};
-        pv.position = merian::mul(mv, mat_model).xyz();
-        pv.encoded_normal = enc_n;
-        pv.uv = merian::half2(p->verts[v][3], p->verts[v][4]);
-        pv.encoded_tangent = 0;
-        vertices.push_back(pv);
-        prev_positions.push_back(merian::mul(mv, mat_prev_model).xyz());
-    }
-    for (int v = 2; v < p->numverts; v++) {
-        indices.push_back(merian::uint3(base, base + uint32_t(v) - 1u, base + uint32_t(v)));
-    }
-}
-
-merian::float4x4 entity_world_transform(const float* origin, const float* angles) {
-    std::array<float, 3> a = {-angles[0], angles[1], angles[2]};
-    merian::float4x4 m = merian::identity();
-    AngleVectors(a.data(), &m[0].x, &m[1].x, &m[2].x);
-    m[1] *= -1;
-    m[3] = merian::float4(origin[0], origin[1], origin[2], 1.f);
-    return m;
-}
-
-} // namespace
-
-void extract_alias_geo(entity_t* ent,
-                       std::vector<merian::PackedVertexData>& vertices,
-                       std::vector<merian::float3>& prev_positions,
-                       std::vector<merian::uint3>& indices) {
-    qmodel_t* m = ent->model;
-    if (m == nullptr || m->type != mod_alias)
-        return;
-
-    // Mod_Extradata may rebind the cached header internally; serialize.
-    static std::mutex quake_mutex;
-    std::lock_guard<std::mutex> lock(quake_mutex);
-
-    aliashdr_t* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
-    aliasmesh_t* desc = (aliasmesh_t*)((uint8_t*)hdr + hdr->meshdesc);
-    int16_t* indexes = (int16_t*)((uint8_t*)hdr + hdr->indexes);
-    trivertx_t* trivertexes = (trivertx_t*)((uint8_t*)hdr + hdr->vertexes);
-
-    int f = ent->frame;
-    if (f < 0 || f >= hdr->numposes)
-        return;
-
-    // Make the player gun FOV-independent (mirrors r_alias.c gun handling).
-    merian::float3 fovscale(1.f);
-    if (ent == &cl.viewent && scr_fov.value > 90.f && cl_gun_fovscale.value != 0.f) {
-        const float t = std::tan(scr_fov.value * static_cast<float>(0.5 * M_PI / 180.0));
-        fovscale.y = t;
-        fovscale.z = t;
-    }
-
-    const merian::float4x4 scale = merian::transpose(
-        merian::mul(merian::translation(merian::as_float3(hdr->scale_origin) * fovscale),
-                    merian::scale(merian::as_float3(hdr->scale) * fovscale)));
-
-    // Previous-frame model matrix from cached mv_prev_origin/angles. The
-    // axis flip mirrors the current-frame logic below.
-    std::array<float, 3> prev_angles = {-ent->mv_prev_angles[0], ent->mv_prev_angles[1],
-                                        ent->mv_prev_angles[2]};
-    merian::float4x4 mat_prev_model = merian::identity();
-    AngleVectors(prev_angles.data(), &mat_prev_model[0].x, &mat_prev_model[1].x,
-                 &mat_prev_model[2].x);
-    mat_prev_model[3] = merian::float4(merian::as_float3(ent->mv_prev_origin), 1.f);
-    mat_prev_model[1] *= -1;
-    mat_prev_model = merian::mul(scale, mat_prev_model);
-    const float prev_blend = ent->mv_prev_blend;
-
-    lerpdata_t lerpdata;
-    R_SetupAliasFrame(ent, hdr, ent->frame, &lerpdata);
-    R_SetupEntityTransform(ent, &lerpdata);
-
-    // Match the legacy axis flip convention.
-    lerpdata.angles[0] *= -1;
-
-    merian::float4x4 mat_model = merian::identity();
-    AngleVectors(lerpdata.angles, &mat_model[0].x, &mat_model[1].x, &mat_model[2].x);
-    mat_model[3] = merian::float4(merian::as_float3(lerpdata.origin), 1.f);
-    mat_model[1] *= -1;
-    mat_model = merian::mul(scale, mat_model);
-
-    const merian::float3x3 mat_model_inv_t =
-        merian::float3x3(merian::transpose(merian::inverse(mat_model)));
-
-    const float skin_w = static_cast<float>(hdr->skinwidth);
-    const float skin_h = static_cast<float>(hdr->skinheight);
-    const uint32_t base = static_cast<uint32_t>(vertices.size());
-
-    for (int v = 0; v < hdr->numverts_vbo; v++) {
-        const int i_pose1 = hdr->numverts * lerpdata.pose1 + desc[v].vertindex;
-        const int i_pose2 = hdr->numverts * lerpdata.pose2 + desc[v].vertindex;
-
-        merian::float3 p1{static_cast<float>(trivertexes[i_pose1].v[0]),
-                          static_cast<float>(trivertexes[i_pose1].v[1]),
-                          static_cast<float>(trivertexes[i_pose1].v[2])};
-        merian::float3 p2{static_cast<float>(trivertexes[i_pose2].v[0]),
-                          static_cast<float>(trivertexes[i_pose2].v[1]),
-                          static_cast<float>(trivertexes[i_pose2].v[2])};
-
-        const merian::float3 world_pos =
-            merian::mul(merian::float4(merian::lerp(p1, p2, lerpdata.blend), 1.f), mat_model).xyz();
-        // Previous-frame world position: same model-space pose1/pose2, but
-        // blended with last frame's blend factor and transformed by the
-        // previous model matrix. This matches the legacy motion-vector
-        // computation in quake_helpers.cpp.
-        const merian::float3 prev_world_pos =
-            merian::mul(merian::float4(merian::lerp(p1, p2, prev_blend), 1.f), mat_prev_model)
-                .xyz();
-
-        const merian::float3 n1 =
-            merian::as_float3(r_avertexnormals[trivertexes[i_pose1].lightnormalindex]);
-        const merian::float3 n2 =
-            merian::as_float3(r_avertexnormals[trivertexes[i_pose2].lightnormalindex]);
-        const merian::float3 world_n =
-            merian::normalize(merian::mul(merian::lerp(n1, n2, lerpdata.blend), mat_model_inv_t));
-
-        merian::PackedVertexData pv{};
-        pv.position = world_pos;
-        pv.encoded_normal = merian::encode_normal(world_n);
-        pv.uv = merian::half2((desc[v].st[0] + 0.5f) / skin_w, (desc[v].st[1] + 0.5f) / skin_h);
-        pv.encoded_tangent = 0;
-        vertices.push_back(pv);
-        prev_positions.push_back(prev_world_pos);
-    }
-
-    // Bookkeeping: keep prev-frame state up to date for future motion vectors.
-    ent->mv_prev_blend = lerpdata.blend;
-    VectorCopy(lerpdata.angles, ent->mv_prev_angles);
-    VectorCopy(lerpdata.origin, ent->mv_prev_origin);
-
-    for (int i = 0; i + 2 < hdr->numindexes; i += 3) {
-        indices.push_back(merian::uint3(base + static_cast<uint32_t>(indexes[i + 0]),
-                                        base + static_cast<uint32_t>(indexes[i + 1]),
-                                        base + static_cast<uint32_t>(indexes[i + 2])));
-    }
-}
-
-void extract_brush_entity_geo(entity_t* ent,
-                              std::vector<merian::PackedVertexData>& vertices,
-                              std::vector<merian::float3>& prev_positions,
-                              std::vector<merian::uint3>& indices) {
-    qmodel_t* m = ent->model;
-    if (m == nullptr || m->type != mod_brush)
-        return;
-
-    const merian::float4x4 mat_model = entity_world_transform(ent->origin, ent->angles);
-    const merian::float4x4 mat_prev_model =
-        entity_world_transform(ent->mv_prev_origin, ent->mv_prev_angles);
-
-    for (int i = 0; i < m->nummodelsurfaces; i++) {
-        msurface_t* surf = &m->surfaces[m->firstmodelsurface + i];
-        if (surf->texinfo == nullptr || surf->texinfo->texture == nullptr)
-            continue;
-        if (strcmp(surf->texinfo->texture->name, "skip") == 0)
-            continue;
-
-        merian::float3 plane_n = merian::as_float3(surf->plane->normal);
-        if ((surf->flags & SURF_PLANEBACK) != 0)
-            plane_n = -plane_n;
-        // Transform plane normal to world space (no scale on entities, so the
-        // upper 3x3 of mat_model is orthonormal — direct multiply is fine).
-        plane_n = merian::mul(merian::float3x3(mat_model), plane_n);
-        const uint32_t enc_n = merian::encode_normal(merian::normalize(plane_n));
-
-        for (glpoly_t* p = surf->polys; p != nullptr; p = nullptr) {
-            emit_brush_poly(p, mat_model, mat_prev_model, enc_n, vertices, prev_positions, indices);
+    // Quake winds CW so the outward face normal is cross(v2-v0, v1-v0). Positions stay
+    // in byte-coord space — the per-axis scale cancels in the shader's inv-transpose.
+    std::vector<merian::float3> normals(static_cast<size_t>(numposes) * numverts,
+                                        merian::float3(0.f));
+    for (uint32_t pose = 0; pose < numposes; pose++) {
+        merian::float3* pose_normals = normals.data() + pose * numverts;
+        const trivertx_t* pose_verts = trivertexes + pose * numverts;
+        for (uint32_t t = 0; t < prim_count; t++) {
+            const int vi0 = desc[indexes[t * 3 + 0]].vertindex;
+            const int vi1 = desc[indexes[t * 3 + 1]].vertindex;
+            const int vi2 = desc[indexes[t * 3 + 2]].vertindex;
+            const merian::float3 p0(pose_verts[vi0].v[0], pose_verts[vi0].v[1],
+                                    pose_verts[vi0].v[2]);
+            const merian::float3 p1(pose_verts[vi1].v[0], pose_verts[vi1].v[1],
+                                    pose_verts[vi1].v[2]);
+            const merian::float3 p2(pose_verts[vi2].v[0], pose_verts[vi2].v[1],
+                                    pose_verts[vi2].v[2]);
+            const merian::float3 face_n = merian::cross(p2 - p0, p1 - p0);
+            pose_normals[vi0] += face_n;
+            pose_normals[vi1] += face_n;
+            pose_normals[vi2] += face_n;
+        }
+        for (uint32_t v = 0; v < numverts; v++) {
+            const float len2 = merian::dot(pose_normals[v], pose_normals[v]);
+            pose_normals[v] =
+                (len2 > 0.f) ? pose_normals[v] / std::sqrt(len2) : merian::float3(0.f, 0.f, 1.f);
         }
     }
-
-    VectorCopy(ent->origin, ent->mv_prev_origin);
-    VectorCopy(ent->angles, ent->mv_prev_angles);
+    return normals;
 }
 
 bool sprite_world_basis(entity_t* ent,
@@ -301,37 +145,33 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
         const merian::float3 origin = merian::as_float3(p->org);
         const merian::float3 prev_origin = merian::as_float3(p->mv_prev_origin);
 
+        const float particle_offset = static_cast<float>(2.0 * (xrand.next_double() - 0.5) +
+                                                         2.0 * (xrand.next_double() - 0.5));
+        const float rand_angle = static_cast<float>(xrand.next_double());
+        const merian::float3 rand_v = merian::normalize(merian::float3(
+            static_cast<float>(xrand.next_double()), static_cast<float>(xrand.next_double()),
+            static_cast<float>(xrand.next_double())));
+
+        const merian::float4x4 rot = merian::rotation(
+            rand_v, (rand_angle + cl.time * 0.001f * velocity) * 2.f * static_cast<float>(M_PI));
+        const merian::float4x4 prev_rot = merian::rotation(
+            rand_v, (rand_angle + static_cast<float>(prev_cl_time) * 0.001f * velocity) * 2.f *
+                        static_cast<float>(M_PI));
+
         merian::float3 vert[4];
         merian::float3 prev_vert[4];
-        for (int l = 0; l < 3; l++) {
-            const float particle_offset = static_cast<float>(2.0 * (xrand.next_double() - 0.5) +
-                                                             2.0 * (xrand.next_double() - 0.5));
-            const float rand_angle = static_cast<float>(xrand.next_double());
-            const merian::float3 rand_v = merian::normalize(merian::float3(
-                static_cast<float>(xrand.next_double()), static_cast<float>(xrand.next_double()),
-                static_cast<float>(xrand.next_double())));
-
-            const merian::float4x4 rot =
-                merian::rotation(rand_v, (rand_angle + cl.time * 0.001f * velocity) * 2.f *
-                                             static_cast<float>(M_PI));
-            const merian::float4x4 prev_rot = merian::rotation(
-                rand_v, (rand_angle + static_cast<float>(prev_cl_time) * 0.001f * velocity) * 2.f *
-                            static_cast<float>(M_PI));
-            for (int k = 0; k < 4; k++) {
-                const float vert_off = static_cast<float>(
-                    0.5 * ((xrand.next_double() - 0.5) + (xrand.next_double() - 0.5)));
-                const float rand_scale = static_cast<float>(xrand.next_double());
-                const merian::float4 corner(scale * voff[k] * (1.f + rand_scale) + vert_off, 1.f);
-                vert[k] = origin + particle_offset + merian::mul(rot, corner).xyz();
-                prev_vert[k] = prev_origin + particle_offset + merian::mul(prev_rot, corner).xyz();
-            }
+        for (int k = 0; k < 4; k++) {
+            const float vert_off = static_cast<float>(
+                0.5 * ((xrand.next_double() - 0.5) + (xrand.next_double() - 0.5)));
+            const float rand_scale = static_cast<float>(xrand.next_double());
+            const merian::float4 corner(scale * voff[k] * (1.f + rand_scale) + vert_off, 1.f);
+            vert[k] = origin + particle_offset + merian::mul(rot, corner).xyz();
+            prev_vert[k] = prev_origin + particle_offset + merian::mul(prev_rot, corner).xyz();
         }
         VectorCopy(p->org, p->mv_prev_origin);
 
-        // Build a tetrahedron (4 triangles) per particle and emit one
-        // shared face-normal per vertex (encoded from the tet centroid).
-        // uv.x carries the palette index ([0,255] / 255) so the particle
-        // material samples the diffuse / emission palette texture by uv.
+        // One tetrahedron per particle. uv.x is the palette index in [0,1] so the
+        // particle material samples the diffuse / emission palette by uv.
         const uint32_t base = static_cast<uint32_t>(vertices.size());
         const float palette_uv =
             (static_cast<float>(static_cast<int>(p->color) & 0xff) + 0.5f) / 256.f;
@@ -340,10 +180,8 @@ void extract_particle_geo(std::vector<merian::PackedVertexData>& vertices,
             pv.position = vert[k];
             pv.uv = merian::half2(palette_uv, 0.f);
             pv.encoded_tangent = 0;
-            // Per-vertex normal: take the average of the three faces meeting
-            // here — for a regular-ish tet that's roughly the radial outward
-            // direction from the centroid, which is good enough for the
-            // billboard-style shading the renderer does.
+            // Radial outward from the centroid — close enough to the averaged
+            // face normal for billboard-style shading.
             const merian::float3 centroid = 0.25f * (vert[0] + vert[1] + vert[2] + vert[3]);
             pv.encoded_normal = merian::encode_normal(merian::normalize(vert[k] - centroid));
             vertices.push_back(pv);

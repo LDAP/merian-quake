@@ -7,24 +7,10 @@
 
 namespace merian_quake {
 
-// Surface flag values mirror MAT_FLAGS_* in res/shader/config.h. Kept inline
-// here to avoid forcing every translation unit that touches QuakeMaterial to
-// drag in the shader-side config header.
-enum class QuakeSurfaceFlags : uint16_t {
-    None = 0,
-    Lava = 1,
-    Slime = 2,
-    Tele = 3,
-    Water = 4,
-    Sky = 5,
-    Waterfall = 6,
-    Sprite = 7,
-    Solid = 8,
-};
-
-// 12-byte payload that mirrors the trailing fields of merian::QuakeMaterial in
-// res/shader/quake-material.slang. The Slang side reads this via the
-// MaterialPayload blob, so the order, sizes and packing must stay in sync.
+// Mirrors the trailing fields of merian::QuakeMaterial in
+// res/shader/quake-material.slang — order, sizes and packing must stay in sync.
+// surface_flags carries MAT_FLAGS_* (res/shader/config.h); brush variants alias
+// Quake's SURF_DRAW* bits so msurface_t::flags can be assigned directly.
 struct QuakeMaterialPayload {
     merian::TextureID fullbright_tex{};
     merian::TextureID normal_tex{};
@@ -36,15 +22,14 @@ struct QuakeMaterialPayload {
 static_assert(sizeof(QuakeMaterialPayload) == 10,
               "QuakeMaterialPayload layout must match Slang QuakeMaterial");
 
-// Sentinel value used by the Slang side (kQuakeNoTexture) for "no texture".
+// kQuakeNoTexture on the Slang side.
 static constexpr merian::TextureID QUAKE_NO_TEXTURE = merian::TextureID(0xFFFF);
 
 struct QuakeMaterial : merian::Material {
     QuakeMaterialPayload payload;
 
     QuakeMaterial() {
-        // alpha_texture_id is consumed by MaterialSystem::alpha_test for
-        // alpha-mask discard. Default to "no alpha mask".
+        // (-1) disables MaterialSystem::alpha_test's alpha-mask discard.
         header.alpha_texture_id = merian::TextureID(-1);
         payload.fullbright_tex = QUAKE_NO_TEXTURE;
         payload.normal_tex = QUAKE_NO_TEXTURE;
@@ -60,8 +45,7 @@ struct QuakeMaterial : merian::Material {
     }
 };
 
-// Slang module path (relative to a shader search-path entry; the merian-quake
-// app adds res/ as one of its search paths).
+// Resolved against the shader search path (the app adds res/).
 inline constexpr const char* QUAKE_MATERIAL_SLANG_MODULE_PATH = "shader/quake-material.slang";
 inline constexpr const char* QUAKE_MATERIAL_SLANG_TYPE_NAME = "merian::QuakeMaterial";
 

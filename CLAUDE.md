@@ -19,14 +19,33 @@ Run one: `build/subprojects/merian/tests/test-<name>` (e.g. `test-small-vector`)
 
 # Coding style
 
-- Use existing math utilities (`mul()`, `inverse()`, `transpose()`) — never hand-roll matrix/vector operations or write helper wrappers for things the library already provides.
-- Prefer to use modern C++.
-- Use descriptive variable names (`mesh_id` not `mid`).
-- Mark local variables `const` when they are not modified.
-- Prefer `enum` / `enum class` over bare constants.
-- Don't `std::move` trivially copyable types.
-- Prefer `std::unordered_*` and only use others when iteration order must be deterministic.
-- Keep comments minimal: no multi-line docstrings, no section separator banners. A single short line is enough when a comment is needed at all. Target an very experienced programmer.
-- Very long methods can be organized with `// section` few-word comments. 
+ Comments
+  - Single short line is the default; multi-line walls of text are out. If the explanation needs a
+  paragraph, the code probably needs restructuring instead.
+  - Explain why, never what. Identifier names already say what.
+  - Inside long methods, label sub-sections with one-liner comments (// 1. ..., // upload prev vertices)
+  — never banner separators.
+  - File-level major dividers (// --- Section ---) are allowed sparingly for the obvious lifecycle splits
+   (constructor / building / update). Don't multiply them.
+  - Drop comments that just point to commit history, removed files, or the old pipeline (e.g. "matches 
+  the legacy motion-vector computation in quake_helpers.cpp").
+  - Keep TODOs as commented-out future code when the code is the clearest spec for the deferred work;
+  otherwise delete.
+
+  Naming
+  - Descriptive: mesh_id, node_id, vertex_count, prim_count — not mid, nid, vc.
+  - Tight-scope math locals can be terse (m, it, v, pv) but only when the surrounding code makes the role
+   obvious.
+  - Method names follow lifecycle verb conventions: add_*, mark_*_dirty, upload_*, compute_*, build_*,
+  ensure_*. One verb per concept; pick one and stick to it.
+
+  Code
+  - const on every local that isn't reassigned (the reference does this religiously).
+  - Modern containers / idioms: try_emplace, extract, structured bindings, auto [it, inserted], assign(n,
+   value), std::move on heavy types only.
+  - Replace hand-rolled matrix building with the library: mul, transpose, inverse, identity, translation,
+   scale, rotation. Never write a 3-line "AngleVectors then fix-up" snippet when it's needed twice.
+  - Use enum / enum class over magic constants.
+  - Prefer std::unordered_map over std::map unless iteration order matters.
 
 Use clang-format on the modified files.

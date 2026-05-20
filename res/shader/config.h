@@ -21,18 +21,20 @@
 // should match DISTANCE_MC_VERTEX_STATE_COUNT (only increase for testing purposes)
 #define MAX_DISTANCE_MC_VERTEX_STATE_COUNT 10
 
-// Material flags
+// Material flags — values for brush variants alias to Quake's SURF_DRAW* bits
+// (see gl_model.h) so msurface_t::flags can be assigned directly. Synthetic
+// flags use bits SURF_* leaves free.
 
 #define MAT_FLAGS_NONE 0
-#define MAT_FLAGS_LAVA 1
-#define MAT_FLAGS_SLIME 2
-#define MAT_FLAGS_TELE 3
-#define MAT_FLAGS_WATER 4
-#define MAT_FLAGS_SKY 5
-#define MAT_FLAGS_WATERFALL 6
-#define MAT_FLAGS_SPRITE 7
+#define MAT_FLAGS_SKY 0x4      // SURF_DRAWSKY
+#define MAT_FLAGS_LAVA 0x400   // SURF_DRAWLAVA
+#define MAT_FLAGS_SLIME 0x800  // SURF_DRAWSLIME
+#define MAT_FLAGS_TELE 0x1000  // SURF_DRAWTELE
+#define MAT_FLAGS_WATER 0x2000 // SURF_DRAWWATER
+#define MAT_FLAGS_WATERFALL 0x4000
+#define MAT_FLAGS_SPRITE 0x8000
 // material has a solid color. n0 is albedo, n1 is emission (tex can still be used for alpha)
-#define MAT_FLAGS_SOLID 8
+#define MAT_FLAGS_SOLID 0x1
 
 // Player flags
 

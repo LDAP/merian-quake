@@ -9,8 +9,7 @@
 QuakeNode::QuakeNode() : Node() {}
 
 QuakeNode::~QuakeNode() {
-    // Tear down the scene first so the game thread stops and Quake shuts
-    // down before the resource allocator etc. go away.
+    // Tear down the scene first so Quake shuts down before the allocator goes away.
     scene.reset();
 }
 
@@ -38,9 +37,7 @@ void QuakeNode::process(merian::GraphRun& run,
                         const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
 
-    // Lazy init: deferred to the first process so the
-    // FrameCachingShaderObjectAllocator can be sized to iterations_in_flight,
-    // mirroring GLTFSceneNode.
+    // Lazy init so we know iterations_in_flight for the obj_allocator (cf. GLTFSceneNode).
     if (!obj_allocator) {
         obj_allocator = std::make_shared<merian::FrameCachingShaderObjectAllocator>(
             allocator, run.get_iterations_in_flight());

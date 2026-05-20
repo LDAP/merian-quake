@@ -24,14 +24,9 @@ extern "C" {
 
 namespace merian_quake {
 
-// QuakeScene owns Quake's global lifecycle: the QuakeSpasm init, the game
-// thread, the input listener that pumps key/mouse events, the per-frame
-// render info (camera/sun/fog/sky/uniform), and the texture upload pump.
-//
-// Quake itself is built on a stack of static globals; only one instance can
-// exist at a time. The owning QuakeNode constructs the scene exactly once
-// (lazily, after the FrameCachingShaderObjectAllocator has the right
-// in-flight count) and tears it down with the node.
+// Owns Quake's global lifecycle: QuakeSpasm init, the game thread, the input
+// listener, the per-frame scene refresh, and the texture upload pump. Quake
+// runs on static globals so only one instance can exist at a time.
 class QuakeScene : public merian::Scene {
   public:
     QuakeScene(const merian::ShaderCompileContextHandle& compile_context,
@@ -61,18 +56,12 @@ class QuakeScene : public merian::Scene {
         return resolution;
     }
 
-    // Swap the input controller. Safe to call before or after game-thread
-    // startup; the listener is rebound to the new controller. Pass a dummy
-    // controller to detach.
+    // Pass a dummy controller to detach.
     void set_controller(const merian::InputControllerHandle& controller);
 
-    // Queue a Quake console command to be executed on the game thread.
     void queue_command(const std::string& command);
 
-    // ------------------------------------------------------------------
-    // Quake callback entry points (invoked from the QuakeSpasm thread via
-    // the extern "C" thunks in quake_scene.cpp).
-
+    // --- QuakeSpasm callbacks (invoked from the game thread via extern "C") ---
     void cb_VID_Changed();
     void cb_QS_texture_load(gltexture_t* glt, const uint32_t* data);
     void cb_IN_Move(usercmd_t* cmd);
@@ -91,13 +80,28 @@ class QuakeScene : public merian::Scene {
   private:
     void register_input_listener(const merian::InputControllerHandle& controller);
 
-    void rebuild_static_world();
-    void build_model_registries(const merian::CommandBufferHandle& cmd);
+    // --- World lifecycle ---
+    void unload_world();
+    void load_world(const merian::CommandBufferHandle& cmd);
+    void load_world_brushes();
+    void register_alias_models(const merian::CommandBufferHandle& cmd);
+    void register_sprite_models();
     void init_particle_batch();
-    void update_dynamic(const merian::CommandBufferHandle& cmd);
-    void cycle_animated_materials();
-    void teardown_world();
     void update_sky();
+
+    // --- Per-frame ---
+    void sync_game_thread(float time_diff);
+    void update_entities(const merian::CommandBufferHandle& cmd);
+    void update_alias_entity(entity_t* ent,
+                             const merian::CommandBufferHandle& cmd,
+                             uint8_t instance_mask);
+    void update_brush_entity(entity_t* ent,
+                             const merian::CommandBufferHandle& cmd,
+                             uint8_t instance_mask);
+    void update_sprite_entity(entity_t* ent, uint8_t instance_mask);
+    void update_particles();
+    void update_animated_materials();
+    void update_camera_and_sun();
 
   private:
     merian::MaterialModelID quake_material_type_id{};
@@ -120,14 +124,12 @@ class QuakeScene : public merian::Scene {
     merian::float3 sun_direction{0, 0, 1};
     float volume_max_t = 1000.F;
 
-    // Static brush world: rebuilt on every worldspawn. The previous map's
-    // meshes / nodes are torn down first.
+    // Static brush world: rebuilt on every worldspawn.
     bool world_meshes_built = false;
-    merian::NodeID world_node_id = merian::NODE_ID_INVALID;
-    std::vector<merian::MeshID> world_mesh_ids;
+    merian::Scene::NodeID world_node_id = merian::Scene::NODE_ID_INVALID;
+    std::vector<merian::Scene::MeshID> world_mesh_ids;
 
-    // Partition key for static brush surfaces. Two surfaces sharing the same
-    // (texture_t*, surf->flags) tuple share a material and a mesh.
+    // Surfaces sharing (texture, surf_flags) share a material and a mesh.
     struct TexFlagsKey {
         texture_t* tex;
         int surf_flags;
@@ -145,21 +147,29 @@ class QuakeScene : public merian::Scene {
             return std::hash<texture_t*>()(k.tex) ^ (std::hash<int>()(k.surf_flags) << 1u);
         }
     };
-    // Bits we care about for material partitioning. SURF_PLANEBACK is
-    // per-vertex (geometry-level), SURF_DRAWTILED governs r_notexture
-    // surfaces; both irrelevant. The rest distinguish material variants.
+    // SURF_PLANEBACK is per-vertex, SURF_DRAWTILED selects r_notexture; the
+    // rest carry meaningful material variants.
     static constexpr int SURF_INTERESTING_BITS =
         SURF_DRAWSKY | SURF_DRAWLAVA | SURF_DRAWSLIME | SURF_DRAWTELE | SURF_DRAWWATER;
 
-    // Worldmodel + brush submodels share textures (loadmodel->textures[]),
-    // so this single map covers both.
+    // Pre-upload CPU buffer for one (texture, surf_flags) partition.
+    struct BrushSurfaceBucket {
+        std::vector<merian::PackedVertexData> vertices;
+        std::vector<merian::uint3> indices;
+        texture_t* tex = nullptr;
+        int surf_flags = 0;
+    };
+    std::unordered_map<TexFlagsKey, BrushSurfaceBucket, TexFlagsKeyHash>
+    collect_brush_surfaces(qmodel_t* mod);
+    // Lookup-or-create; only pushes onto animated_brush_materials on creation.
+    merian::MaterialID register_brush_material(texture_t* tex, int surf_flags);
+
+    // Shared by worldmodel and submodels (textures are model-private but the
+    // same texture_t* gets re-used across submodels of the same map).
     std::unordered_map<TexFlagsKey, merian::MaterialID, TexFlagsKeyHash> material_id_for_tex;
 
-    // Animated brush materials: (material_id, base_texture, fb/normal/gloss
-    // texnums, surface_flags, alpha_mode). Per-frame, R_TextureAnimation
-    // resolves the current member of the cycle for each base; if its texnum
-    // differs from what the material currently holds, we re-pack and call
-    // MaterialSystem::update_material so the geometry doesn't have to rebake.
+    // R_TextureAnimation resolves the current frame each tick; we re-pack the
+    // material when the resolved texnum changes so geometry isn't rebaked.
     struct AnimatedBrushMaterial {
         merian::MaterialID material_id;
         texture_t* base_tex;
@@ -174,19 +184,16 @@ class QuakeScene : public merian::Scene {
 
     // Per-model info built at worldspawn; stable across frames.
     struct AliasModelInfo {
-        merian::BufferHandle index_buffer; // device-local, uploaded once
+        merian::BufferHandle index_buffer;
         uint32_t vertex_count;
         uint32_t primitive_count;
         int numskins;
-        // Smooth vertex normals computed from face geometry, laid out as
-        // numposes * numverts. MDL only stores a quantized 162-direction
-        // index per vertex; computing actual per-pose smooth normals gives
-        // far better shading especially on high-poly Arcane Dimensions models.
+        // smooth per-pose normals; MDL's 162-direction quantization is too coarse for AD models
         std::vector<merian::float3> baked_normals;
     };
     std::unordered_map<qmodel_t*, AliasModelInfo> alias_model_info;
 
-    // One per (texture_t*, surf_flags) partition in a brush submodel.
+    // One uploaded VB/IB pair per (texture, surf_flags) partition.
     struct BrushSubmodelGeoPart {
         merian::BufferHandle vb;
         merian::BufferHandle ib;
@@ -197,7 +204,6 @@ class QuakeScene : public merian::Scene {
     };
     std::unordered_map<qmodel_t*, std::vector<BrushSubmodelGeoPart>> brush_submodel_geo;
 
-    // Material registries built at worldspawn.
     struct AliasSkinKey {
         qmodel_t* model;
         int skin;
@@ -211,41 +217,23 @@ class QuakeScene : public merian::Scene {
     std::unordered_map<AliasSkinKey, merian::MaterialID, AliasSkinKeyHash>
         material_id_for_alias_skin;
 
-    // Shared mesh + material per real mspriteframe_t*. Geometry is a
-    // local-space quad sized by frame->left/right/up/down; orientation, scale
-    // and translation live on the per-entity node. Built at worldspawn for
-    // every mod_sprite in cl.model_precache, walking SPR_SINGLE frames
-    // directly and SPR_ANGLED/animated groups via their mspritegroup_t*.
+    // Shared mesh + material per mspriteframe_t*; orientation/scale live on the entity node.
     struct SpriteFrameInfo {
-        merian::MeshID mesh_id;
+        merian::Scene::MeshID mesh_id;
         merian::MaterialID material_id;
     };
     std::unordered_map<mspriteframe_t*, SpriteFrameInfo> sprite_frame_info;
 
-
-    enum class EntityKind : uint8_t {
-        Alias = 0,  // per-entity AliasInstanceMesh
-        Brush = 1,  // per-entity BrushEntityMesh wrapping shared submodel vb/ib
-        Sprite = 2, // instance into shared sprite-frame mesh
-    };
-
-    // Per-entity slot: one SceneNode plus the MeshIDs currently instanced on
-    // it. Only Sprite slots share their mesh across entities; Alias and Brush
-    // own their per-entity meshes.
+    // mod_alias / mod_brush own their per-entity meshes; mod_sprite shares from sprite_frame_info.
     struct EntityMeshSlot {
-        merian::NodeID node_id = merian::NODE_ID_INVALID;
-        merian::SmallVector<merian::MeshID, 1> mesh_ids;
+        merian::Scene::NodeID node_id = merian::Scene::NODE_ID_INVALID;
+        merian::SmallVector<merian::Scene::MeshID, 1> mesh_ids;
         qmodel_t* model = nullptr;
-        EntityKind kind = EntityKind::Alias;
 
-        // Sprite-only: which mspriteframe_t* the shared mesh we're currently
-        // instanced on corresponds to, so frame changes can swap to a
-        // different sprite-frame mesh without rebuilding the node.
         mspriteframe_t* cached_sprite_frame = nullptr;
 
-        // Alias change detection.
         int cached_skinnum = -1;
-        merian::TextureID cached_skin_texnum{};
+        int cached_anim_frame = -1;
         int cached_pose1 = -1;
         int cached_pose2 = -1;
         float cached_blend = -1.f;
@@ -256,37 +244,24 @@ class QuakeScene : public merian::Scene {
         vec3_t cached_angles = {};
     };
     std::unordered_map<entity_t*, EntityMeshSlot> entity_slots;
-    // update_dynamic swaps entity_slots into here at the start of each frame.
-    // acquire_slot migrates entries back as entities are visited; anything
-    // left at the end belonged to entities that disappeared (removed, culled,
-    // or temp-entity slots that got recycled without nulling ent->model, like
-    // expired lightning beams) and gets destroyed.
+    // Holds last frame's slots until each surviving entity migrates back; what
+    // remains belongs to entities that vanished (server-removed, culled, or
+    // temp-entity slots recycled without nulling ent->model — e.g. expired
+    // lightning beams) and is destroyed by release_unused_entities.
     std::unordered_map<entity_t*, EntityMeshSlot> previous_entity_slots;
 
-    void process_entity(entity_t* ent, const merian::CommandBufferHandle& cmd);
-    // Migrate-or-build: if previous_entity_slots holds a compatible slot for
-    // ent it moves back into entity_slots intact; otherwise builds a fresh
-    // one. Returns nullptr if the model type is unsupported or its registry
-    // entry isn't ready yet (e.g. brush submodel geometry pending) — in that
-    // case nothing lands in entity_slots and the entity is silently dropped
-    // for this frame.
-    EntityMeshSlot* acquire_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
-    EntityMeshSlot build_alias_slot(entity_t* ent);
-    EntityMeshSlot build_brush_slot(entity_t* ent, const merian::CommandBufferHandle& cmd);
-    EntityMeshSlot build_sprite_slot(entity_t* ent);
-    void refresh_alias(EntityMeshSlot& slot, entity_t* ent);
-    void refresh_brush(EntityMeshSlot& slot, entity_t* ent);
-    void refresh_sprite(EntityMeshSlot& slot, entity_t* ent);
-    // Tear down a slot: removes owned meshes (Alias, Brush) and its node; for
-    // Sprite slots the shared mesh stays and remove_node detaches the
-    // instance.
+    // Returns nullptr if the previous-frame slot is unusable (caller builds fresh).
+    EntityMeshSlot* migrate_entity_slot(entity_t* ent);
+    void release_unused_entities();
     void destroy_slot(EntityMeshSlot& slot);
 
-    // Particle batch: single mesh, palette-encoded color.
-    bool particle_mesh_built = false;
-    merian::MeshID particle_mesh_id = 0;
-    merian::NodeID particle_node_id = merian::NODE_ID_INVALID;
+    // Single particle mesh with palette-encoded color. The instance is only
+    // attached while extraction yields non-empty geometry — Scene can't
+    // upload empty meshes.
+    merian::Scene::MeshID particle_mesh_id = 0;
+    merian::Scene::NodeID particle_node_id = merian::Scene::NODE_ID_INVALID;
     merian::MaterialID particle_material_id = 0;
+    bool particle_instance_attached = false;
     double prev_cl_time = 0.0;
 
     // Input.
@@ -298,15 +273,13 @@ class QuakeScene : public merian::Scene {
     double mouse_y = 0;
     bool raw_mouse_was_enabled = false;
 
-    // Console commands queued from the graph/UI thread; executed on game
-    // thread.
+    // Queued from graph/UI thread, drained by the game thread.
     std::queue<std::string> pending_commands;
     std::mutex pending_commands_mutex;
 
     // Properties.
     int default_filtering = 0;
     std::string startup_commands{};
-    bool startup_commands_dispatched = false;
     int stop_after_worldspawn = -1;
     bool rebuild_after_stop = true;
     bool overwrite_sun = false;
@@ -315,17 +288,11 @@ class QuakeScene : public merian::Scene {
     bool mu_t_s_overwrite = false;
     float mu_t = 0.0F;
     merian::float3 mu_s_div_mu_t{1};
-    int playermodel = 1;
     bool reproducible_renders = false;
 
-    // HACK texture ids stored once at load.
-    uint32_t texnum_blood = 0;
-    uint32_t texnum_explosion = 0;
+    merian::Scene::CameraID quake_camera;
 
-    merian::CameraID quake_camera;
-
-    // Per-frame entity counters; "newly_created" is bumped inside ensure_*_slot
-    // when a fresh slot is allocated for a new entity.
+    // Per-frame entity counters; newly_created bumps in update_*_entity when a slot is built.
     struct CategoryStats {
         uint32_t active = 0;
         uint32_t newly_created = 0;

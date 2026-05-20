@@ -58,8 +58,7 @@ class QuakeNode : public merian::Node {
     uint32_t argc = 0;
     const char** argv = nullptr;
 
-    // Stashed controller; either applied during lazy scene init or when
-    // set_controller is called after the scene exists.
+    // Controller stashed until lazy scene init completes.
     merian::InputControllerHandle pending_controller;
 
     merian::PtrOutHandle<merian::Scene> con_scene = merian::PtrOut<merian::Scene>::create(true);

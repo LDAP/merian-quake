@@ -8,8 +8,7 @@
 namespace merian_quake {
 
 struct PlayerData {
-    // see PLAYER_* in config.h
-    unsigned char flags;
+    unsigned char flags; // PLAYER_* in config.h
     unsigned char padding0;
     unsigned char padding1;
     unsigned char padding2;
@@ -31,10 +30,9 @@ struct UniformData {
     merian::float4 prev_cam_w_mu_sy;
     merian::float4 prev_cam_u_mu_sz;
 
-    // The texnums for sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn;
+    // sky_rt, sky_bk, sky_lf, sky_ft, sky_up, sky_dn texnums
     std::array<uint16_t, 6> sky;
 
-    // quake time
     float cl_time;
     uint32_t frame;
 
@@ -52,17 +50,15 @@ struct ConstantData {
 };
 
 struct QuakeRenderInfo {
-    // Can be used as push constant.
-    // Updated every frame and only valid if render == true
+    // Push-constant friendly; only valid when render == true.
     UniformData uniform;
 
-    // Does only change if a new world is loaded or settings are changed
+    // Changes only on world load / setting changes.
     ConstantData constant;
 
-    // If this is false do not render, just clear your outputs.
+    // false: do not render, clear outputs.
     bool render;
-    // Set if new constant data is available. For example, if a new map was loaded, maybe reset
-    // stuff?
+    // true: new constant data available (e.g. a new map loaded).
     bool constant_data_update = true;
 };
 

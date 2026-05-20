@@ -7,10 +7,8 @@
 
 namespace merian_quake {
 
-// Static brush geometry in world space. HostPacked source, never dirty after creation.
-// uint32 because gl_warp SubdividePolygon expands water/sky into many small polys —
-// a single texture bucket can exceed 65k verts.
-class QuakeBrushMesh : public merian::Mesh {
+// Static brush geometry in world space, HostPacked.
+class QuakeBrushMesh : public merian::Scene::Mesh {
   public:
     std::vector<merian::PackedVertexData> vertices;
     std::vector<merian::uint3> indices;
@@ -33,9 +31,8 @@ class QuakeBrushMesh : public merian::Mesh {
     }
 };
 
-// Static sprite-frame mesh: 6 sequential vertices (two triangles), no index buffer,
-// no prev_vertices (the engine synthesizes motion vectors from the node transform).
-class QuakeSpriteFrameMesh : public merian::Mesh {
+// Shared sprite quad (6 sequential verts, no index buffer); motion comes from the node.
+class QuakeSpriteFrameMesh : public merian::Scene::Mesh {
   public:
     std::vector<merian::PackedVertexData> vertices;
 
@@ -61,12 +58,11 @@ class QuakeSpriteFrameMesh : public merian::Mesh {
     }
 };
 
-// Per-frame CPU-rebuilt mesh (sprites, particles). Stores prev_vertices for motion vectors.
-class QuakeHostDynamicMesh : public merian::Mesh {
+// Per-frame CPU-rebuilt mesh (particles). Carries prev_vertices for motion vectors.
+class QuakeHostDynamicMesh : public merian::Scene::Mesh {
   public:
     std::vector<merian::PackedVertexData> vertices;
     std::vector<merian::PackedPrevVertexData> prev_vertices;
-    // Empty for IndexType::None — primitive count is then vertices.size() / 3.
     std::vector<merian::uint3> indices;
 
     uint32_t get_vertex_count() const override {
@@ -93,9 +89,9 @@ class QuakeHostDynamicMesh : public merian::Mesh {
     }
 };
 
-// One per visible alias entity. Host-visible staging buffers filled with lerped
-// object-space vertices; Scene copies them to device-local. Persistently mapped.
-class AliasInstanceMesh : public merian::Mesh {
+// Per-entity alias mesh. Persistently mapped staging buffers receive lerped
+// object-space vertices; Scene copies them device-local.
+class AliasInstanceMesh : public merian::Scene::Mesh {
   public:
     merian::BufferHandle vb_staging;
     merian::BufferHandle prev_vb_staging;
@@ -107,8 +103,7 @@ class AliasInstanceMesh : public merian::Mesh {
     merian::PackedPrevVertexData* prev_vb_mapped = nullptr;
 
     AliasInstanceMesh() {
-        // Quake mdl indices are int16.
-        index_type = vk::IndexType::eUint16;
+        index_type = vk::IndexType::eUint16; // mdl indices are int16
     }
 
     ~AliasInstanceMesh() override {
@@ -138,9 +133,8 @@ class AliasInstanceMesh : public merian::Mesh {
     }
 };
 
-// One per (visible brush entity, material partition). Static device-local geometry
-// built once; only the parent SceneNode transform changes per frame.
-class BrushEntityMesh : public merian::Mesh {
+// Per (brush entity, material partition); device-local geometry built once, transform on the node.
+class BrushEntityMesh : public merian::Scene::Mesh {
   public:
     merian::BufferHandle vb;
     merian::BufferHandle ib;
