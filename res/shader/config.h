@@ -21,20 +21,19 @@
 // should match DISTANCE_MC_VERTEX_STATE_COUNT (only increase for testing purposes)
 #define MAX_DISTANCE_MC_VERTEX_STATE_COUNT 10
 
-// Material flags — values for brush variants alias to Quake's SURF_DRAW* bits
-// (see gl_model.h) so msurface_t::flags can be assigned directly. Synthetic
-// flags use bits SURF_* leaves free.
+// Material types — values for brush variants alias to Quake's SURF_DRAW* bits
+// (see gl_model.h) so msurface_t::flags can be assigned directly.
 
-#define MAT_FLAGS_NONE 0
-#define MAT_FLAGS_SKY 0x4      // SURF_DRAWSKY
-#define MAT_FLAGS_LAVA 0x400   // SURF_DRAWLAVA
-#define MAT_FLAGS_SLIME 0x800  // SURF_DRAWSLIME
-#define MAT_FLAGS_TELE 0x1000  // SURF_DRAWTELE
-#define MAT_FLAGS_WATER 0x2000 // SURF_DRAWWATER
-#define MAT_FLAGS_WATERFALL 0x4000
-#define MAT_FLAGS_SPRITE 0x8000
-// material has a solid color. n0 is albedo, n1 is emission (tex can still be used for alpha)
-#define MAT_FLAGS_SOLID 0x1
+#define MAT_TYPE_NONE 0
+#define MAT_TYPE_SKY 0x4      // SURF_DRAWSKY
+#define MAT_TYPE_LAVA 0x400   // SURF_DRAWLAVA
+#define MAT_TYPE_SLIME 0x800  // SURF_DRAWSLIME
+#define MAT_TYPE_TELE 0x1000  // SURF_DRAWTELE
+#define MAT_TYPE_WATER 0x2000 // SURF_DRAWWATER
+#define MAT_TYPE_WATERFALL 0x4000
+
+// Surfaces that get quake_warp applied to their UVs.
+#define MAT_TYPE_WARP (MAT_TYPE_LAVA | MAT_TYPE_SLIME | MAT_TYPE_TELE | MAT_TYPE_WATER)
 
 // Player flags
 

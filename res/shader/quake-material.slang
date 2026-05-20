@@ -49,7 +49,7 @@ float2 quake_waves(const float2 st, const float time) {
 //     buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)]; const
 //     uint16_t flags = extra_data.texnum_fb_flags >> 12;
 
-//     if (flags == MAT_FLAGS_SKY) {
+//     if (flags == MAT_TYPE_SKY) {
 //         const f16vec3 sky = get_sky(hit.wi);
 //         contribution += throughput * sky;
 //         hit.albedo = sky;
@@ -64,7 +64,7 @@ float2 quake_waves(const float2 st, const float time) {
 //     vec2 st = extra_data.st * bary;
 //     if (flags > 0 && flags < 5) {
 //         st = MERIAN_TEXTUREEFFECT_QUAKE_WARPCALC(st, params.cl_time);
-//         if (flags == MAT_FLAGS_WATER) {
+//         if (flags == MAT_TYPE_WATER) {
 //             st += MERIAN_TEXTUREEFFECT_WAVES(st, params.cl_time);
 //             hit.roughness = 0.4hf;
 //         }
@@ -149,7 +149,7 @@ float2 quake_waves(const float2 st, const float time) {
 //             hit.roughness = float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st,
 //             0).r);;
 //         }
-//     } else if (flags == MAT_FLAGS_SOLID) {
+//     } else if (flags == MAT_TYPE_SOLID) {
 //         hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
 //         contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) /
 //         255.hf); return;
@@ -163,10 +163,10 @@ float2 quake_waves(const float2 st, const float time) {
 //     }
 
 //     // MATERIAL
-//     if (flags == MAT_FLAGS_WATERFALL) {
+//     if (flags == MAT_TYPE_WATERFALL) {
 //         hit.albedo = albedo_texture.rgb;
 //         contribution += throughput * hit.albedo;
-//     } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
+//     } else if (flags == MAT_TYPE_SPRITE || flags == MAT_TYPE_TELE) {
 //         hit.albedo = ldr_to_hdr(albedo_texture.rgb);
 //         contribution += throughput * hit.albedo;
 //     } else {
@@ -201,7 +201,7 @@ struct QuakeMaterial : MaterialModel {
     TextureID fullbright_tex;
     TextureID normal_tex;
     TextureID gloss_tex;
-    uint16_t flags;     // MAT_FLAGS_*
+    uint16_t flags;     // MAT_TYPE_*
     uint8_t alpha_mode; // 0: use texture alpha; [1,15] map to [0,1] opaque
     uint8_t _pad;
 
@@ -211,7 +211,7 @@ struct QuakeMaterial : MaterialModel {
 
     QuakeMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        if (get_flags() == MAT_FLAGS_SKY) {
+        if (get_flags() == MAT_TYPE_SKY) {
             QuakeMaterialSample s;
             s.brdf = LambertDiffuseBRDF(0);
             s.frame = OrthonormalFrame(sd.wi);
@@ -241,9 +241,9 @@ struct QuakeMaterial : MaterialModel {
 
         // Albedo / Emission
         float2 uv = sd.uv;
-        if (flags > 0 && flags < 5) {
+        if (flags & MAT_TYPE_WARP) {
             uv = quake_warp(uv, sd.time);
-            if (flags == MAT_FLAGS_WATER) {
+            if (flags == MAT_TYPE_WATER) {
                 uv += quake_waves(uv, sd.time);
                 // hit.roughness = 0.4hf;
             }
@@ -256,9 +256,9 @@ struct QuakeMaterial : MaterialModel {
             albedo = pow(albedo, 1. / 1.2);
         }
 
-        if (get_flags() == MAT_FLAGS_WATERFALL) {
+        if (get_flags() == MAT_TYPE_WATERFALL) {
             s.emission = albedo;
-            // } else if (get_flags() == MAT_FLAGS_TELE || get_flags() == MAT_FLAGS_SPRITE) {
+            // } else if (get_flags() == MAT_TYPE_TELE || get_flags() == MAT_TYPE_SPRITE) {
             //     TODO: Fix on host side!
             //     s.emission = ldr_to_hdr(albedo);
         } else if (fullbright_tex != TextureID(-1)) {

@@ -695,17 +695,17 @@ QuakeMaterial make_brush_material(texture_t* tex, int surf_flags) {
         tex->norm != nullptr ? static_cast<merian::TextureID>(tex->norm->texnum) : QUAKE_NO_TEXTURE;
     m.payload.gloss_tex = tex->gloss != nullptr ? static_cast<merian::TextureID>(tex->gloss->texnum)
                                                 : QUAKE_NO_TEXTURE;
-    // MAT_FLAGS_* alias SURF_DRAW* bits; callers pre-mask with SURF_INTERESTING_BITS.
+    // MAT_TYPE_* alias SURF_DRAW* bits; callers pre-mask with SURF_INTERESTING_BITS.
     m.payload.surface_flags = static_cast<uint16_t>(surf_flags);
     const bool has_alpha =
         tex->gltexture != nullptr && (tex->gltexture->flags & TEXPREF_ALPHA) != 0u;
     m.payload.alpha_mode = has_alpha ? 0u : 15u;
     // ad_tears emissive waterfalls
     if (tex->gltexture != nullptr && strstr(tex->gltexture->name, "wfall") != nullptr) {
-        m.payload.surface_flags = MAT_FLAGS_WATERFALL;
+        m.payload.surface_flags = MAT_TYPE_WATERFALL;
     }
 
-    if (m.payload.surface_flags == MAT_FLAGS_TELE && m.payload.fullbright_tex == QUAKE_NO_TEXTURE) {
+    if (m.payload.surface_flags == MAT_TYPE_TELE && m.payload.fullbright_tex == QUAKE_NO_TEXTURE) {
         m.payload.fullbright_tex = m.header.alpha_texture_id;
     }
     return m;
@@ -727,7 +727,7 @@ QuakeMaterial make_alias_material(aliashdr_t* hdr, int skin, int fm = 0) {
         m.payload.normal_tex = static_cast<merian::TextureID>(hdr->nmtextures[skin][fm]->texnum);
     if (hdr->gstextures[skin][fm] != nullptr)
         m.payload.gloss_tex = static_cast<merian::TextureID>(hdr->gstextures[skin][fm]->texnum);
-    m.payload.surface_flags = MAT_FLAGS_NONE;
+    m.payload.surface_flags = MAT_TYPE_NONE;
     m.payload.alpha_mode = 15;
     return m;
 }
@@ -736,7 +736,7 @@ QuakeMaterial make_sprite_frame_material(mspriteframe_t* frame) {
     QuakeMaterial m;
     if (frame->gltexture != nullptr)
         m.header.alpha_texture_id = static_cast<merian::TextureID>(frame->gltexture->texnum);
-    m.payload.surface_flags = MAT_FLAGS_SPRITE;
+    m.payload.surface_flags = MAT_TYPE_NONE;
     m.payload.alpha_mode = 0;
     m.payload.fullbright_tex = m.header.alpha_texture_id;
     return m;
@@ -1119,7 +1119,7 @@ void QuakeScene::init_particle_batch() {
     QuakeMaterial particle_mat;
     particle_mat.header.alpha_texture_id = static_cast<merian::TextureID>(MAX_GLTEXTURES);
     particle_mat.payload.fullbright_tex = static_cast<merian::TextureID>(MAX_GLTEXTURES + 1);
-    particle_mat.payload.surface_flags = MAT_FLAGS_SOLID;
+    particle_mat.payload.surface_flags = MAT_TYPE_NONE;
     particle_mat.payload.alpha_mode = 15;
     particle_material_id =
         get_material_system()->add_material(quake_material_type_id, particle_mat);

@@ -9,7 +9,7 @@ namespace merian_quake {
 
 // Mirrors the trailing fields of merian::QuakeMaterial in
 // res/shader/quake-material.slang — order, sizes and packing must stay in sync.
-// surface_flags carries MAT_FLAGS_* (res/shader/config.h); brush variants alias
+// surface_flags carries MAT_TYPE_* (res/shader/config.h); brush variants alias
 // Quake's SURF_DRAW* bits so msurface_t::flags can be assigned directly.
 struct QuakeMaterialPayload {
     merian::TextureID fullbright_tex{};

@@ -133,7 +133,7 @@ bool trace_visibility(accelerationStructureEXT tlas, const vec3 from, const vec3
 
     // Need this for restir, because with artificially move the position in trace ray when we hit the skybox...
     const uint16_t flags = buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)].texnum_fb_flags >> 12;
-    if (flags == MAT_FLAGS_SKY) {
+    if (flags == MAT_TYPE_SKY) {
         return true;
     }
 
@@ -182,7 +182,7 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     const VertexExtraData extra_data = buf_ext[nonuniformEXT(rq_instance_id(ray_query))].v[rq_primitive_index(ray_query)];
     const uint16_t flags = extra_data.texnum_fb_flags >> 12;
 
-    if (flags == MAT_FLAGS_SKY) {
+    if (flags == MAT_TYPE_SKY) {
         const f16vec3 sky = get_sky(hit.wi);
         contribution += throughput * sky;
         hit.albedo = sky;
@@ -195,9 +195,9 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
 
     const vec3 bary = rq_barycentrics(ray_query);
     vec2 st = extra_data.st * bary;
-    if (flags > 0 && flags < 5) {
+    if ((flags & MAT_TYPE_WARP) != 0) {
         st = MERIAN_TEXTUREEFFECT_QUAKE_WARPCALC(st, params.cl_time);
-        if (flags == MAT_FLAGS_WATER) {
+        if (flags == MAT_TYPE_WATER) {
             st += MERIAN_TEXTUREEFFECT_WAVES(st, params.cl_time);
             hit.roughness = 0.4hf;
         }
@@ -272,10 +272,6 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
         if (texnum_gloss > 0 && texnum_gloss < MAX_GLTEXTURES) {
             hit.roughness = float16_t(textureLod(img_tex[nonuniformEXT(texnum_gloss)], st, 0).r);;
         }
-    } else if (flags == MAT_FLAGS_SOLID) {
-        hit.albedo = f16vec3(unpack8(extra_data.n0_gloss_norm).rgb) / 255.hf;
-        contribution += throughput * ldr_to_hdr(f16vec3(unpack8(extra_data.n1_brush).rgb) / 255.hf);
-        return;
     } else {
         // Only for alias models. Disabled for now, results in artifacts.
 
@@ -285,10 +281,10 @@ void trace_ray(inout f16vec3 throughput, inout f16vec3 contribution, inout Hit h
     }
 
     // MATERIAL
-    if (flags == MAT_FLAGS_WATERFALL) {
+    if (flags == MAT_TYPE_WATERFALL) {
         hit.albedo = albedo_texture.rgb;
         contribution += throughput * hit.albedo;
-    } else if (flags == MAT_FLAGS_SPRITE || flags == MAT_FLAGS_TELE) {
+    } else if (flags == MAT_TYPE_TELE) {
         hit.albedo = ldr_to_hdr(albedo_texture.rgb);
         contribution += throughput * hit.albedo;
     } else {
