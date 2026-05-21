@@ -969,6 +969,7 @@ void QuakeScene::load_world_brushes() {
             (bucket.tex->gltexture->flags & TEXPREF_ALPHA) == 0u) {
             mesh->flags = mesh->flags | merian::Scene::MeshFlags::IsOpaque;
         }
+        mesh->instance_mask = to_mask(InstanceMask::WORLD);
         mesh->vertices = std::move(bucket.vertices);
         mesh->indices = std::move(bucket.indices);
 
@@ -1071,6 +1072,7 @@ void QuakeScene::register_sprite_models() {
         sprite_mesh->name = fmt::format("sprite:{}:{}", mod->name, debug_idx);
         sprite_mesh->material_id = material_id;
         sprite_mesh->flags = merian::Scene::MeshFlags::TwoSided;
+        sprite_mesh->instance_mask = to_mask(InstanceMask::SPRITE);
 
         const uint32_t enc_n = merian::encode_normal(merian::float3(1, 0, 0));
         const float smax = frame->smax;
@@ -1134,6 +1136,7 @@ void QuakeScene::init_particle_batch() {
     mesh->flags = merian::Scene::MeshFlags::IsMorphed |
                   merian::Scene::MeshFlags::HasVariableTopology |
                   merian::Scene::MeshFlags::FrontCounterClockwise;
+    mesh->instance_mask = to_mask(InstanceMask::PARTICLE);
     particle_mesh_id = add_mesh(std::move(mesh));
     // update_particles attaches the instance lazily on first non-empty extraction.
     particle_instance_attached = false;
@@ -1370,7 +1373,7 @@ void QuakeScene::update_brush_entity(entity_t* ent,
     update_node(slot->node_id, entity_transform(ent));
 }
 
-void QuakeScene::update_sprite_entity(entity_t* ent, const uint8_t /*instance_mask*/) {
+void QuakeScene::update_sprite_entity(entity_t* ent) {
     mspriteframe_t* frame = R_GetSpriteFrame(ent);
     const auto frame_it = sprite_frame_info.find(frame);
     if (frame_it == sprite_frame_info.end())
@@ -1413,32 +1416,38 @@ void QuakeScene::update_entities(const merian::CommandBufferHandle& cmd) {
     entity_slots.clear();
     current_entity_stats = {};
 
-    const auto visit = [&](entity_t* ent, uint8_t instance_mask) {
+    // mask_override != 0 forces a specific bit (viewent / player body);
+    // otherwise the bit is derived from ent->model->type.
+    const auto visit = [&](entity_t* ent, uint8_t mask_override) {
         if (ent == nullptr || ent->model == nullptr)
             return;
         switch (ent->model->type) {
         case mod_alias:
-            update_alias_entity(ent, cmd, instance_mask);
+            update_alias_entity(ent, cmd,
+                                mask_override != 0 ? mask_override : to_mask(InstanceMask::ALIAS));
             break;
         case mod_brush:
-            update_brush_entity(ent, cmd, instance_mask);
+            update_brush_entity(ent, cmd,
+                                mask_override != 0 ? mask_override
+                                                   : to_mask(InstanceMask::BRUSH_ENTITY));
             break;
         case mod_sprite:
-            update_sprite_entity(ent, instance_mask);
+            // sprite mask is baked on the shared frame mesh at register time
+            update_sprite_entity(ent);
             break;
         default:
             break;
         }
     };
 
-    // gun (mask 0x02) and player body (mask 0x04); gbuffer toggles which one renders
-    visit(&cl.viewent, 0x02);
+    // gbuffer toggles between viewent (gun) and player body via the trace mask.
+    visit(&cl.viewent, to_mask(InstanceMask::VIEWENT));
     if (cl.viewentity > 0 && cl.viewentity < cl_max_edicts && cl_entities != nullptr)
-        visit(&cl_entities[cl.viewentity], 0x04);
+        visit(&cl_entities[cl.viewentity], to_mask(InstanceMask::PLAYER_BODY));
     for (int i = 0; i < cl_numvisedicts; i++)
-        visit(cl_visedicts[i], 0x01);
+        visit(cl_visedicts[i], 0);
     for (int i = 0; i < cl.num_statics; i++)
-        visit(&cl_static_entities[i], 0x01);
+        visit(&cl_static_entities[i], 0);
 
     release_unused_entities();
     update_particles();

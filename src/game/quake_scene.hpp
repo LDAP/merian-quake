@@ -24,6 +24,22 @@ extern "C" {
 
 namespace merian_quake {
 
+// One bit per geometry class, written into Mesh::instance_mask. Lets render
+// passes include/exclude classes by ANDing with the TLAS trace mask.
+enum class InstanceMask : uint8_t {
+    WORLD = 1u << 0,        // worldspawn brushes
+    BRUSH_ENTITY = 1u << 1, // moving/submodel brushes (doors, lifts, plats)
+    ALIAS = 1u << 2,        // monsters, items, third-party players
+    SPRITE = 1u << 3,       // sprite billboards
+    PARTICLE = 1u << 4,     // particles
+    VIEWENT = 1u << 5,      // first-person gun (cl.viewent)
+    PLAYER_BODY = 1u << 6,  // local player's third-person body
+};
+
+constexpr uint8_t to_mask(InstanceMask m) {
+    return static_cast<uint8_t>(m);
+}
+
 // Owns Quake's global lifecycle: QuakeSpasm init, the game thread, the input
 // listener, the per-frame scene refresh, and the texture upload pump. Quake
 // runs on static globals so only one instance can exist at a time.
@@ -98,7 +114,7 @@ class QuakeScene : public merian::Scene {
     void update_brush_entity(entity_t* ent,
                              const merian::CommandBufferHandle& cmd,
                              uint8_t instance_mask);
-    void update_sprite_entity(entity_t* ent, uint8_t instance_mask);
+    void update_sprite_entity(entity_t* ent);
     void update_particles();
     void update_animated_materials();
     void update_camera_and_sun();
