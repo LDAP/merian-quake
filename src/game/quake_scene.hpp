@@ -62,6 +62,10 @@ class QuakeScene : public merian::Scene {
     // Expose Quake's `cl.time` to the shader-side scene clock.
     float get_time(float time) override;
 
+    bool is_ready() const override {
+        return render_next;
+    }
+
     merian::MaterialModelID get_quake_material_type_id() const {
         return quake_material_type_id;
     }

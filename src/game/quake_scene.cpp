@@ -329,6 +329,7 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
     tm->resize(MAX_GLTEXTURES + 2);
     quake_material_type_id = material_system->register_material_type(
         QUAKE_MATERIAL_SLANG_TYPE_NAME, QUAKE_MATERIAL_SLANG_MODULE_PATH);
+    material_system->set_alpha_test_threshold(0.7F);
 
     auto cam = std::make_shared<merian::Camera>(merian::float3(1, 0, 0), merian::float3(0, 0, 0),
                                                 get_up(), 90.F, 16.F / 9.F, 0.01F, 1e5f);
