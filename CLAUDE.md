@@ -22,7 +22,7 @@ Run one: `build/subprojects/merian/tests/test-<name>` (e.g. `test-small-vector`)
  Comments
   - Single short line is the default; multi-line walls of text are out. If the explanation needs a
   paragraph, the code probably needs restructuring instead.
-  - Explain why, never what. Identifier names already say what.
+  - Explain why, never what. Identifier names already say what. Don't mention implementation details users of a function, class or interface!
   - Inside long methods, label sub-sections with one-liner comments (// 1. ..., // upload prev vertices)
   — never banner separators.
   - File-level major dividers (// --- Section ---) are allowed sparingly for the obvious lifecycle splits
