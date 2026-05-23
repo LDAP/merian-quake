@@ -686,6 +686,17 @@ std::mutex quake_cache_mutex;
 
 QuakeMaterial make_brush_material(texture_t* tex, int surf_flags) {
     QuakeMaterial m;
+    // Sky brushes carry no surface textures — shading goes through the scene env map.
+    if ((surf_flags & MAT_TYPE_SKY) != 0) {
+        m.header.alpha_texture_id = 0;
+        m.payload.fullbright_tex = QUAKE_NO_TEXTURE;
+        m.payload.normal_tex = QUAKE_NO_TEXTURE;
+        m.payload.gloss_tex = QUAKE_NO_TEXTURE;
+        m.payload.surface_flags = static_cast<uint16_t>(surf_flags);
+        m.payload.alpha_mode = 15u;
+        return m;
+    }
+
     m.header.alpha_texture_id = tex->gltexture != nullptr
                                     ? static_cast<merian::TextureID>(tex->gltexture->texnum)
                                     : QUAKE_NO_TEXTURE;
@@ -969,6 +980,9 @@ void QuakeScene::load_world_brushes() {
         if (bucket.tex->gltexture != nullptr &&
             (bucket.tex->gltexture->flags & TEXPREF_ALPHA) == 0u) {
             mesh->flags = mesh->flags | merian::Scene::MeshFlags::IsOpaque;
+        }
+        if ((bucket.surf_flags & MAT_TYPE_SKY) != 0) {
+            mesh->flags = mesh->flags | merian::Scene::MeshFlags::UseEnvMap;
         }
         mesh->instance_mask = to_mask(InstanceMask::WORLD);
         mesh->vertices = std::move(bucket.vertices);

@@ -28,7 +28,9 @@ class ConfigurationManager {
     }
 
     void store() {
-        graph.store_to_file(CONFIG_NAME);
+        std::filesystem::path config_path =
+            std::getenv(CONFIG_PATH_ENV_VAR) ? std::getenv(CONFIG_PATH_ENV_VAR) : CONFIG_NAME;
+        graph.store_to_file(config_path);
     }
     void get(merian::Properties& config) {
         graph.properties(config);
