@@ -1,6 +1,7 @@
 #include "game/quake_scene.hpp"
 
 #include "../../res/shader/config.h"
+#include "game/quake_env_map.hpp"
 #include "game/quake_extraction.hpp"
 #include "game/quake_material.hpp"
 #include "game/quake_meshes.hpp"
@@ -312,11 +313,10 @@ extern "C" void SNDDMA_UnblockSound(void) {
 QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context,
                        const merian::ContextHandle& context,
                        const merian::ResourceAllocatorHandle& allocator,
-                       const merian::ShaderObjectAllocatorHandle& obj_allocator,
                        const merian::MaterialSystemHandle& material_system,
                        const uint32_t quakespasm_argc,
                        const char** quakespasm_argv)
-    : merian::Scene(compile_context, context, allocator, obj_allocator, material_system) {
+    : merian::Scene(compile_context, context, allocator, material_system) {
 
     if (g_quake_data.quake_scene != nullptr) {
         throw std::runtime_error{"only one QuakeScene can exist (Quake uses static globals)"};
@@ -627,7 +627,8 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
             update_entities(cmd);
             update_animated_materials();
         }
-        update_camera_and_sun();
+        update_camera();
+        update_sky();
 
         const bool in_game = key_dest == key_game;
         controller->set_mouse_grabbed(in_game);
@@ -649,8 +650,8 @@ void QuakeScene::sync_game_thread(const float time_diff) {
     sync_gamestate.pop();
 }
 
-void QuakeScene::update_camera_and_sun() {
-    MERIAN_PROFILE_SCOPE("camera & sun");
+void QuakeScene::update_camera() {
+    MERIAN_PROFILE_SCOPE("camera");
 
     const auto cam = get_camera(quake_camera);
     assert(cam);
@@ -667,17 +668,6 @@ void QuakeScene::update_camera_and_sun() {
     cam->look_at(pos, pos + merian::float3(fwd[0], fwd[1], fwd[2]),
                  merian::float3(up[0], up[1], up[2]), r_refdef.fov_x);
     cam->set_aspect_ratio(aspect);
-
-    if (overwrite_sun) {
-        sun_color = overwrite_sun_col;
-        sun_direction = overwrite_sun_dir;
-    } else {
-        sun_color = g_quake_data.current_sun_color;
-        sun_direction = g_quake_data.current_sun_direction;
-    }
-    if (merian::length(sun_direction) > 0) {
-        sun_direction = merian::normalize(sun_direction);
-    }
 }
 
 namespace {
@@ -884,10 +874,6 @@ void QuakeScene::load_world(const merian::CommandBufferHandle& cmd) {
         MERIAN_PROFILE_SCOPE("init_particle_batch");
         init_particle_batch();
     }
-    {
-        MERIAN_PROFILE_SCOPE("update_sky");
-        update_sky();
-    }
 
     world_meshes_built = true;
 }
@@ -998,40 +984,33 @@ void QuakeScene::load_world_brushes() {
 }
 
 void QuakeScene::update_sky() {
-    const merian::float3 active_sun_dir =
-        overwrite_sun ? overwrite_sun_dir : g_quake_data.current_sun_direction;
-    const merian::float3 active_sun_color =
-        overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
+    MERIAN_PROFILE_SCOPE("sky");
 
-    std::string source = "import shader.quake_sky;\n";
-    source += "namespace merian {\n";
-    source += fmt::format("export static const float3 sun_dir = float3({:.6f}, {:.6f}, {:.6f});\n",
-                          active_sun_dir.x, active_sun_dir.y, active_sun_dir.z);
-    source +=
-        fmt::format("export static const float3 sun_color = float3({:.6f}, {:.6f}, {:.6f});\n",
-                    active_sun_color.r, active_sun_color.g, active_sun_color.b);
+    const merian::float3 raw_dir =
+        overwrite_sun ? overwrite_sun_dir : g_quake_data.current_sun_direction;
+    const merian::float3 sun_dir =
+        merian::length(raw_dir) > 0 ? merian::normalize(raw_dir) : raw_dir;
+    const merian::float3 sun_col =
+        overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
+    const auto tid = [](uint32_t texnum) { return static_cast<merian::TextureID>(texnum); };
 
     if (skybox_name[0] != 0) {
-        const auto t = [](int i) -> uint32_t {
-            return skybox_textures[i] != nullptr ? skybox_textures[i]->texnum : 0u;
-        };
-        source += fmt::format("export static const QuakeSky sky = CubemapSky("
-                              "TextureID({}), TextureID({}), TextureID({}), "
-                              "TextureID({}), TextureID({}), TextureID({}));\n",
-                              t(0), t(1), t(2), t(3), t(4), t(5));
+        std::array<merian::TextureID, 6> faces;
+        for (int i = 0; i < 6; ++i) {
+            faces[i] = skybox_textures[i] != nullptr ? tid(skybox_textures[i]->texnum) : tid(0);
+        }
+        auto env = std::make_shared<merian_quake::QuakeCubemapSkyEnvMap>(faces);
+        env->set_sun(sun_dir, sun_col);
+        set_env(env);
     } else if (solidskytexture != nullptr) {
-        const uint32_t solid = solidskytexture->texnum;
-        const uint32_t alpha = alphaskytexture != nullptr ? alphaskytexture->texnum : 0u;
-        source += fmt::format(
-            "export static const QuakeSky sky = ClassicSky(TextureID({}), TextureID({}));\n", solid,
-            alpha);
+        const merian::TextureID solid = tid(solidskytexture->texnum);
+        const merian::TextureID alpha = alphaskytexture != nullptr ? tid(alphaskytexture->texnum) : tid(0);
+        auto env = std::make_shared<merian_quake::QuakeClassicSkyEnvMap>(solid, alpha);
+        env->set_sun(sun_dir, sun_col);
+        set_env(env);
     } else {
-        source += "export static const QuakeSky sky = BlackSky();\n";
+        set_env(std::make_shared<merian::EmptyEnvMap>());
     }
-    source += "}\n";
-
-    get_material_system()->get_composition()->add_module_from_string("merian_quake_scene_spec",
-                                                                     source);
 }
 
 void QuakeScene::register_alias_models(const merian::CommandBufferHandle& cmd) {
@@ -1579,9 +1558,12 @@ void QuakeScene::properties(merian::Properties& config) {
                                        std::pow(fog_color[1], 1.F / 1.2F) * fog_t,
                                        std::pow(fog_color[2], 1.F / 1.2F) * fog_t));
     }
+    const merian::float3 sd =
+        overwrite_sun ? overwrite_sun_dir : g_quake_data.current_sun_direction;
+    const merian::float3 sc =
+        overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
     config.output_text(fmt::format("sun direction: ({}, {}, {})\nsun color: ({}, {}, {})",
-                                   sun_direction.x, sun_direction.y, sun_direction.z, sun_color.r,
-                                   sun_color.g, sun_color.b));
+                                   sd.x, sd.y, sd.z, sc.r, sc.g, sc.b));
     config.output_text(fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                                    r_refdef.viewangles[1], r_refdef.viewangles[2]));
     config.output_text(fmt::format("server fps: {}", server_fps));

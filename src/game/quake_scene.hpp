@@ -4,7 +4,6 @@
 
 #include "merian-shaders/scene/scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
-#include "merian/shader/shader_object_allocator.hpp"
 #include "merian/utils/concurrent/concurrent_queue.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
@@ -48,7 +47,6 @@ class QuakeScene : public merian::Scene {
     QuakeScene(const merian::ShaderCompileContextHandle& compile_context,
                const merian::ContextHandle& context,
                const merian::ResourceAllocatorHandle& allocator,
-               const merian::ShaderObjectAllocatorHandle& obj_allocator,
                const merian::MaterialSystemHandle& material_system,
                uint32_t quakespasm_argc,
                const char** quakespasm_argv);
@@ -121,7 +119,7 @@ class QuakeScene : public merian::Scene {
     void update_sprite_entity(entity_t* ent);
     void update_particles();
     void update_animated_materials();
-    void update_camera_and_sun();
+    void update_camera();
 
   private:
     merian::MaterialModelID quake_material_type_id{};
@@ -140,8 +138,6 @@ class QuakeScene : public merian::Scene {
     uint64_t last_worldspawn_frame = 0;
     double server_fps = 0;
 
-    merian::float3 sun_color{};
-    merian::float3 sun_direction{0, 0, 1};
     float volume_max_t = 1000.F;
 
     // Static brush world: rebuilt on every worldspawn.

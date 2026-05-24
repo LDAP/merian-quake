@@ -2,7 +2,6 @@
 
 #include "../../res/shader/config.h"
 #include "merian/shader/shader_compile_context.hpp"
-#include "merian/shader/shader_object_allocator.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -25,6 +24,16 @@ void QuakeNode::initialize(const merian::ContextHandle& context,
     this->context = context;
     this->allocator = allocator;
     compile_context = merian::ShaderCompileContext::create(context);
+    texture_manager = std::make_shared<merian::TextureManager>(compile_context, context, allocator,
+                                                               MAX_GLTEXTURES);
+    material_system = std::make_shared<merian::MaterialSystem>(compile_context, context, allocator,
+                                                               texture_manager);
+    scene = std::make_shared<merian_quake::QuakeScene>(compile_context, context, allocator,
+                                                       material_system, argc, argv);
+    if (pending_controller) {
+        scene->set_controller(pending_controller);
+        pending_controller.reset();
+    }
 }
 
 std::vector<merian::OutputConnectorDescriptor>
@@ -36,24 +45,6 @@ void QuakeNode::process(merian::GraphRun& run,
                         [[maybe_unused]] const merian::DescriptorSetHandle& descriptor_set,
                         const merian::NodeIO& io) {
     const merian::CommandBufferHandle& cmd = run.get_cmd();
-
-    // Lazy init so we know iterations_in_flight for the obj_allocator (cf. GLTFSceneNode).
-    if (!obj_allocator) {
-        obj_allocator = std::make_shared<merian::FrameCachingShaderObjectAllocator>(
-            allocator, run.get_iterations_in_flight());
-        texture_manager = std::make_shared<merian::TextureManager>(
-            compile_context, context, allocator, obj_allocator, MAX_GLTEXTURES);
-        material_system = std::make_shared<merian::MaterialSystem>(
-            compile_context, context, allocator, obj_allocator, texture_manager);
-        scene = std::make_shared<merian_quake::QuakeScene>(
-            compile_context, context, allocator, obj_allocator, material_system, argc, argv);
-        if (pending_controller) {
-            scene->set_controller(pending_controller);
-            pending_controller.reset();
-        }
-    }
-
-    obj_allocator->set_iteration(run.get_in_flight_index());
 
     scene->update(cmd, static_cast<float>(run.get_elapsed()),
                   static_cast<float>(run.get_time_delta()), run.get_total_iteration());

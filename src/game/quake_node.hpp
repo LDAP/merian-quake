@@ -49,7 +49,6 @@ class QuakeNode : public merian::Node {
     merian::ContextHandle context;
     merian::ResourceAllocatorHandle allocator;
     merian::ShaderCompileContextHandle compile_context;
-    std::shared_ptr<merian::FrameCachingShaderObjectAllocator> obj_allocator;
     merian::TextureManagerHandle texture_manager;
     merian::MaterialSystemHandle material_system;
 
@@ -58,7 +57,7 @@ class QuakeNode : public merian::Node {
     uint32_t argc = 0;
     const char** argv = nullptr;
 
-    // Controller stashed until lazy scene init completes.
+    // Stashed until initialize() runs — main calls set_controller before the graph initializes us.
     merian::InputControllerHandle pending_controller;
 
     merian::PtrOutHandle<merian::Scene> con_scene = merian::PtrOut<merian::Scene>::create(true);

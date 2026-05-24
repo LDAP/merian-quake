@@ -4,28 +4,9 @@
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
 
-import merian_shaders.distributions.von_mises_fisher;
-import shader.quake_sky;
-
 #include "shader/quake-material.slangh"
 
 namespace merian {
-
-// Scene-overridable: scenes drop a Slang module into the material composition
-// that re-declares any of these with `export static const ...` to specialize.
-extern static const float3 sun_dir = float3(0, 0, 1);
-extern static const float3 sun_color = float3(0);
-extern static const QuakeSky sky = BlackSky();
-
-float3 eval_sun(const float3 dir) {
-    float3 sun = float3(0);
-
-    sun += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(sun_dir, dir))), 4.0hf);
-    sun += 5.0hf * float16_t(vmf_pdf_tokuyoshi(dir, sun_dir, 3000.0));
-    sun *= sun_color;
-
-    return sun;
-}
 
 // this took way to long to get right...
 float3 ldr_to_hdr(float3 color) {
@@ -211,19 +192,6 @@ struct QuakeMaterial : MaterialModel {
 
     QuakeMaterialSample
     get_sample(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
-        if (get_flags() == MAT_TYPE_SKY) {
-            QuakeMaterialSample s;
-            s.brdf = LambertDiffuseBRDF(0);
-            s.frame = OrthonormalFrame(sd.wi);
-            s.emission = sky.eval(-sd.wi, sd.time, tm);
-
-            if (sd.bounce > 0) {
-                s.emission += eval_sun(-sd.wi);
-            }
-
-            return s;
-        }
-
         // Normal
         QuakeMaterialSample s;
         if (normal_tex != TextureID(-1)) {

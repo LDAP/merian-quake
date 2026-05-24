@@ -31,6 +31,9 @@ Run one: `build/subprojects/merian/tests/test-<name>` (e.g. `test-small-vector`)
   the legacy motion-vector computation in quake_helpers.cpp").
   - Keep TODOs as commented-out future code when the code is the clearest spec for the deferred work;
   otherwise delete.
+  - Do NOT comment about how subclasses might override, design alternatives considered, or future intent.
+   That belongs in the PR, not the code.
+
 
   Naming
   - Descriptive: mesh_id, node_id, vertex_count, prim_count — not mid, nid, vc.

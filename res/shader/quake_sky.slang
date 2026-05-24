@@ -1,89 +1,92 @@
-// Sky shading types used by quake-material.slang. The actual link-time
-// `extern static const QuakeSky sky` declaration lives next to the material.
-// Scene-side override modules can `import shader.quake_sky;` to get these
-// types in scope, then specialize the value as e.g.:
-//
-//   namespace merian {
-//       export static const QuakeSky sky = CubemapSky(...);
-//   }
+__exported import merian_shaders.scene.environment_map;
 
-__exported import merian_shaders.utils.texture_manager;
 import merian_shaders.utils.envmap;
+import merian_shaders.distributions.von_mises_fisher;
 
 namespace merian {
 
-interface QuakeSky {
-    float3 eval(const float3 dir, const float time, const TextureManager tm);
-};
+float3 quake_sun(const float3 dir, const float3 sun_dir, const float3 sun_color) {
+    float3 sun = float3(0);
+    sun += 0.5hf * pow(0.5hf * (1.0hf + float16_t(dot(sun_dir, dir))), 4.0hf);
+    sun += 5.0hf * float16_t(vmf_pdf_tokuyoshi(dir, sun_dir, 3000.0));
+    return sun * sun_color;
+}
 
-struct BlackSky : QuakeSky {
-    float3 eval(const float3 dir, const float time, const TextureManager tm) {
-        return float3(0);
-    }
-};
+struct QuakeClassicSkyEnvMap : IEnvMap {
+    TextureID solid;
+    TextureID alpha;
+    float3 sun_dir;
+    float3 sun_color;
 
-struct ClassicSky : QuakeSky {
-    TextureID tex_bck;
-    TextureID tex_fnt;
-
-    float3 eval(const float3 dir, const float time, const TextureManager tm) {
-        const float2 st = 0.5 + 1. * float2(dir.x, dir.y) / abs(dir.z);
-        const float2 t = time * float2(0.12, 0.12);
-        const float4 bck = tm.get_sampler2D(tex_bck).SampleLevel(st + 0.5 * t, 0);
-        const float4 fnt = tm.get_sampler2D(tex_fnt).SampleLevel(st + t, 0);
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+        const float3 dir = -sd.wi;
+        const float2 st = 0.5 + float2(dir.x, dir.y) / abs(dir.z);
+        const float2 t = sd.time * float2(0.12, 0.12);
+        const float4 bck = lod.sample(tm.get_sampler2D(solid), st + 0.5 * t);
+        const float4 fnt = lod.sample(tm.get_sampler2D(alpha), st + t);
         const float3 tex = lerp(bck.rgb, fnt.rgb, fnt.a);
-
-        return 10.0 * (exp2(3.5 * tex) - 1.0);
+        float3 emission = 10.0 * (exp2(3.5 * tex) - 1.0);
+        if (sd.bounce > 0) {
+            emission += quake_sun(dir, sun_dir, sun_color);
+        }
+        return emission;
     }
-};
+}
 
-struct CubemapSky : QuakeSky {
-    TextureID sky_rt;
-    TextureID sky_bk;
-    TextureID sky_lf;
-    TextureID sky_ft;
-    TextureID sky_up;
-    TextureID sky_dn;
+struct QuakeCubemapSkyEnvMap : IEnvMap {
+    TextureID rt;
+    TextureID bk;
+    TextureID lf;
+    TextureID ft;
+    TextureID up;
+    TextureID dn;
+    float3 sun_dir;
+    float3 sun_color;
 
-    float3 eval(const float3 dir, const float time, const TextureManager tm) {
-        TextureID tex_id = 0;
-        float2 st;
+    float3 eval(const ShadingData sd, const TextureManager tm, const LODSampler2D lod) {
+        const float3 dir = -sd.wi;
+        TextureID id = rt;
+        float2 uv;
 
         switch (cubemap_side(dir)) {
         case 0: {
-            tex_id = sky_rt;
-            st = 0.5 + 0.5 * float2(-dir.y, -dir.z) / abs(dir.x);
+            id = rt;
+            uv = 0.5 + 0.5 * float2(-dir.y, -dir.z) / abs(dir.x);
             break;
         }
         case 1: {
-            tex_id = sky_lf;
-            st = 0.5 + 0.5 * float2(dir.y, -dir.z) / abs(dir.x);
+            id = lf;
+            uv = 0.5 + 0.5 * float2(dir.y, -dir.z) / abs(dir.x);
             break;
         }
         case 2: {
-            tex_id = sky_bk;
-            st = 0.5 + 0.5 * float2(dir.x, -dir.z) / abs(dir.y);
+            id = bk;
+            uv = 0.5 + 0.5 * float2(dir.x, -dir.z) / abs(dir.y);
             break;
         }
         case 3: {
-            tex_id = sky_ft;
-            st = 0.5 + 0.5 * float2(-dir.x, -dir.z) / abs(dir.y);
+            id = ft;
+            uv = 0.5 + 0.5 * float2(-dir.x, -dir.z) / abs(dir.y);
             break;
         }
         case 4: {
-            tex_id = sky_up;
-            st = 0.5 + 0.5 * float2(-dir.y, dir.x) / abs(dir.z);
+            id = up;
+            uv = 0.5 + 0.5 * float2(-dir.y, dir.x) / abs(dir.z);
             break;
         }
         case 5: {
-            tex_id = sky_dn;
-            st = 0.5 + 0.5 * float2(-dir.y, -dir.x) / abs(dir.z);
+            id = dn;
+            uv = 0.5 + 0.5 * float2(-dir.y, -dir.x) / abs(dir.z);
             break;
         }
         }
 
-        return tm.get_sampler2D(tex_id).SampleLevel(st, 0).rgb;
+        float3 emission = lod.sample(tm.get_sampler2D(id), uv).rgb;
+        if (sd.bounce > 0) {
+            emission += quake_sun(dir, sun_dir, sun_color);
+        }
+        return emission;
     }
-};
+}
 
 }
