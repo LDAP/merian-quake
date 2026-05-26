@@ -1013,7 +1013,7 @@ void QuakeScene::load_world_brushes() {
         mesh->name =
             fmt::format("worldspawn:{}", bucket.tex->name[0] != 0 ? bucket.tex->name : "unnamed");
         mesh->material_id = material_id;
-        mesh->flags = merian::Scene::MeshFlags::FrontCounterClockwise;
+        mesh->flags = merian::Scene::MeshFlags::FlipFacing;
         if (bucket.tex->gltexture != nullptr &&
             (bucket.tex->gltexture->flags & TEXPREF_ALPHA) == 0u) {
             mesh->flags = mesh->flags | merian::Scene::MeshFlags::IsOpaque;
@@ -1181,7 +1181,7 @@ void QuakeScene::init_particle_batch() {
     mesh->material_id = particle_material_id;
     mesh->flags = merian::Scene::MeshFlags::IsMorphed |
                   merian::Scene::MeshFlags::HasVariableTopology |
-                  merian::Scene::MeshFlags::FrontCounterClockwise;
+                  merian::Scene::MeshFlags::FlipFacing;
     mesh->instance_mask = to_mask(InstanceMask::PARTICLE);
     particle_mesh_id = add_mesh(std::move(mesh));
     // update_particles attaches the instance lazily on first non-empty extraction.
@@ -1260,7 +1260,7 @@ void QuakeScene::update_alias_entity(entity_t* ent,
         mesh->name = fmt::format("alias:{}", ent->model->name);
         mesh->material_id = material_id;
         mesh->flags =
-            merian::Scene::MeshFlags::IsMorphed | merian::Scene::MeshFlags::FrontCounterClockwise;
+            merian::Scene::MeshFlags::IsMorphed | merian::Scene::MeshFlags::FlipFacing;
         mesh->instance_mask = instance_mask;
         mesh->vb_staging = std::move(vb);
         mesh->prev_vb_staging = std::move(prev_vb);
@@ -1394,7 +1394,7 @@ void QuakeScene::update_brush_entity(entity_t* ent,
             auto mesh = std::make_unique<BrushEntityMesh>();
             mesh->name = fmt::format("brush:{}:{}", ent->model->name, part.material_id);
             mesh->material_id = part.material_id;
-            mesh->flags = merian::Scene::MeshFlags::FrontCounterClockwise;
+            mesh->flags = merian::Scene::MeshFlags::FlipFacing;
             if (!part.has_alpha)
                 mesh->flags = mesh->flags | merian::Scene::MeshFlags::IsOpaque;
             mesh->instance_mask = instance_mask;
@@ -1434,6 +1434,7 @@ void QuakeScene::update_sprite_entity(entity_t* ent) {
         fresh.node_id = node_id;
         fresh.mesh_ids = {frame_it->second.mesh_id};
         fresh.model = ent->model;
+        fresh.owns_meshes = false;
         fresh.cached_sprite_frame = frame;
         auto [it, _] = entity_slots.emplace(ent, std::move(fresh));
         slot = &it->second;
