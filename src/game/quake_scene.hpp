@@ -1,12 +1,14 @@
 #pragma once
 
 #include "game/quake_material.hpp"
+#include "game/quake_draw.hpp"
 
 #include "merian-shaders/scene/scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/concurrent/concurrent_queue.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
+#include "merian/vk/window/window.hpp"
 #include "merian/utils/input_listener.hpp"
 #include "merian/utils/properties.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -61,7 +63,7 @@ class QuakeScene : public merian::Scene {
     float get_time(float time) override;
 
     bool is_ready() const override {
-        return render_next;
+        return last_scene_rendered;
     }
 
     merian::MaterialModelID get_quake_material_type_id() const {
@@ -74,8 +76,10 @@ class QuakeScene : public merian::Scene {
         return resolution;
     }
 
-    // Pass a dummy controller to detach.
-    void set_controller(const merian::InputControllerHandle& controller);
+    // Pass a dummy controller to detach. The window enables text-input
+    // toggling (Quake console / menu typing); pass nullptr to skip.
+    void set_controller(const merian::InputControllerHandle& controller,
+                        const merian::WindowHandle& window = nullptr);
 
     void queue_command(const std::string& command);
 
@@ -85,6 +89,18 @@ class QuakeScene : public merian::Scene {
     void cb_IN_Move(usercmd_t* cmd);
     void cb_R_RenderScene();
     void cb_QS_worldspawn();
+
+    // 2D draw stream hooks. Sticky state until next set_*.
+    void cb_QS_ui_set_canvas(const UICanvas& canvas);
+    void cb_QS_ui_set_scissor(const UIScissor& scissor);
+    void cb_QS_ui_set_color(uint32_t rgba);
+    void cb_QS_ui_push_quad(const UIDrawCmd& cmd);
+    void cb_QS_ui_frame_ready();
+
+    // Snapshot of the UI draw commands captured during the most recent on_update().
+    const std::shared_ptr<UIDrawCommands>& get_ui_draw_commands() const {
+        return last_ui_draw_commands;
+    }
 
     // Called by QuakeNode::properties() to surface Quake-level settings.
     void properties(merian::Properties& config);
@@ -108,7 +124,6 @@ class QuakeScene : public merian::Scene {
     void update_sky();
 
     // --- Per-frame ---
-    void sync_game_thread(float time_diff);
     void update_entities(const merian::CommandBufferHandle& cmd);
     void update_alias_entity(entity_t* ent,
                              const merian::CommandBufferHandle& cmd,
@@ -126,13 +141,14 @@ class QuakeScene : public merian::Scene {
 
     vk::Extent3D resolution{};
 
-    // Game thread / synchronization.
-    std::thread game_thread;
-    std::atomic_bool game_running{true};
-    merian::ConcurrentQueue<bool> sync_gamestate;
-    merian::ConcurrentQueue<float> sync_render;
-
-    bool render_next = false;
+    // Set while Host_Frame runs; callbacks use it for GPU-side work.
+    merian::CommandBufferHandle active_cmd;
+    UIDrawCommands ui_draw_commands;
+    UICanvas ui_current_canvas{};
+    UIScissor ui_current_scissor{0, 0, 0, -1};
+    uint32_t ui_current_color = 0xFFFFFFFFu;
+    std::shared_ptr<UIDrawCommands> last_ui_draw_commands = std::make_shared<UIDrawCommands>();
+    bool last_scene_rendered = false;
     bool update_gamestate = true;
     uint64_t frame = 0;
     uint64_t last_worldspawn_frame = 0;
@@ -282,7 +298,9 @@ class QuakeScene : public merian::Scene {
 
     // Input.
     merian::InputControllerHandle controller = std::make_shared<merian::DummyInputController>();
+    merian::WindowHandle window;
     std::shared_ptr<merian::InputListener> input_listener;
+    std::optional<bool> input_in_game;
     double mouse_oldx = 0;
     double mouse_oldy = 0;
     double mouse_x = 0;

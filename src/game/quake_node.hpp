@@ -2,6 +2,7 @@
 
 #include "game/quake_render_info.hpp"
 #include "game/quake_scene.hpp"
+#include "game/quake_draw.hpp"
 
 #include "../../res/shader/config.h"
 #include "merian-nodes/connectors/ptr_out.hpp"
@@ -41,7 +42,8 @@ class QuakeNode : public merian::Node {
 
     void set_cmd_args(uint32_t argc, const char** argv);
 
-    void set_controller(const merian::InputControllerHandle& controller);
+    void set_controller(const merian::InputControllerHandle& controller,
+                        const merian::WindowHandle& window = nullptr);
 
     void queue_command(const std::string& command);
 
@@ -59,6 +61,9 @@ class QuakeNode : public merian::Node {
 
     // Stashed until initialize() runs — main calls set_controller before the graph initializes us.
     merian::InputControllerHandle pending_controller;
+    merian::WindowHandle pending_window;
 
     merian::PtrOutHandle<merian::Scene> con_scene = merian::PtrOut<merian::Scene>::create(true);
+    merian::PtrOutHandle<merian_quake::UIDrawCommands> con_ui_draw_commands =
+        merian::PtrOut<merian_quake::UIDrawCommands>::create(true);
 };

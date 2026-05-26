@@ -8,8 +8,7 @@
 QuakeNode::QuakeNode() : Node() {}
 
 QuakeNode::~QuakeNode() {
-    // Tear down the scene first so Quake shuts down before the allocator goes away.
-    scene.reset();
+    scene.reset(); // before the allocator
 }
 
 merian::DeviceSupportInfo
@@ -31,14 +30,15 @@ void QuakeNode::initialize(const merian::ContextHandle& context,
     scene = std::make_shared<merian_quake::QuakeScene>(compile_context, context, allocator,
                                                        material_system, argc, argv);
     if (pending_controller) {
-        scene->set_controller(pending_controller);
+        scene->set_controller(pending_controller, pending_window);
         pending_controller.reset();
+        pending_window.reset();
     }
 }
 
 std::vector<merian::OutputConnectorDescriptor>
 QuakeNode::describe_outputs([[maybe_unused]] const merian::NodeIOLayout& io_layout) {
-    return {{"scene", con_scene}};
+    return {{"scene", con_scene}, {"ui_draw_commands", con_ui_draw_commands}};
 }
 
 void QuakeNode::process(merian::GraphRun& run,
@@ -50,6 +50,7 @@ void QuakeNode::process(merian::GraphRun& run,
                   static_cast<float>(run.get_time_delta()), run.get_total_iteration());
 
     io[con_scene] = std::static_pointer_cast<merian::Scene>(scene);
+    io[con_ui_draw_commands] = scene->get_ui_draw_commands();
 }
 
 QuakeNode::NodeStatusFlags QuakeNode::properties(merian::Properties& config) {
@@ -63,11 +64,13 @@ void QuakeNode::set_cmd_args(const uint32_t argc, const char** argv) {
     this->argv = argv;
 }
 
-void QuakeNode::set_controller(const merian::InputControllerHandle& controller) {
+void QuakeNode::set_controller(const merian::InputControllerHandle& controller,
+                               const merian::WindowHandle& window) {
     if (scene) {
-        scene->set_controller(controller);
+        scene->set_controller(controller, window);
     } else {
         pending_controller = controller;
+        pending_window = window;
     }
 }
 

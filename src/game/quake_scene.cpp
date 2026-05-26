@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <csignal>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -25,6 +26,7 @@
 
 extern "C" {
 #include "bgmusic.h"
+#include "qs_ui_hook.h"
 #include "quakedef.h"
 #include "screen.h"
 
@@ -196,6 +198,50 @@ extern "C" void R_RenderScene() {
         g_quake_data.quake_scene->cb_R_RenderScene();
 }
 
+extern "C" void Host_Quit_f() {
+    if (key_dest != key_console && cls.state != ca_dedicated) {
+        M_Menu_Quit_f();
+        return;
+    }
+    SPDLOG_INFO("quit requested by Quake");
+    std::raise(SIGINT);
+}
+
+extern "C" void QS_ui_set_canvas(float ortho_l,
+                                 float ortho_r,
+                                 float ortho_b,
+                                 float ortho_t,
+                                 int viewport_x,
+                                 int viewport_y,
+                                 int viewport_w,
+                                 int viewport_h) {
+    if (g_quake_data.quake_scene)
+        g_quake_data.quake_scene->cb_QS_ui_set_canvas(UICanvas{
+            ortho_l, ortho_r, ortho_b, ortho_t, viewport_x, viewport_y, viewport_w, viewport_h});
+}
+
+extern "C" void QS_ui_set_scissor(int x, int y, int w, int h) {
+    if (g_quake_data.quake_scene)
+        g_quake_data.quake_scene->cb_QS_ui_set_scissor(UIScissor{x, y, w, h});
+}
+
+extern "C" void QS_ui_set_color(uint32_t rgba) {
+    if (g_quake_data.quake_scene)
+        g_quake_data.quake_scene->cb_QS_ui_set_color(rgba);
+}
+
+extern "C" void QS_ui_push_quad(
+    int texnum, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1) {
+    if (g_quake_data.quake_scene)
+        g_quake_data.quake_scene->cb_QS_ui_push_quad(
+            UIDrawCmd{{x0, y0, x1, y1}, {u0, v0, u1, v1}, texnum});
+}
+
+extern "C" void QS_ui_frame_ready() {
+    if (g_quake_data.quake_scene)
+        g_quake_data.quake_scene->cb_QS_ui_frame_ready();
+}
+
 extern "C" qboolean SNDDMA_Init(dma_t* dma) {
     if (!g_quake_data.audio_device)
         return false;
@@ -344,60 +390,9 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
     host_parms = &g_quake_data.params;
 
     init_quakespasm(quakespasm_argc, quakespasm_argv);
-
-    // Upload palette textures AFTER Quake init so d_8to24table is populated.
-    tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES), d_8to24table, 256, 1,
-                               vk::SamplerAddressMode::eClampToEdge, vk::Filter::eNearest,
-                               vk::Filter::eNearest, true, false);
-    // hack for rocket trails and explosions
-    std::array<uint32_t, 256> fb_palette{};
-    std::memcpy(fb_palette.data(), d_8to24table_fbright, sizeof(fb_palette));
-    for (uint32_t i = 96; i <= 111; i++)
-        fb_palette[i] = d_8to24table[i];
-    tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES + 1),
-                               fb_palette.data(), 256, 1, vk::SamplerAddressMode::eClampToEdge,
-                               vk::Filter::eNearest, vk::Filter::eNearest, true, false);
-
-    game_thread = std::thread([this] {
-        merian::Stopwatch sw;
-        while (game_running.load()) {
-            {
-                std::lock_guard<std::mutex> lock(pending_commands_mutex);
-                if (!pending_commands.empty()) {
-                    Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
-                    pending_commands.pop();
-                }
-            }
-            try {
-                render_next = false;
-                Host_Frame(g_quake_data.timediff);
-                if (!render_next) {
-                    sync_gamestate.push(true, 1);
-                    if (!game_running.load()) {
-                        throw std::runtime_error{"quit"};
-                    }
-                    g_quake_data.timediff = sync_render.pop();
-                }
-            } catch (const std::runtime_error&) {
-                // game quit; loop checks game_running and exits.
-            }
-            server_fps = 1 / sw.seconds();
-            sw.reset();
-        }
-    });
-    sync_gamestate.pop();
-
-    resolution =
-        vk::Extent3D{static_cast<uint32_t>(vid.width), static_cast<uint32_t>(vid.height), 1U};
 }
 
 QuakeScene::~QuakeScene() {
-    game_running.store(false);
-    // unblock the game thread
-    sync_render.push(0);
-    sync_render.push(0);
-    game_thread.join();
-
     shutdown_quakespasm();
 }
 
@@ -405,15 +400,15 @@ float QuakeScene::get_time(const float /*time*/) {
     return static_cast<float>(cl.time);
 }
 
-void QuakeScene::set_controller(const merian::InputControllerHandle& controller) {
-    if (input_listener && this->controller) {
-        // detach existing listener so we don't double-register on the new
-        // controller.
-        this->controller->add_listener(input_listener, 0);
-    }
+void QuakeScene::set_controller(const merian::InputControllerHandle& controller,
+                                const merian::WindowHandle& window) {
+    // Drop the old listener so its weak_ptr on the old controller expires.
+    input_listener.reset();
+    input_in_game.reset();
     this->controller = controller ? controller
                                   : std::static_pointer_cast<merian::InputController>(
                                         std::make_shared<merian::DummyInputController>());
+    this->window = window;
     register_input_listener(this->controller);
 }
 
@@ -500,14 +495,21 @@ void QuakeScene::register_input_listener(const merian::InputControllerHandle& co
             return true;
         }
 
-        bool on_scroll(merian::InputController& /*c*/, double xoffset, double yoffset) override {
+        bool on_scroll(merian::InputController& /*c*/, double /*xoffset*/,
+                       double yoffset) override {
             if (yoffset > 0) {
                 Key_Event(K_MWHEELUP, true);
                 Key_Event(K_MWHEELUP, false);
-            } else if (xoffset < 0) {
+            } else if (yoffset < 0) {
                 Key_Event(K_MWHEELDOWN, true);
                 Key_Event(K_MWHEELDOWN, false);
             }
+            return true;
+        }
+
+        bool on_char(merian::InputController& /*c*/, unsigned int codepoint) override {
+            if (codepoint >= 32 && codepoint < 127)
+                Char_Event(static_cast<int>(codepoint));
             return true;
         }
     };
@@ -527,6 +529,10 @@ void QuakeScene::cb_QS_worldspawn() {
     SPDLOG_DEBUG("worldspawn");
     parse_worldspawn();
     last_worldspawn_frame = frame;
+
+    MERIAN_PROFILE_SCOPE_GPU(active_cmd, "worldspawn");
+    unload_world();
+    load_world(active_cmd);
 }
 
 void QuakeScene::cb_IN_Move(usercmd_t* cmd) {
@@ -560,13 +566,59 @@ void QuakeScene::cb_IN_Move(usercmd_t* cmd) {
     }
 }
 
+// Fired by R_RenderScene from inside V_RenderView. Extract camera + entity
+// state into the scene graph. active_cmd is the cmd buffer of the current
+// on_update call.
 void QuakeScene::cb_R_RenderScene() {
-    if (!game_running.load()) {
-        throw std::runtime_error{"quit"};
+    last_scene_rendered = scr_drawloading == 0;
+    if (!last_scene_rendered)
+        return;
+
+    if (cl.worldmodel != nullptr) {
+        update_entities(active_cmd);
+        update_animated_materials();
     }
-    render_next = true;
-    sync_gamestate.push(true, 1);
-    g_quake_data.timediff = sync_render.pop();
+    update_camera();
+    update_sky();
+
+    const bool in_game = key_dest == key_game;
+    if (in_game != input_in_game) {
+        input_in_game = in_game;
+        controller->set_mouse_grabbed(in_game);
+        if (window) {
+            if (in_game)
+                window->stop_text_input();
+            else
+                window->start_text_input();
+        }
+        if (input_listener)
+            controller->add_listener(input_listener, in_game ? 100 : 0);
+    }
+}
+
+void QuakeScene::cb_QS_ui_set_canvas(const UICanvas& canvas) {
+    ui_current_canvas = canvas;
+    ui_draw_commands.canvas_events.emplace_back(ui_draw_commands.cmds.size(), canvas);
+}
+
+void QuakeScene::cb_QS_ui_set_scissor(const UIScissor& scissor) {
+    ui_current_scissor = scissor;
+    ui_draw_commands.scissor_events.emplace_back(ui_draw_commands.cmds.size(), scissor);
+}
+
+void QuakeScene::cb_QS_ui_set_color(const uint32_t rgba) {
+    ui_current_color = rgba;
+    ui_draw_commands.color_events.emplace_back(ui_draw_commands.cmds.size(), rgba);
+}
+
+void QuakeScene::cb_QS_ui_push_quad(const UIDrawCmd& cmd) {
+    ui_draw_commands.cmds.push_back(cmd);
+}
+
+void QuakeScene::cb_QS_ui_frame_ready() {
+    ui_draw_commands.width = static_cast<uint32_t>(vid.width);
+    ui_draw_commands.height = static_cast<uint32_t>(vid.height);
+    last_ui_draw_commands = std::make_shared<UIDrawCommands>(std::move(ui_draw_commands));
 }
 
 void QuakeScene::cb_QS_texture_load(gltexture_t* glt, const uint32_t* data) {
@@ -608,46 +660,31 @@ void QuakeScene::on_update(const merian::CommandBufferHandle& cmd,
                            const uint32_t /*frame*/) {
     MERIAN_PROFILE_SCOPE_GPU(cmd, "QuakeScene::on_update");
 
-    if (update_gamestate) {
-        sync_game_thread(time_diff);
-        render_next = render_next && scr_drawloading == 0;
+    if (!update_gamestate)
+        return;
 
-        if (cl.worldmodel != nullptr && this->frame == last_worldspawn_frame) {
-            MERIAN_PROFILE_SCOPE_GPU(cmd, "worldspawn");
-            unload_world();
-            load_world(cmd);
+    {
+        std::lock_guard<std::mutex> lock(pending_commands_mutex);
+        while (!pending_commands.empty()) {
+            Cmd_ExecuteString(pending_commands.front().c_str(), src_command);
+            pending_commands.pop();
         }
-
-        if (!render_next) {
-            this->frame++;
-            return;
-        }
-
-        if (cl.worldmodel != nullptr) {
-            update_entities(cmd);
-            update_animated_materials();
-        }
-        update_camera();
-        update_sky();
-
-        const bool in_game = key_dest == key_game;
-        controller->set_mouse_grabbed(in_game);
-        if (input_listener)
-            controller->add_listener(input_listener, in_game ? 100 : 0);
     }
+
+    active_cmd = cmd;
+    last_scene_rendered = false;
+    // SCR_UpdateScreen may be skipped (vid_hidden, throttle) — clear so a
+    // skipped frame doesn't leak draws into the next.
+    ui_draw_commands.clear();
+    Host_Frame(time_diff);
+    active_cmd.reset();
+
+    this->frame++;
 
     if (stop_after_worldspawn >= 0 &&
         (this->frame - last_worldspawn_frame) == static_cast<uint64_t>(stop_after_worldspawn)) {
         update_gamestate = false;
     }
-
-    this->frame++;
-}
-
-void QuakeScene::sync_game_thread(const float time_diff) {
-    MERIAN_PROFILE_SCOPE("game thread sync");
-    sync_render.push(time_diff, 1);
-    sync_gamestate.pop();
 }
 
 void QuakeScene::update_camera() {
@@ -671,8 +708,6 @@ void QuakeScene::update_camera() {
 }
 
 namespace {
-
-std::mutex quake_cache_mutex;
 
 QuakeMaterial make_brush_material(texture_t* tex, int surf_flags) {
     QuakeMaterial m;
@@ -859,6 +894,22 @@ void QuakeScene::load_world(const merian::CommandBufferHandle& cmd) {
     sv_player = nullptr;
 
     {
+        MERIAN_PROFILE_SCOPE("upload_palette");
+        const auto& tm = get_texture_manager();
+        tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES), d_8to24table,
+                                   256, 1, vk::SamplerAddressMode::eClampToEdge,
+                                   vk::Filter::eNearest, vk::Filter::eNearest, true, false);
+        // fullbright palette hack for rocket trails and explosions
+        std::array<uint32_t, 256> fb_palette{};
+        std::memcpy(fb_palette.data(), d_8to24table_fbright, sizeof(fb_palette));
+        for (uint32_t i = 96; i <= 111; i++)
+            fb_palette[i] = d_8to24table[i];
+        tm->set_texture_from_rgba8(static_cast<merian::TextureID>(MAX_GLTEXTURES + 1),
+                                   fb_palette.data(), 256, 1, vk::SamplerAddressMode::eClampToEdge,
+                                   vk::Filter::eNearest, vk::Filter::eNearest, true, false);
+    }
+
+    {
         MERIAN_PROFILE_SCOPE("load_world_brushes");
         load_world_brushes();
     }
@@ -1004,7 +1055,8 @@ void QuakeScene::update_sky() {
         set_env(env);
     } else if (solidskytexture != nullptr) {
         const merian::TextureID solid = tid(solidskytexture->texnum);
-        const merian::TextureID alpha = alphaskytexture != nullptr ? tid(alphaskytexture->texnum) : tid(0);
+        const merian::TextureID alpha =
+            alphaskytexture != nullptr ? tid(alphaskytexture->texnum) : tid(0);
         auto env = std::make_shared<merian_quake::QuakeClassicSkyEnvMap>(solid, alpha);
         env->set_sun(sun_dir, sun_col);
         set_env(env);
@@ -1235,7 +1287,6 @@ void QuakeScene::update_alias_entity(entity_t* ent,
     current_entity_stats.alias.active++;
 
     auto& mesh = static_cast<AliasInstanceMesh&>(*get_mesh_infos()[slot->mesh_ids[0]].mesh);
-    std::lock_guard<std::mutex> lock(quake_cache_mutex);
     auto* hdr = (aliashdr_t*)Mod_Extradata(ent->model);
 
     if (hdr->numskins > 0) {
@@ -1421,9 +1472,8 @@ void QuakeScene::update_entities(const merian::CommandBufferHandle& cmd) {
                                 mask_override != 0 ? mask_override : to_mask(InstanceMask::ALIAS));
             break;
         case mod_brush:
-            update_brush_entity(ent, cmd,
-                                mask_override != 0 ? mask_override
-                                                   : to_mask(InstanceMask::BRUSH_ENTITY));
+            update_brush_entity(
+                ent, cmd, mask_override != 0 ? mask_override : to_mask(InstanceMask::BRUSH_ENTITY));
             break;
         case mod_sprite:
             // sprite mask is baked on the shared frame mesh at register time
@@ -1560,10 +1610,9 @@ void QuakeScene::properties(merian::Properties& config) {
     }
     const merian::float3 sd =
         overwrite_sun ? overwrite_sun_dir : g_quake_data.current_sun_direction;
-    const merian::float3 sc =
-        overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
-    config.output_text(fmt::format("sun direction: ({}, {}, {})\nsun color: ({}, {}, {})",
-                                   sd.x, sd.y, sd.z, sc.r, sc.g, sc.b));
+    const merian::float3 sc = overwrite_sun ? overwrite_sun_col : g_quake_data.current_sun_color;
+    config.output_text(fmt::format("sun direction: ({}, {}, {})\nsun color: ({}, {}, {})", sd.x,
+                                   sd.y, sd.z, sc.r, sc.g, sc.b));
     config.output_text(fmt::format("view angles {} {} {}", r_refdef.viewangles[0],
                                    r_refdef.viewangles[1], r_refdef.viewangles[2]));
     config.output_text(fmt::format("server fps: {}", server_fps));
