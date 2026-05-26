@@ -256,11 +256,13 @@ class QuakeScene : public merian::Scene {
     };
     std::unordered_map<mspriteframe_t*, SpriteFrameInfo> sprite_frame_info;
 
-    // mod_alias / mod_brush own their per-entity meshes; mod_sprite shares from sprite_frame_info.
+    // owns_meshes=false marks sprite slots whose mesh is shared via sprite_frame_info.
     struct EntityMeshSlot {
         merian::Scene::NodeID node_id = merian::Scene::NODE_ID_INVALID;
         merian::SmallVector<merian::Scene::MeshID, 1> mesh_ids;
+        // Opaque identity for migration — never dereferenced (may dangle after Mod_ResetAll).
         qmodel_t* model = nullptr;
+        bool owns_meshes = true;
 
         mspriteframe_t* cached_sprite_frame = nullptr;
 

@@ -1191,14 +1191,12 @@ void QuakeScene::init_particle_batch() {
 // --- Per-entity slot management ---
 
 void QuakeScene::destroy_slot(EntityMeshSlot& slot) {
-    // mod_alias / mod_brush own their per-entity meshes; mod_sprite shares
-    // from sprite_frame_info — only detach the instance.
-    if (slot.model != nullptr && slot.model->type == mod_sprite) {
-        if (!slot.mesh_ids.empty() && slot.node_id != merian::Scene::NODE_ID_INVALID)
-            remove_mesh_instance(slot.mesh_ids[0], slot.node_id);
-    } else {
+    if (slot.owns_meshes) {
         for (const merian::Scene::MeshID id : slot.mesh_ids)
             remove_mesh(id);
+    } else if (slot.node_id != merian::Scene::NODE_ID_INVALID) {
+        for (const merian::Scene::MeshID id : slot.mesh_ids)
+            remove_mesh_instance(id, slot.node_id);
     }
     if (slot.node_id != merian::Scene::NODE_ID_INVALID)
         remove_node(slot.node_id);
