@@ -495,8 +495,8 @@ void QuakeScene::register_input_listener(const merian::InputControllerHandle& co
             return true;
         }
 
-        bool on_scroll(merian::InputController& /*c*/, double /*xoffset*/,
-                       double yoffset) override {
+        bool
+        on_scroll(merian::InputController& /*c*/, double /*xoffset*/, double yoffset) override {
             if (yoffset > 0) {
                 Key_Event(K_MWHEELUP, true);
                 Key_Event(K_MWHEELUP, false);
@@ -1259,8 +1259,7 @@ void QuakeScene::update_alias_entity(entity_t* ent,
         auto mesh = std::make_unique<AliasInstanceMesh>();
         mesh->name = fmt::format("alias:{}", ent->model->name);
         mesh->material_id = material_id;
-        mesh->flags =
-            merian::Scene::MeshFlags::IsMorphed | merian::Scene::MeshFlags::FlipFacing;
+        mesh->flags = merian::Scene::MeshFlags::IsMorphed | merian::Scene::MeshFlags::FlipFacing;
         mesh->instance_mask = instance_mask;
         mesh->vb_staging = std::move(vb);
         mesh->prev_vb_staging = std::move(prev_vb);
