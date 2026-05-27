@@ -209,7 +209,7 @@ struct QuakeMaterial : MaterialModel {
 
         // Albedo / Emission
         float2 uv = sd.uv;
-        if (flags & MAT_TYPE_WARP) {
+        if ((flags & MAT_TYPE_WARP) != 0u) {
             uv = quake_warp(uv, sd.time);
             if (flags == MAT_TYPE_WATER) {
                 uv += quake_waves(uv, sd.time);
