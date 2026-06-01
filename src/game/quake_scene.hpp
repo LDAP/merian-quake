@@ -1,18 +1,18 @@
 #pragma once
 
-#include "game/quake_material.hpp"
 #include "game/quake_draw.hpp"
+#include "game/quake_material.hpp"
 
 #include "merian-shaders/scene/scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/concurrent/concurrent_queue.hpp"
 #include "merian/utils/input_controller.hpp"
 #include "merian/utils/input_controller_dummy.hpp"
-#include "merian/vk/window/window.hpp"
 #include "merian/utils/input_listener.hpp"
 #include "merian/utils/properties.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/utils/profiler.hpp"
+#include "merian/vk/window/window.hpp"
 
 #include <atomic>
 #include <queue>
@@ -193,26 +193,14 @@ class QuakeScene : public merian::Scene {
     };
     std::unordered_map<TexFlagsKey, BrushSurfaceBucket, TexFlagsKeyHash>
     collect_brush_surfaces(qmodel_t* mod);
-    // Lookup-or-create; only pushes onto animated_brush_materials on creation.
-    merian::MaterialID register_brush_material(texture_t* tex, int surf_flags);
 
-    // Shared by worldmodel and submodels (textures are model-private but the
-    // same texture_t* gets re-used across submodels of the same map).
-    std::unordered_map<TexFlagsKey, merian::MaterialID, TexFlagsKeyHash> material_id_for_tex;
-
-    // R_TextureAnimation resolves the current frame each tick; we re-pack the
-    // material when the resolved texnum changes so geometry isn't rebaked.
+    // Per-owner so each brush entity's `frame` can resolve independently.
     struct AnimatedBrushMaterial {
         merian::MaterialID material_id;
         texture_t* base_tex;
-        merian::TextureID fb_texnum;
-        merian::TextureID normal_texnum;
-        merian::TextureID gloss_texnum;
-        uint16_t surface_flags;
-        uint8_t alpha_mode;
-        merian::TextureID current_base_texnum;
+        int surf_flags;
     };
-    std::vector<AnimatedBrushMaterial> animated_brush_materials;
+    std::vector<AnimatedBrushMaterial> world_animated_materials;
 
     // Per-model info built at worldspawn; stable across frames.
     struct AliasModelInfo {
@@ -231,7 +219,8 @@ class QuakeScene : public merian::Scene {
         merian::BufferHandle ib;
         uint32_t vertex_count;
         uint32_t primitive_count;
-        merian::MaterialID material_id;
+        texture_t* tex;
+        int surf_flags;
         bool has_alpha;
     };
     std::unordered_map<qmodel_t*, std::vector<BrushSubmodelGeoPart>> brush_submodel_geo;
@@ -263,6 +252,9 @@ class QuakeScene : public merian::Scene {
         // Opaque identity for migration — never dereferenced (may dangle after Mod_ResetAll).
         qmodel_t* model = nullptr;
         bool owns_meshes = true;
+
+        // Empty for non-brush slots.
+        std::vector<AnimatedBrushMaterial> animated_materials;
 
         mspriteframe_t* cached_sprite_frame = nullptr;
 

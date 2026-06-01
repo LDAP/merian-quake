@@ -377,9 +377,9 @@ QuakeScene::QuakeScene(const merian::ShaderCompileContextHandle& compile_context
         QUAKE_MATERIAL_SLANG_TYPE_NAME, QUAKE_MATERIAL_SLANG_MODULE_PATH);
     material_system->set_alpha_test_threshold(0.7F);
 
-    auto cam = std::make_shared<merian::Camera>(merian::float3(1, 0, 0), merian::float3(0, 0, 0),
-                                                get_up(), merian::radians(60.F), 16.F / 9.F, 0.01F,
-                                                1e5f);
+    auto cam =
+        std::make_shared<merian::Camera>(merian::float3(1, 0, 0), merian::float3(0, 0, 0), get_up(),
+                                         merian::radians(60.F), 16.F / 9.F, 0.01F, 1e5f);
     quake_camera = add_camera(std::move(cam));
 
     // Quake
@@ -868,9 +868,8 @@ void QuakeScene::unload_world() {
         world_node_id = merian::Scene::NODE_ID_INVALID;
     }
 
-    material_id_for_tex.clear();
     material_id_for_alias_skin.clear();
-    animated_brush_materials.clear();
+    world_animated_materials.clear();
 
     for (auto& [_, info] : alias_model_info)
         defer_buffer_release(std::move(info.index_buffer));
@@ -972,23 +971,6 @@ QuakeScene::collect_brush_surfaces(qmodel_t* mod) {
     return buckets;
 }
 
-merian::MaterialID QuakeScene::register_brush_material(texture_t* tex, int surf_flags) {
-    const TexFlagsKey key{tex, surf_flags};
-    if (const auto it = material_id_for_tex.find(key); it != material_id_for_tex.end())
-        return it->second;
-
-    const QuakeMaterial mat = make_brush_material(tex, surf_flags);
-    const auto material_id = get_material_system()->add_material(quake_material_type_id, mat);
-    material_id_for_tex.emplace(key, material_id);
-    if (tex->anim_total > 0) {
-        animated_brush_materials.push_back({material_id, tex, mat.payload.fullbright_tex,
-                                            mat.payload.normal_tex, mat.payload.gloss_tex,
-                                            mat.payload.surface_flags, mat.payload.alpha_mode,
-                                            mat.header.alpha_texture_id});
-    }
-    return material_id;
-}
-
 void QuakeScene::load_world_brushes() {
     if (cl.worldmodel == nullptr)
         return;
@@ -1003,12 +985,16 @@ void QuakeScene::load_world_brushes() {
 
     auto buckets = collect_brush_surfaces(world);
 
+    const auto& material_system = get_material_system();
     for (auto& [key, bucket] : buckets) {
         if (bucket.indices.empty())
             continue;
 
+        const QuakeMaterial mat = make_brush_material(bucket.tex, bucket.surf_flags);
         const merian::MaterialID material_id =
-            register_brush_material(bucket.tex, bucket.surf_flags);
+            material_system->add_material(quake_material_type_id, mat);
+        if (bucket.tex->anim_total > 0)
+            world_animated_materials.push_back({material_id, bucket.tex, bucket.surf_flags});
 
         auto mesh = std::make_unique<QuakeBrushMesh>();
         mesh->name =
@@ -1032,7 +1018,7 @@ void QuakeScene::load_world_brushes() {
     }
 
     SPDLOG_DEBUG("static world: {} partitions, {} surfaces, {} animated materials", buckets.size(),
-                 world->nummodelsurfaces, animated_brush_materials.size());
+                 world->nummodelsurfaces, world_animated_materials.size());
 }
 
 void QuakeScene::update_sky() {
@@ -1362,8 +1348,6 @@ void QuakeScene::update_brush_entity(entity_t* ent,
         for (auto& [key, bucket] : buckets) {
             if (bucket.indices.empty())
                 continue;
-            const merian::MaterialID material_id =
-                register_brush_material(bucket.tex, bucket.surf_flags);
             auto vb = alloc->create_buffer(cmd, bucket.vertices, buf_usage,
                                            fmt::format("brush_vb:{}", ent->model->name));
             auto ib = alloc->create_buffer(cmd, bucket.indices, buf_usage,
@@ -1372,7 +1356,8 @@ void QuakeScene::update_brush_entity(entity_t* ent,
                                    (bucket.tex->gltexture->flags & TEXPREF_ALPHA) != 0u;
             parts.push_back({std::move(vb), std::move(ib),
                              static_cast<uint32_t>(bucket.vertices.size()),
-                             static_cast<uint32_t>(bucket.indices.size()), material_id, has_alpha});
+                             static_cast<uint32_t>(bucket.indices.size()), bucket.tex,
+                             bucket.surf_flags, has_alpha});
         }
         geo_it = brush_submodel_geo.find(ent->model);
     }
@@ -1390,10 +1375,17 @@ void QuakeScene::update_brush_entity(entity_t* ent,
         fresh.node_id = node_id;
         fresh.model = ent->model;
 
+        const auto& material_system = get_material_system();
         for (const auto& part : geo_it->second) {
+            const QuakeMaterial mat = make_brush_material(part.tex, part.surf_flags);
+            const merian::MaterialID material_id =
+                material_system->add_material(quake_material_type_id, mat);
+            if (part.tex->anim_total > 0)
+                fresh.animated_materials.push_back({material_id, part.tex, part.surf_flags});
+
             auto mesh = std::make_unique<BrushEntityMesh>();
-            mesh->name = fmt::format("brush:{}:{}", ent->model->name, part.material_id);
-            mesh->material_id = part.material_id;
+            mesh->name = fmt::format("brush:{}:{}", ent->model->name, material_id);
+            mesh->material_id = material_id;
             mesh->flags = merian::Scene::MeshFlags::FlipFacing;
             if (!part.has_alpha)
                 mesh->flags = mesh->flags | merian::Scene::MeshFlags::IsOpaque;
@@ -1528,29 +1520,22 @@ void QuakeScene::update_particles() {
 }
 
 void QuakeScene::update_animated_materials() {
-    if (animated_brush_materials.empty())
-        return;
-
     const auto& material_system = get_material_system();
-    for (auto& entry : animated_brush_materials) {
-        // worldspawn brushes use frame=0; alternate anims are entity-driven
-        const texture_t* current = R_TextureAnimation(entry.base_tex, 0);
-        const merian::TextureID current_texnum =
-            current->gltexture != nullptr
-                ? static_cast<merian::TextureID>(current->gltexture->texnum)
-                : entry.current_base_texnum;
-        if (current_texnum == entry.current_base_texnum)
-            continue;
-
-        QuakeMaterial mat;
-        mat.header.alpha_texture_id = current_texnum;
-        mat.payload.fullbright_tex = entry.fb_texnum;
-        mat.payload.normal_tex = entry.normal_texnum;
-        mat.payload.gloss_tex = entry.gloss_texnum;
-        mat.payload.surface_flags = entry.surface_flags;
-        mat.payload.alpha_mode = entry.alpha_mode;
+    const auto resolve = [&](const AnimatedBrushMaterial& entry, int frame) {
+        texture_t* current = R_TextureAnimation(entry.base_tex, frame);
+        const QuakeMaterial mat = make_brush_material(current, entry.surf_flags);
         material_system->update_material(entry.material_id, mat);
-        entry.current_base_texnum = current_texnum;
+    };
+
+    for (const auto& entry : world_animated_materials)
+        resolve(entry, 0);
+
+    // ent->frame picks the +0… vs +a… alt-anim set for togglable brush entities.
+    for (auto& [ent, slot] : entity_slots) {
+        if (slot.animated_materials.empty())
+            continue;
+        for (const auto& entry : slot.animated_materials)
+            resolve(entry, ent->frame);
     }
 }
 
