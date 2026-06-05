@@ -3,6 +3,7 @@
 
 import merian_shaders.shading.materials.material;
 import merian_shaders.shading.bsdfs.brdf_lambert_diffuse;
+import merian_shaders.utils.normal_map;
 
 #include "shader/quake-material.slangh"
 
@@ -196,8 +197,14 @@ struct QuakeMaterial : MaterialModel {
         QuakeMaterialSample s;
         if (normal_tex != TextureID(-1)) {
             const float3 n = (tm.get_sampler2D(normal_tex).SampleLevel(sd.uv, 0).rgb - 0.5) * 2;
-            // TODO: n = clamp_to_geo(n, n_geo, wi);
-            s.frame = sd.frame.apply_normal_map(n);
+            const OrthonormalFrame mapped = sd.frame.apply_normal_map(n);
+            if (merian_hint_clamp_normals) {
+                const float3 clamped_n =
+                    keller_clamp_normal(mapped.get_normal(), sd.face_normal, sd.wi);
+                s.frame = OrthonormalFrame(clamped_n, mapped.get_tangent());
+            } else {
+                s.frame = mapped;
+            }
         } else {
             s.frame = sd.frame;
         }
