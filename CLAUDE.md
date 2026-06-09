@@ -18,21 +18,20 @@ Enable tests: `meson configure build -Dmerian:tests=true`
 Run one: `build/subprojects/merian/tests/test-<name>` (e.g. `test-small-vector`)
 
 # Coding style
+ Expect the code to be only read by expecienced (graphics)programmers. 
 
  Comments
   - Single short line is the default; multi-line walls of text are out. If the explanation needs a
   paragraph, the code probably needs restructuring instead.
   - Explain why, never what. Identifier names already say what. Don't mention implementation details users of a function, class or interface!
+  - Don't explain usage of well known concepts, for example: "Aliased so switching to a different microfacet model is a one-line change at the call sites." is not necessary because the using / typealias definition makes it clear.
   - Inside long methods, label sub-sections with one-liner comments (// 1. ..., // upload prev vertices)
   — never banner separators.
   - File-level major dividers (// --- Section ---) are allowed sparingly for the obvious lifecycle splits
    (constructor / building / update). Don't multiply them.
   - Drop comments that just point to commit history, removed files, or the old pipeline (e.g. "matches 
-  the legacy motion-vector computation in quake_helpers.cpp").
-  - Keep TODOs as commented-out future code when the code is the clearest spec for the deferred work;
-  otherwise delete.
-  - Do NOT comment about how subclasses might override, design alternatives considered, or future intent.
-   That belongs in the PR, not the code.
+  the legacy motion-vector computation in...") or which reference a concrete implementation in an abstract class or interface.
+  - I.e. Do NOT comment about how subclasses might override, design alternatives considered, or future intent.
 
 
   Naming

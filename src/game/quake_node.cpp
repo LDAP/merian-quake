@@ -22,7 +22,7 @@ void QuakeNode::initialize(const merian::ContextHandle& context,
     assert(this->context == nullptr && "QuakeNode was initialized multiple times.");
     this->context = context;
     this->allocator = allocator;
-    compile_context = merian::ShaderCompileContext::create(context);
+    compile_context = context->get_shader_compile_context();
     texture_manager = std::make_shared<merian::TextureManager>(compile_context, context, allocator,
                                                                MAX_GLTEXTURES);
     material_system = std::make_shared<merian::MaterialSystem>(compile_context, context, allocator,
