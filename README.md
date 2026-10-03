@@ -1,3 +1,7 @@
+⚠️ Legacy project
+
+This project is no longer actively maintained. For a newer and improved version with UI support, please check out the [Quake plugin for merian](https://github.com/LDAP/merian-plugin-quake).
+ 
 # Merian-Quake
 
 A path-tracer for the original Quake game on top of [quakespasm](https://github.com/sezero/quakespasm) and [Merian](https://github.com/LDAP/merian).
